@@ -1,5 +1,5 @@
 // HM Tracker - Training Data
-function getDayDate(s,dow){const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+dow);return d.toISOString().substring(0,10)}
+function getDayDate(s,dow){const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+dow);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 
 const RACE={date:'2026-09-05',name:'Wizz Air Praski Night Half Marathon',target:'1:44:30 - 1:45:00',pace:'4:58 min/km'};
 
