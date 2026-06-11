@@ -149,7 +149,7 @@ function rPlan(){
 function toggleDay(wi,di){document.getElementById('dc-'+wi+'-'+di).classList.toggle('exp')}
 function setFeeling(wi,di,f){document.querySelectorAll('#lf-'+wi+'-'+di+' .fb').forEach(b=>b.classList.remove('act'));document.querySelector('#lf-'+wi+'-'+di+' .fb[data-f="'+f+'"]').classList.add('act')}
 function setStatus(wi,di,st){const w=PLAN[wi],d=w.days[di],dt=getDayDate(w.start,d.dow);const log=S.getLog(dt);log.status=log.status===st?'':st;S.setLog(dt,log);rPlan()}
-function saveLog(wi,di){const w=PLAN[wi],d=w.days[di],dt=getDayDate(w.start,d.dow);const dist=document.getElementById('ld-'+wi+'-'+di).value;const pace=document.getElementById('lp-'+wi+'-'+di).value;const hr=document.getElementById('lh-'+wi+'-'+di).value;const notes=document.getElementById('ln-'+wi+'-'+di).value;const fb=document.querySelector('#lf-'+wi+'-'+di+' .fb.act');const feeling=fb?fb.dataset.f:'';S.setLog(dt,{distance:dist,pace:pace,hr:hr,feeling:feeling,notes:notes,status:'done'});toast('Trening zapisany! \uD83D\uDCAA');rPlan()}
+function saveLog(wi,di){const w=PLAN[wi],d=w.days[di],dt=getDayDate(w.start,d.dow);const dist=document.getElementById('ld-'+wi+'-'+di).value;const pace=document.getElementById('lp-'+wi+'-'+di).value;const hr=document.getElementById('lh-'+wi+'-'+di).value;const notes=document.getElementById('ln-'+wi+'-'+di).value;const fb=document.querySelector('#lf-'+wi+'-'+di+' .fb.act');const feeling=fb?fb.dataset.f:'';S.setLog(dt,{distance:dist,pace:pace,hr:hr,feeling:feeling,notes:notes,status:'done'});TL.update();toast('Trening zapisany! \uD83D\uDCAA');rPlan()}
 
 // ─── NUTRITION ───
 let nutrTab='today';
@@ -180,6 +180,7 @@ function rStat(){
   const el=document.getElementById('s-stat');
   const t=today();
   let h=`<h1>Statystyki</h1><p class="sub">Postepy treningowe</p>`;
+  setTimeout(()=>{Charts.weeklyKm('ch1');Charts.paceTrend('ch2');Charts.feelingTrend('ch3');Charts.monthlyVol('ch4');Charts.trainingLoad('ch-tl');Charts.predTrend('ch-pred')},100);
 
   // ═══ HEAT MAP ═══
   h+=`<div class="hmap"><div class="hmap-title">\uD83D\uDFE9 Mapa aktywnosci (13 tygodni)</div>`;
@@ -205,6 +206,12 @@ function rStat(){
   h+=`<div class="hmap-leg"><div class="hmap-li"><div class="hmap-lc" style="background:var(--g)"></div>Wykonany</div><div class="hmap-li"><div class="hmap-lc" style="background:var(--o)"></div>Brak logu</div><div class="hmap-li"><div class="hmap-lc" style="background:var(--r)"></div>Pominiety</div><div class="hmap-li"><div class="hmap-lc" style="background:var(--c3);opacity:.3"></div>Rest</div><div class="hmap-li"><div class="hmap-lc" style="background:var(--c2);border:.5px solid var(--c3)"></div>Przyszlosc</div></div>`;
   h+=`</div>`;
 
+  // ═══ TRAINING LOAD CHART (Sprint 2) ═══
+  h+=`<div class="chc"><div class="ch-t">\u2764\uFE0F\u200D\uD83D\uDD25 Training Load (CTL / ATL / TSB)</div><canvas id="ch-tl"></canvas></div>`;
+
+  // ═══ PREDICTOR TREND (Sprint 2) ═══
+  h+=`<div class="chc"><div class="ch-t">\uD83C\uDFAF Prognoza polmaratonu - trend</div><canvas id="ch-pred"></canvas></div>`;
+
   // CHARTS
   h+=`<div class="chc"><div class="ch-t">\uD83D\uDCCA Km tygodniowy (plan vs realizacja)</div><canvas id="ch1"></canvas></div>`;
   h+=`<div class="chc"><div class="ch-t">\u23F1\uFE0F Trend tempa</div><canvas id="ch2"></canvas></div>`;
@@ -217,7 +224,7 @@ function rStat(){
 // ─── SETTINGS ───
 function rSett(){
   const el=document.getElementById('s-sett');const set=S.getSettings();
-  el.innerHTML=`<h1>Ustawienia</h1><p class="sub">Konfiguracja</p><div class="ss"><div class="stit">Dane osobowe</div><div class="card"><div class="lf"><div class="fr"><div class="fg"><label>Waga (kg)</label><input type="number" id="sw" value="${set.weight||75}"></div><div class="fg"><label>Spoczynkowe HR</label><input type="number" id="srhr" value="${set.rhr||50}"></div></div><button class="bsv" onclick="S.setSettings({weight:+document.getElementById('sw').value,rhr:+document.getElementById('srhr').value});toast('Zapisano!')">Zapisz</button></div></div></div><div class="ss"><div class="stit">Strava</div><div class="card"><p style="font-size:13px;color:var(--fg2);margin-bottom:12px">${Strava.isConnected()?'\u2705 Polaczono ze Strava':'Polacz konto Strava aby importowac treningi.'}</p>${Strava.isConnected()?`<button class="btns" onclick="syncStr()">\uD83D\uDD04 Synchronizuj</button><button class="btnd" onclick="Strava.disconnect();rSett();toast('Rozlaczono')">Rozlacz</button>`:`<button class="btn-str" onclick="Strava.authorize()">Polacz ze Strava</button>`}</div></div><div class="ss"><div class="stit">Dane</div><button class="btns" onclick="exportData()">\uD83D\uDCE4 Eksportuj (JSON)</button><button class="btnd" onclick="if(confirm('Na pewno?')){S.clearAll();toast('Usunieto');rSett()}">\uD83D\uDDD1\uFE0F Usun dane</button></div><div class="ainfo"><p>HM Tracker v3.0 (Sprint 1)</p><p>Sub 1:45 \uD83C\uDFC3</p></div>`;
+  el.innerHTML=`<h1>Ustawienia</h1><p class="sub">Konfiguracja</p><div class="ss"><div class="stit">Dane osobowe</div><div class="card"><div class="lf"><div class="fr"><div class="fg"><label>Waga (kg)</label><input type="number" id="sw" value="${set.weight||75}"></div><div class="fg"><label>Spoczynkowe HR</label><input type="number" id="srhr" value="${set.rhr||50}"></div></div><button class="bsv" onclick="S.setSettings({weight:+document.getElementById('sw').value,rhr:+document.getElementById('srhr').value});TL.update();toast('Zapisano!')">Zapisz</button></div></div></div><div class="ss"><div class="stit">Strava</div><div class="card"><p style="font-size:13px;color:var(--fg2);margin-bottom:12px">${Strava.isConnected()?'\u2705 Polaczono ze Strava':'Polacz konto Strava aby importowac treningi.'}</p>${Strava.isConnected()?`<button class="btns" onclick="syncStr()">\uD83D\uDD04 Synchronizuj</button><button class="btnd" onclick="Strava.disconnect();rSett();toast('Rozlaczono')">Rozlacz</button>`:`<button class="btn-str" onclick="Strava.authorize()">Polacz ze Strava</button>`}</div></div><div class="ss"><div class="stit">Dane</div><button class="btns" onclick="exportData()">\uD83D\uDCE4 Eksportuj (JSON)</button><button class="btnd" onclick="if(confirm('Na pewno?')){S.clearAll();toast('Usunieto');rSett()}">\uD83D\uDDD1\uFE0F Usun dane</button></div><div class="ainfo"><p>HM Tracker v3.0 (Sprint 1)</p><p>Sub 1:45 \uD83C\uDFC3</p></div>`;
 }
 async function syncStr(){toast('Synchronizuje...');const n=await Strava.syncWorkouts();toast(n>0?`Zsynchronizowano ${n} treningow!`:'Brak nowych');rPlan()}
 function exportData(){const d=S.exportAll();const b=new Blob([d],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='hm-tracker-backup.json';a.click();toast('Wyeksportowano!')}
