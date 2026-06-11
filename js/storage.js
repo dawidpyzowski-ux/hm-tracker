@@ -1,0 +1,15 @@
+const S={P:'hm_',
+g(k){try{return JSON.parse(localStorage.getItem(this.P+k))}catch{return null}},
+s(k,v){localStorage.setItem(this.P+k,JSON.stringify(v))},
+getLog(d){return this.g('l_'+d)||{}},
+setLog(d,v){this.s('l_'+d,v)},
+getAllLogs(){const o={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k.startsWith(this.P+'l_')){o[k.replace(this.P+'l_','')]=JSON.parse(localStorage.getItem(k))}}return o},
+getSettings(){return this.g('set')||{weight:75}},
+setSettings(v){this.s('set',v)},
+getStravaTokens(){return this.g('str')},
+setStravaTokens(v){this.s('str',v)},
+getChecklist(){return this.g('cl')||{}},
+setChecklist(v){this.s('cl',v)},
+exportAll(){const o={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k.startsWith(this.P))o[k]=localStorage.getItem(k)}return JSON.stringify(o,null,2)},
+clearAll(){const ks=[];for(let i=0;i<localStorage.length;i++){if(localStorage.key(i).startsWith(this.P))ks.push(localStorage.key(i))}ks.forEach(k=>localStorage.removeItem(k))}
+};
