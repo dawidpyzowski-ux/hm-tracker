@@ -201,3 +201,37 @@ h1{font-size:28px;font-weight:700;padding:48px 0 4px;letter-spacing:-.3px}
 .tl-msg.yellow{background:rgba(255,159,10,.08);color:var(--o)}
 .tl-msg.red{background:rgba(255,69,58,.08);color:var(--r)}
 
+
+/* ═══ SPRINT 3: SHOE TRACKER ═══ */
+.shoe-card{background:var(--c1);border-radius:10px;padding:14px;margin-bottom:8px;border:.5px solid var(--bd)}
+.shoe-head{display:flex;justify-content:space-between;align-items:center}
+.shoe-name{font-size:15px;font-weight:600}
+.shoe-type{font-size:11px;color:var(--fg2);background:var(--c2);padding:2px 8px;border-radius:10px}
+.shoe-km{font-size:13px;color:var(--g);margin-top:4px}
+.shoe-bar{background:var(--c2);border-radius:6px;height:8px;overflow:hidden;margin-top:6px}
+.shoe-fill{height:100%;border-radius:6px;transition:width .4s}
+.shoe-fill.ok{background:var(--g)}.shoe-fill.warn{background:var(--o)}.shoe-fill.danger{background:var(--r)}
+.shoe-max{font-size:11px;color:var(--fg3);margin-top:4px;text-align:right}
+.shoe-alert{font-size:12px;color:var(--o);margin-top:6px}
+.shoe-actions{display:flex;gap:6px;margin-top:8px}
+.shoe-actions button{padding:6px 12px;border-radius:8px;border:1px solid var(--bd);background:transparent;color:var(--fg2);font-size:11px;cursor:pointer}
+.shoe-add{display:flex;gap:8px;margin-bottom:12px}
+.shoe-add input,.shoe-add select{flex:1;background:var(--bg);border:.5px solid var(--bd);border-radius:8px;color:var(--fg);padding:10px;font-size:14px}
+.shoe-select{background:var(--bg);border:.5px solid var(--bd);border-radius:8px;color:var(--fg);padding:8px;font-size:13px;width:100%;margin-top:6px}
+
+/* ═══ SPRINT 3: STRENGTH TRAINING ═══ */
+.str-card{background:var(--c1);border-radius:var(--rad);padding:16px;margin-bottom:12px;border:.5px solid var(--bd)}
+.str-title{font-size:14px;font-weight:600;margin-bottom:12px}
+.str-ex{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:.5px solid var(--bd)}
+.str-ex:last-child{border-bottom:none}
+.str-ex-name{font-size:14px;font-weight:500}
+.str-ex-target{font-size:12px;color:var(--fg2)}
+.str-sets{display:flex;gap:4px}
+.str-dot{width:24px;height:24px;border-radius:50%;border:2px solid var(--bd);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .2s}
+.str-dot.done{background:var(--g);border-color:var(--g);color:#000}
+.str-done-msg{text-align:center;padding:12px;color:var(--g);font-weight:600;font-size:14px}
+.str-timer{text-align:center;margin-top:12px}
+.str-timer-btn{padding:10px 24px;border-radius:10px;border:none;background:var(--b);color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+.str-timer-display{font-size:28px;font-weight:700;color:var(--b);margin-top:8px}
+.str-week{font-size:12px;color:var(--fg2);margin-top:4px}
+
