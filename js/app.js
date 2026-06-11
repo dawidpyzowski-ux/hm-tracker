@@ -179,7 +179,7 @@ function toggleCheck(i,v){const cl=S.getChecklist();cl[i]=v;S.setChecklist(cl)}
 function rStat(){
   const el=document.getElementById('s-stat');
   const t=today();
-  let h=`<h1>Statystyki</h1><p class="sub">Postepy treningowe</p>`;
+  TL.update();let h=`<h1>Statystyki</h1><p class="sub">Postepy treningowe</p>`;
   setTimeout(()=>{Charts.weeklyKm('ch1');Charts.paceTrend('ch2');Charts.feelingTrend('ch3');Charts.monthlyVol('ch4');Charts.trainingLoad('ch-tl');Charts.predTrend('ch-pred')},100);
 
   // ═══ HEAT MAP ═══
