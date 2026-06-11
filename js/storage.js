@@ -1,3 +1,4 @@
+
 const S={P:'hm_',
 g(k){try{return JSON.parse(localStorage.getItem(this.P+k))}catch{return null}},
 s(k,v){localStorage.setItem(this.P+k,JSON.stringify(v))},
@@ -12,10 +13,14 @@ getChecklist(){return this.g('cl')||{}},
 setChecklist(v){this.s('cl',v)},
 getRecovery(d){return this.g('r_'+d)||null},
 setRecovery(d,v){this.s('r_'+d,v)},
-         
 getTL(){return this.g('tl')||null},
 setTL(v){this.s('tl',v)},
-
+getShoes(){return this.g('shoes')||[]},
+setShoes(v){this.s('shoes',v)},
+getShoeLog(d){return this.g('sl_'+d)||null},
+setShoeLog(d,v){this.s('sl_'+d,v)},
+getStrength(d){return this.g('st_'+d)||null},
+setStrength(d,v){this.s('st_'+d,v)},
 exportAll(){const o={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k.startsWith(this.P))o[k]=localStorage.getItem(k)}return JSON.stringify(o,null,2)},
 clearAll(){const ks=[];for(let i=0;i<localStorage.length;i++){if(localStorage.key(i).startsWith(this.P))ks.push(localStorage.key(i))}ks.forEach(k=>localStorage.removeItem(k))}
 };
