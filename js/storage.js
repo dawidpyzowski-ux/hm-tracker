@@ -12,6 +12,10 @@ getChecklist(){return this.g('cl')||{}},
 setChecklist(v){this.s('cl',v)},
 getRecovery(d){return this.g('r_'+d)||null},
 setRecovery(d,v){this.s('r_'+d,v)},
+         
+getTL(){return this.g('tl')||null},
+setTL(v){this.s('tl',v)},
+
 exportAll(){const o={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k.startsWith(this.P))o[k]=localStorage.getItem(k)}return JSON.stringify(o,null,2)},
 clearAll(){const ks=[];for(let i=0;i<localStorage.length;i++){if(localStorage.key(i).startsWith(this.P))ks.push(localStorage.key(i))}ks.forEach(k=>localStorage.removeItem(k))}
 };
