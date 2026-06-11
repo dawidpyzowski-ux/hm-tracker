@@ -50,6 +50,22 @@ async function rDash(){
     h+=`</div><button class="rform-save" onclick="saveRecovery()">Zapisz</button></div></div>`;
   }
 
+  // ═══ RACE PREDICTOR (Sprint 2) ═══
+  TL.update();
+  const pred=Pred.getCurrent();
+  if(pred){
+    const trendIcon=pred.trend==='up'?'\u2B06\uFE0F':pred.trend==='down'?'\u2B07\uFE0F':'\u27A1\uFE0F';
+    const trendCls=pred.trend==='up'?'up':pred.trend==='down'?'down':'';
+    h+=`<div class="pred-card"><div class="pred-head"><span class="pred-label">\uD83C\uDFAF Prognoza polmaratonu</span><span class="pred-trend ${trendCls}">${trendIcon}${pred.prevFmt?' vs '+pred.prevFmt:''}</span></div><div class="pred-time">${pred.formatted}</div><div class="pred-pace">${pred.pace} min/km \u2022 na podstawie ${pred.fromDist} km @ ${pred.fromPace}</div><div class="pred-bar"><div class="pred-fill" style="width:${pred.pct}%"></div></div><div class="pred-target">Cel: ${Pred.fmtTime(Pred.TARGET)} \u2022 ${pred.pct}% gotowosci</div></div>`;
+  }
+
+  // ═══ TRAINING LOAD (Sprint 2) ═══
+  const fit=TL.get();
+  if(fit.history.length){
+    const tc=TL.tsbColor(fit.tsb),tl=TL.tsbLabel(fit.tsb);
+    h+=`<div class="tl-card"><div class="tl-head">\u2764\uFE0F\u200D\uD83D\uDD25 Forma treningowa</div><div class="tl-row"><div class="tl-item"><div class="tl-val green">${fit.ctl}</div><div class="tl-lab">Fitness (CTL)</div></div><div class="tl-item"><div class="tl-val red">${fit.atl}</div><div class="tl-lab">Zmeczenie (ATL)</div></div><div class="tl-item"><div class="tl-val ${tc}">${fit.tsb>0?'+':''}${fit.tsb}</div><div class="tl-lab">Forma (TSB)</div></div></div><div class="tl-msg ${tc}">${tl}</div></div>`;
+  }
+
   // ═══ TODAY'S WORKOUT ═══
   if(td){
     const cls=td.rest?'rest':td.race?'race-day':'';
