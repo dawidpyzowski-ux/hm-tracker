@@ -3,7 +3,7 @@ let CUR='dash', WI=0;
 const EMO=['','😫','😣','😕','😐','🙂','😊','😄','😃','🤩','🔥'];
 const TAGS={baza:'#0A84FF',budowa:'#BF5AF2',szczyt:'#FF9F0A',peak:'#FF453A',deload:'#30D158',taper:'#64D2FF',race:'#FF453A'};
 
-function today(){return new Date().toISOString().substring(0,10)}
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function fmtD(s){const p=s.split('-');return p[2]+'.'+p[1]}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
 
