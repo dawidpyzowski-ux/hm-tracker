@@ -1,6 +1,15 @@
 // HM Tracker - Training Data
 function getDayDate(s,dow){const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+dow);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 
+function calcRecovery(sleep,rhr,soreness,energy){
+  const base=S.getSettings().rhr||50;
+  const a=(sleep/5)*30;
+  const b=Math.max(0,Math.min(25,(1-(rhr-base)/15)*25));
+  const c=(1-soreness/2)*20;
+  const d=(energy/5)*25;
+  return Math.round(a+b+c+d);
+}
+
 const RACE={date:'2026-09-05',name:'Wizz Air Praski Night Half Marathon',target:'1:44:30 - 1:45:00',pace:'4:58 min/km'};
 
 const ZONES=[{sym:'R',name:'Recovery',pace:'6:50-7:15',usage:'Regeneracja'},{sym:'E',name:'Easy',pace:'6:15-6:40',usage:'Baza aerobowa'},{sym:'M',name:'Moderate',pace:'5:35-5:55',usage:'Biegi progresywne'},{sym:'T',name:'Tempo',pace:'4:55-5:05',usage:'Tempo docelowe'},{sym:'I',name:'Intervals',pace:'4:25-4:45',usage:'VO2max'},{sym:'S',name:'Strides',pace:'4:00-4:15',usage:'Technika'}];
