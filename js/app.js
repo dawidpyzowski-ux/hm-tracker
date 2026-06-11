@@ -137,10 +137,41 @@ function rPlan(){
     let cls='dc';if(isToday)cls+=' today';if(d.rest)cls+=' rs';if(d.opt)cls+=' op';if(d.race)cls+=' rc';if(log.status==='done')cls+=' dn';if(log.status==='skipped')cls+=' sk';
     const si=log.status==='done'?'\u2705':log.status==='skipped'?'\u23ED\uFE0F':d.rest?'\uD83D\uDECB\uFE0F':d.race?'\uD83C\uDFC1':'\u2B1C';
     h+=`<div class="${cls}" id="dc-${WI}-${i}"><div class="dh" onclick="toggleDay(${WI},${i})"><div class="dl"><span class="ds">${si}</span><div><div class="dn-l">${d.name} <span class="dd-l">${fmtD(dt)}</span></div><div class="dt-l">${d.type}</div></div></div><div class="dr">${d.km>0?`<span class="dk-l">${d.km} km</span>`:''}<span class="ei">\u25BC</span></div></div><div class="db"><div class="db-d">${d.desc}</div>${d.pace!=='-'?`<div class="db-p">Tempo: ${d.pace}</div>`:''}`;
+   
+    // Strength training panel for rest/strength days
+    if(d.rest && d.desc.toLowerCase().includes('silowy')){
+      STR.initDay(dt);
+      const stl=STR.getLog(dt);
+      if(stl){
+        h+=`<div class="str-card"><div class="str-title">\uD83C\uDFCB\uFE0F Trening silowy</div>`;
+        if(stl.done)h+=`<div class="str-done-msg">\u2705 Wszystkie serie wykonane!</div>`;
+        stl.exercises.forEach((ex,ei)=>{
+          h+=`<div class="str-ex"><div><div class="str-ex-name">${ex.name}</div><div class="str-ex-target">${ex.target}</div></div><div class="str-sets">`;
+          for(let si=0;si<ex.totalSets;si++){
+            h+=`<div class="str-dot${si<ex.setsDone?' done':''}" onclick="strToggle('${dt}',${ei})">${si<ex.setsDone?'\u2713':''}</div>`;
+          }
+          h+=`</div></div>`;
+        });
+        h+=`<div class="str-timer"><button class="str-timer-btn" onclick="strTimer(this)">⏱ Odpoczynek 90s</button><div class="str-timer-display" id="str-tmr"></div></div></div>`;
+      }
+    }
+
     if(!d.rest){
       h+=`<div class="lf" id="lf-${WI}-${i}"><div class="fr"><div class="fg"><label>Dystans (km)</label><input type="number" step="0.1" id="ld-${WI}-${i}" value="${log.distance||''}"></div><div class="fg"><label>Tempo</label><input type="text" placeholder="6:30" id="lp-${WI}-${i}" value="${log.pace||''}"></div><div class="fg"><label>HR sr.</label><input type="number" id="lh-${WI}-${i}" value="${log.hr||''}"></div></div><div class="fg"><label>Samopoczucie</label><div class="fs">`;
       for(let f=1;f<=10;f++)h+=`<div class="fb${log.feeling==f?' act':''}" onclick="setFeeling(${WI},${i},${f})" data-f="${f}">${EMO[f]}</div>`;
-      h+=`</div></div><div class="fg"><label>Notatki</label><textarea id="ln-${WI}-${i}">${log.notes||''}</textarea></div><div class="fa"><button class="bs${log.status==='done'?' act':''}" onclick="setStatus(${WI},${i},'done')">\u2705 Wykonany</button><button class="bs${log.status==='skipped'?' act':''}" onclick="setStatus(${WI},${i},'skipped')">\u23ED\uFE0F Pominiety</button><button class="bsv" onclick="saveLog(${WI},${i})">Zapisz</button></div></div>`;
+      h+=`</div></div>
+      
+      // Shoe selector
+      const shoes=Shoes.getAll().filter(s=>!s.retired);
+      const curShoe=Shoes.getForDate(dt);
+      if(shoes.length){
+        h+=`<div class="fg"><label>Buty</label><select class="shoe-select" onchange="Shoes.setForDate('${dt}',+this.value||null)"><option value="">-- wybierz --</option>`;
+        shoes.forEach(s=>{h+=`<option value="${s.id}"${curShoe===s.id?' selected':''}>${s.name}</option>`});
+        h+=`</select></div>`;
+      }
+
+      
+      <div class="fg"><label>Notatki</label><textarea id="ln-${WI}-${i}">${log.notes||''}</textarea></div><div class="fa"><button class="bs${log.status==='done'?' act':''}" onclick="setStatus(${WI},${i},'done')">\u2705 Wykonany</button><button class="bs${log.status==='skipped'?' act':''}" onclick="setStatus(${WI},${i},'skipped')">\u23ED\uFE0F Pominiety</button><button class="bsv" onclick="saveLog(${WI},${i})">Zapisz</button></div></div>`;
     }
     h+=`</div></div>`;
   });
@@ -224,10 +255,38 @@ function rStat(){
 // ─── SETTINGS ───
 function rSett(){
   const el=document.getElementById('s-sett');const set=S.getSettings();
-  el.innerHTML=`<h1>Ustawienia</h1><p class="sub">Konfiguracja</p><div class="ss"><div class="stit">Dane osobowe</div><div class="card"><div class="lf"><div class="fr"><div class="fg"><label>Waga (kg)</label><input type="number" id="sw" value="${set.weight||75}"></div><div class="fg"><label>Spoczynkowe HR</label><input type="number" id="srhr" value="${set.rhr||50}"></div></div><button class="bsv" onclick="S.setSettings({weight:+document.getElementById('sw').value,rhr:+document.getElementById('srhr').value});TL.update();toast('Zapisano!')">Zapisz</button></div></div></div><div class="ss"><div class="stit">Strava</div><div class="card"><p style="font-size:13px;color:var(--fg2);margin-bottom:12px">${Strava.isConnected()?'\u2705 Polaczono ze Strava':'Polacz konto Strava aby importowac treningi.'}</p>${Strava.isConnected()?`<button class="btns" onclick="syncStr()">\uD83D\uDD04 Synchronizuj</button><button class="btnd" onclick="Strava.disconnect();rSett();toast('Rozlaczono')">Rozlacz</button>`:`<button class="btn-str" onclick="Strava.authorize()">Polacz ze Strava</button>`}</div></div><div class="ss"><div class="stit">Dane</div><button class="btns" onclick="exportData()">\uD83D\uDCE4 Eksportuj (JSON)</button><button class="btnd" onclick="if(confirm('Na pewno?')){S.clearAll();toast('Usunieto');rSett()}">\uD83D\uDDD1\uFE0F Usun dane</button></div><div class="ainfo"><p>HM Tracker v3.0 (Sprint 1)</p><p>Sub 1:45 \uD83C\uDFC3</p></div>`;
+  el.innerHTML=`<h1>Ustawienia</h1><p class="sub">Konfiguracja</p><div class="ss"><div class="stit">Dane osobowe</div><div class="card"><div class="lf"><div class="fr"><div class="fg"><label>Waga (kg)</label><input type="number" id="sw" value="${set.weight||75}"></div><div class="fg"><label>Spoczynkowe HR</label><input type="number" id="srhr" value="${set.rhr||50}"></div></div><button class="bsv" onclick="S.setSettings({weight:+document.getElementById('sw').value,rhr:+document.getElementById('srhr').value});TL.update();toast('Zapisano!')">Zapisz</button></div></div></div><div class="ss"><div class="stit">\uD83D\uDC5F Buty</div>
+    <div class="card">
+      <div class="shoe-add">
+        <input type="text" id="shoe-name" placeholder="Nazwa (np. Nike Vaporfly 3)">
+        <select id="shoe-type"><option>Startowe</option><option>Treningowe</option><option>Trail</option></select>
+        <input type="number" id="shoe-max" placeholder="Max km" value="600" style="max-width:80px">
+      </div>
+      <button class="bsv" onclick="Shoes.add(document.getElementById('shoe-name').value,document.getElementById('shoe-type').value,+document.getElementById('shoe-max').value);toast('Dodano!');rSett()" style="margin-bottom:12px">Dodaj buty</button>`;
+    const stats=Shoes.getStats();
+    if(stats.length){
+      stats.forEach(s=>{
+        const cls=s.pct>=80?'danger':s.pct>=60?'warn':'ok';
+        h+=`<div class="shoe-card"><div class="shoe-head"><span class="shoe-name">\uD83D\uDC5F ${s.shoe.name}</span><span class="shoe-type">${s.shoe.type}</span></div><div class="shoe-km">${s.km} / ${s.shoe.maxKm} km (${s.pct}%)</div><div class="shoe-bar"><div class="shoe-fill ${cls}" style="width:${Math.min(100,s.pct)}%"></div></div>${s.pct>=80?'<div class="shoe-alert">\u26A0\uFE0F Czas na nowe buty!</div>':''}<div class="shoe-actions"><button onclick="Shoes.retire(${s.shoe.id});toast('Wycofano');rSett()">Wycofaj</button><button onclick="if(confirm('Usunac?')){Shoes.del(${s.shoe.id});rSett()}">Usun</button></div></div>`;
+      });
+    }else{h+=`<div class="empty">Brak butow. Dodaj swoja pierwsza pare!</div>`}
+    h+=`</div></div><div class="ss"><div class="stit">Strava</div><div class="card"><p style="font-size:13px;color:var(--fg2);margin-bottom:12px">${Strava.isConnected()?'\u2705 Polaczono ze Strava':'Polacz konto Strava aby importowac treningi.'}</p>${Strava.isConnected()?`<button class="btns" onclick="syncStr()">\uD83D\uDD04 Synchronizuj</button><button class="btnd" onclick="Strava.disconnect();rSett();toast('Rozlaczono')">Rozlacz</button>`:`<button class="btn-str" onclick="Strava.authorize()">Polacz ze Strava</button>`}</div></div><div class="ss"><div class="stit">Dane</div><button class="btns" onclick="exportData()">\uD83D\uDCE4 Eksportuj (JSON)</button><button class="btnd" onclick="if(confirm('Na pewno?')){S.clearAll();toast('Usunieto');rSett()}">\uD83D\uDDD1\uFE0F Usun dane</button></div><div class="ainfo"><p>HM Tracker v3.0 (Sprint 1)</p><p>Sub 1:45 \uD83C\uDFC3</p></div>`;
 }
 async function syncStr(){toast('Synchronizuje...');const n=await Strava.syncWorkouts();toast(n>0?`Zsynchronizowano ${n} treningow!`:'Brak nowych');rPlan()}
 function exportData(){const d=S.exportAll();const b=new Blob([d],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='hm-tracker-backup.json';a.click();toast('Wyeksportowano!')}
+
+
+// ─── STRENGTH (Sprint 3) ───
+function strToggle(dt,idx){STR.toggleSet(dt,idx);rPlan()}
+function strTimer(btn){
+  let sec=90;btn.disabled=true;
+  const el=document.getElementById('str-tmr');
+  const iv=setInterval(()=>{
+    sec--;el.textContent=sec+'s';
+    if(sec<=0){clearInterval(iv);el.textContent='\u2705 Gotowy!';btn.disabled=false;toast('Nastepna seria!')}
+  },1000);
+}
+
 
 // ─── INIT ───
 document.querySelector('.tabs').addEventListener('click',e=>{const tab=e.target.closest('.tab');if(tab)nav(tab.dataset.s)});
