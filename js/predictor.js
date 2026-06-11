@@ -40,8 +40,10 @@ const Pred={
     // This week vs last week comparison
     const thisWeek=efforts.filter(e=>e.date>=getDayDate(t,-6));
     const lastWeek=efforts.filter(e=>e.date>=getDayDate(t,-13)&&e.date<getDayDate(t,-6));
+
     const bestThis=thisWeek.length?thisWeek[0]:null;
     const bestLast=lastWeek.length?lastWeek[0]:null;
+
     let trend='stable',prevFmt='';
     if(bestThis&&bestLast){
       const diff=bestThis.hmPred-bestLast.hmPred;
