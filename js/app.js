@@ -330,15 +330,7 @@ function rStat(){
 }
 
 
-  h+=`<div class="chc"><div class="ch-t">\u2764\uFE0F\u200D\uD83D\uDD25 Training Load (CTL / ATL / TSB)</div><canvas id="ch-tl"></canvas></div>`;
-  h+=`<div class="chc"><div class="ch-t">\uD83C\uDFAF Prognoza polmaratonu - trend</div><canvas id="ch-pred"></canvas></div>`;
-  h+=`<div class="chc"><div class="ch-t">\uD83D\uDCCA Km tygodniowy (plan vs realizacja)</div><canvas id="ch1"></canvas></div>`;
-  h+=`<div class="chc"><div class="ch-t">\u23F1\uFE0F Trend tempa</div><canvas id="ch2"></canvas></div>`;
-  h+=`<div class="chc"><div class="ch-t">\uD83D\uDE0A Samopoczucie</div><canvas id="ch3"></canvas></div>`;
-  h+=`<div class="chc"><div class="ch-t">\uD83D\uDCC5 Objetosc miesieczna</div><canvas id="ch4"></canvas></div>`;
-  el.innerHTML=h;
-  setTimeout(()=>{Charts.weeklyKm('ch1');Charts.paceTrend('ch2');Charts.feelingTrend('ch3');Charts.monthlyVol('ch4');Charts.trainingLoad('ch-tl');Charts.predTrend('ch-pred')},100);
-}
+  
 
 // ─── SETTINGS ───
 function rSett(){
