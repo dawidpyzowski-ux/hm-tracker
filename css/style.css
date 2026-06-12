@@ -336,3 +336,37 @@ h1{font-size:28px;font-weight:700;padding:48px 0 4px;letter-spacing:-.3px}
 .pacer-splits tr.close td{color:var(--o)}
 .pacer-splits tr.behind td{color:var(--r)}
 .pacer-info{text-align:center;color:var(--fg2);font-size:13px;margin:12px 0}
+
+/* === ADVANCED ANALYTICS (Sprint 6) === */
+.an-section{background:var(--c1);border-radius:12px;padding:14px;margin-bottom:10px;border:.5px solid var(--bd)}
+.an-title{font-size:14px;font-weight:600;margin-bottom:10px}
+/* Gauge */
+.an-gauge-wrap{text-align:center;margin-bottom:12px}
+.an-gauge{width:120px;height:120px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;background:conic-gradient(var(--g) calc(var(--pct)*3.6deg),var(--c2) 0);position:relative}
+.an-gauge::before{content:'';position:absolute;width:90px;height:90px;border-radius:50%;background:var(--c1)}
+.an-gauge-val{position:relative;z-index:1;font-size:32px;font-weight:700}
+.an-gauge-label{margin-top:8px;font-size:13px;color:var(--fg2)}
+.an-rr-row{display:flex;gap:6px}
+.an-rr-item{flex:1;text-align:center;background:var(--bg);border-radius:8px;padding:6px 2px}
+.an-rr-v{font-size:16px;font-weight:700}
+.an-rr-l{font-size:9px;color:var(--fg2);margin-top:1px}
+/* Badges */
+.an-badges{display:flex;gap:8px;margin-bottom:10px}
+.an-badge{flex:1;background:var(--c1);border-radius:10px;padding:10px;text-align:center;border:.5px solid var(--bd)}
+.an-badge-icon{display:block;font-size:22px}
+.an-badge-val{display:block;font-size:20px;font-weight:700;margin:2px 0}
+.an-badge-l{font-size:10px;color:var(--fg2)}
+.an-badge.fire .an-badge-val{color:var(--o)}
+.an-badge.check .an-badge-val{color:var(--g)}
+.an-badge.trophy .an-badge-val{color:var(--o)}
+/* VO2max */
+.an-vo2-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.an-vo2-val{font-size:36px;font-weight:700;color:var(--g)}
+.an-vo2-level{font-size:14px;font-weight:600}
+.an-vo2-sub{font-size:11px;color:var(--fg2)}
+/* Monthly */
+.an-months{display:flex;flex-direction:column;gap:6px}
+.an-month{background:var(--bg);border-radius:8px;padding:10px;display:flex;align-items:center;gap:10px}
+.an-month-name{min-width:50px;font-weight:600;font-size:13px}
+.an-month-km{font-size:16px;font-weight:700;color:var(--g);min-width:60px}
+.an-month-det{font-size:11px;color:var(--fg2)}
