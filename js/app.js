@@ -40,6 +40,7 @@ async function rDash(){
   const wpct=cw?Math.round(done/cw.km*100):0;
   let h=`<h1>HM Tracker</h1><p class="sub">${RACE.name}</p>`;
   h+=`<div id="weather-slot"></div>`;
+  if(typeof WeekSummary!=='undefined')h+=WeekSummary.render();
   const rec=S.getRecovery(t);
   if(rec){
     const cls=rec.score>=80?'green':rec.score>=60?'yellow':'red';
@@ -82,6 +83,7 @@ async function rDash(){
   let cnt=0;
   for(const w of PLAN){for(const d of w.days){const dt=getDayDate(w.start,d.dow);if(dt>t&&!d.rest&&!d.opt&&cnt<4){const log=S.getLog(dt);h+=`<div class="uitem"><span class="ud">${d.name} ${fmtD(dt)}</span><div><div class="ut">${d.type}</div><div class="uk">${d.km} km</div></div><span class="ub">${log.status==='done'?'\u2705':''}</span></div>`;cnt++}}}
   if(!cnt)h+=`<div class="empty">Brak nadchodzacych treningow</div>`;
+  h+=`<button class="pacer-start" onclick="showPacer()" style="margin-top:16px">🏁 Race Day Pacer</button>`;
   el.innerHTML=h;
   loadWeather();
 }
@@ -301,6 +303,7 @@ function rSett(){
   const stats=Shoes.getStats();
   if(stats.length){stats.forEach(s=>{const cls=s.pct>=80?'danger':s.pct>=60?'warn':'ok';h+=`<div class="shoe-card"><div class="shoe-head"><span class="shoe-name">\uD83D\uDC5F ${s.shoe.name}</span><span class="shoe-type">${s.shoe.type}</span></div><div class="shoe-km">${s.km} / ${s.shoe.maxKm} km (${s.pct}%)</div><div class="shoe-bar"><div class="shoe-fill ${cls}" style="width:${Math.min(100,s.pct)}%"></div></div>${s.pct>=80?'<div class="shoe-alert">\u26A0\uFE0F Czas na nowe buty!</div>':''}<div class="shoe-actions"><button onclick="Shoes.retire(${s.shoe.id});toast('Wycofano');rSett()">Wycofaj</button><button onclick="if(confirm('Usunac?')){Shoes.del(${s.shoe.id});rSett()}">Usun</button></div></div>`})}else{h+=`<div class="empty">Brak butow. Dodaj swoja pierwsza pare!</div>`}
   h+=`</div></div>`;
+  if(typeof Notify!=='undefined')h+=Notify.renderToggle();
   h+=`<div class="ss"><div class="stit">Strava</div><div class="card"><p style="font-size:13px;color:var(--fg2);margin-bottom:12px">${Strava.isConnected()?'\u2705 Polaczono ze Strava':'Polacz konto Strava aby importowac treningi.'}</p>${Strava.isConnected()?'<button class="btns" onclick="syncStr()">\uD83D\uDD04 Synchronizuj</button><button class="btnd" onclick="Strava.disconnect();rSett();toast(\'Rozlaczono\')">Rozlacz</button>':'<button class="btn-str" onclick="Strava.authorize()">Polacz ze Strava</button>'}</div></div>`;
   h+=`<div class="ss"><div class="stit">Dane</div><button class="btns" onclick="exportData()">\uD83D\uDCE4 Eksportuj (JSON)</button><button class="btnd" onclick="if(confirm('Na pewno?')){S.clearAll();toast('Usunieto');rSett()}">\uD83D\uDDD1\uFE0F Usun dane</button></div>`;
   h+=`<div class="ainfo"><p>HM Tracker v4.2 (Sprint 4: Deep Analytics)</p><p>Sub 1:45 \uD83C\uDFC3</p></div>`;
@@ -313,6 +316,9 @@ function exportData(){const d=S.exportAll();const b=new Blob([d],{type:'applicat
 // --- STRENGTH ---
 function strToggle(dt,idx){STR.toggleSet(dt,idx);rPlan()}
 function strTimer(btn){let sec=90;btn.disabled=true;const el=document.getElementById('str-tmr');const iv=setInterval(()=>{sec--;el.textContent=sec+'s';if(sec<=0){clearInterval(iv);el.textContent='\u2705 Gotowy!';btn.disabled=false;toast('Nastepna seria!')}},1000)}
+
+function toggleNotify(){if(Notify.isEnabled()){Notify.disable()}else{Notify.requestPermission().then(ok=>{if(ok)Notify.enable()})}rSett()}
+function showPacer(){document.querySelectorAll('.scr').forEach(el=>el.classList.remove('act'));document.getElementById('pacer-view').classList.add('act');Pacer.renderPacer()}
 
 // --- INIT ---
 document.querySelector('.tabs').addEventListener('click',e=>{const tab=e.target.closest('.tab');if(tab)nav(tab.dataset.s)});
