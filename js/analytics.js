@@ -28,27 +28,25 @@ const Analytics={
     if(frac<=0)return 0;
     return oc/frac;
   },
+  
   getVO2(){
     const logs=this._logs().filter(l=>l.pace&&parseFloat(l.distance)>=3);
     const all=[];
+    // Method 1: Jack Daniels from best splits
     logs.forEach(l=>{
       const pMin=this._pp(l.pace);if(pMin<=0)return;
       const km=parseFloat(l.distance);
-      // Try splits for faster segments if available
       let bestVO2=this._vo2calc(pMin,km);
       if(l.strava_id){
         const det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
         if(det&&det.splits&&det.splits.length>=3){
-          // Find best consecutive 3km, 5km from splits
           const sp=det.splits;
           for(let len=3;len<=Math.min(sp.length,10);len++){
             for(let start=0;start<=sp.length-len;start++){
               let d=0,t=0;
               for(let i=start;i<start+len;i++){d+=sp[i].distance||0;t+=sp[i].moving_time||0}
               if(d>0&&t>0){
-                const segPace=t/d*1000/60; // min/km
-                const segKm=d/1000;
-                const v=this._vo2calc(segPace,segKm);
+                const v=this._vo2calc(t/d*1000/60,d/1000);
                 if(v>bestVO2)bestVO2=v;
               }
             }
@@ -56,6 +54,31 @@ const Analytics={
         }
       }
       if(bestVO2>20&&bestVO2<90)all.push({date:l.date,vo2:Math.round(bestVO2*10)/10});
+    });
+    // Method 2: Uth formula (15 * maxHR/restHR) - often more accurate for training data
+    let uthVO2=0;
+    const rhr=S.getSettings().rhr||0;
+    if(rhr>0){
+      let maxHR=0;
+      logs.forEach(l=>{
+        if(!l.strava_id)return;
+        const det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
+        if(det&&det.max_hr&&det.max_hr>maxHR)maxHR=det.max_hr;
+      });
+      if(maxHR>0)uthVO2=Math.round(15.3*(maxHR/rhr)*10)/10;
+    }
+    // Use higher of both methods
+    const trend=[];
+    for(let i=0;i<all.length;i++){
+      let max=uthVO2;
+      for(let j=Math.max(0,i-4);j<=i;j++){if(all[j].vo2>max)max=all[j].vo2}
+      trend.push({date:all[i].date,vo2:max});
+    }
+    const cur=trend.length?trend[trend.length-1].vo2:(uthVO2||0);
+    const lvl=cur>=60?'Elitarny':cur>=55?'Swietny':cur>=50?'Bardzo dobry':cur>=45?'Dobry':cur>=40?'Sredni':'Poczatkujacy';
+    return{current:cur,trend,level:lvl};
+  },
+
     });
     // Build trend: rolling max of last 5 sessions
     const trend=[];
