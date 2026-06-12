@@ -1,4 +1,4 @@
-// HM Tracker v4.0 - Sprint 1+2+3
+// HM Tracker v4.0 - Sprint 1+2+3 + History
 let CUR='dash',WI=0;
 const EMO=['','\uD83D\uDE2B','\uD83D\uDE23','\uD83D\uDE15','\uD83D\uDE10','\uD83D\uDE42','\uD83D\uDE0A','\uD83D\uDE04','\uD83D\uDE03','\uD83E\uDD29','\uD83D\uDD25'];
 const TAGS={baza:'#0A84FF',budowa:'#BF5AF2',szczyt:'#FF9F0A',peak:'#FF453A',deload:'#30D158',taper:'#64D2FF',race:'#FF453A'};
@@ -11,7 +11,7 @@ WI=autoWeek();
 
 function nav(s){CUR=s;document.querySelectorAll('.scr').forEach(el=>el.classList.remove('act'));document.querySelectorAll('.tab').forEach(el=>el.classList.remove('act'));document.getElementById('s-'+s).classList.add('act');document.querySelector(`.tab[data-s="${s}"]`).classList.add('act');({dash:rDash,plan:rPlan,nutr:rNutr,stat:rStat,sett:rSett})[s]()}
 
-// ─── DASHBOARD ───
+// --- DASHBOARD ---
 async function rDash(){
   const el=document.getElementById('s-dash');
   const t=today(),dd=Math.ceil((new Date(RACE.date+'T12:00:00')-new Date(t+'T12:00:00'))/(86400000));
@@ -25,7 +25,6 @@ async function rDash(){
   let h=`<h1>HM Tracker</h1><p class="sub">${RACE.name}</p>`;
   h+=`<div id="weather-slot"></div>`;
 
-  // Recovery Score
   const rec=S.getRecovery(t);
   if(rec){
     const cls=rec.score>=80?'green':rec.score>=60?'yellow':'red';
@@ -45,7 +44,6 @@ async function rDash(){
     h+=`</div><button class="rform-save" onclick="saveRecovery()">Zapisz</button></div></div>`;
   }
 
-  // Race Predictor
   TL.update();
   const pred=Pred.getCurrent();
   if(pred){
@@ -54,14 +52,12 @@ async function rDash(){
     h+=`<div class="pred-card"><div class="pred-head"><span class="pred-label">\uD83C\uDFAF Prognoza polmaratonu</span><span class="pred-trend ${trendCls}">${trendIcon}${pred.prevFmt?' vs '+pred.prevFmt:''}</span></div><div class="pred-time">${pred.formatted}</div><div class="pred-pace">${pred.pace} min/km \u2022 na podstawie ${pred.fromDist} km @ ${pred.fromPace}</div><div class="pred-bar"><div class="pred-fill" style="width:${pred.pct}%"></div></div><div class="pred-target">Cel: ${Pred.fmtTime(Pred.TARGET)} \u2022 ${pred.pct}% gotowosci</div></div>`;
   }
 
-  // Training Load
   const fit=TL.get();
   if(fit.history.length){
     const tc=TL.tsbColor(fit.tsb),tl=TL.tsbLabel(fit.tsb);
     h+=`<div class="tl-card"><div class="tl-head">\u2764\uFE0F\u200D\uD83D\uDD25 Forma treningowa</div><div class="tl-row"><div class="tl-item"><div class="tl-val green">${fit.ctl}</div><div class="tl-lab">Fitness (CTL)</div></div><div class="tl-item"><div class="tl-val red">${fit.atl}</div><div class="tl-lab">Zmeczenie (ATL)</div></div><div class="tl-item"><div class="tl-val ${tc}">${fit.tsb>0?'+':''}${fit.tsb}</div><div class="tl-lab">Forma (TSB)</div></div></div><div class="tl-msg ${tc}">${tl}</div></div>`;
   }
 
-  // Today's workout
   if(td){
     const cls=td.rest?'rest':td.race?'race-day':'';
     const icon=td.race?'\uD83C\uDFC1':td.rest?'\uD83D\uDECB\uFE0F':'\uD83C\uDFC3';
@@ -70,10 +66,8 @@ async function rDash(){
     h+=`</div>`;
   }
 
-  // Stats row
   h+=`<div class="srow"><div class="scard"><div class="sv" style="color:${dd<=0?'var(--g)':'var(--fg)'}">${Math.max(0,dd)}</div><div class="sl">dni do wyscigu</div></div><div class="scard"><div class="sv">${wpct}%</div><div class="sl">tydzien ${cw?cw.weekNum:'-'}</div><div class="pbar"><div class="pfill" style="width:${wpct}%"></div></div></div><div class="scard"><div class="sv">${pct}%</div><div class="sl">plan ukonczony</div></div></div>`;
 
-  // Upcoming
   h+=`<div class="stit">Nadchodzace treningi</div>`;
   let cnt=0;
   for(const w of PLAN){for(const d of w.days){const dt=getDayDate(w.start,d.dow);if(dt>t&&!d.rest&&!d.opt&&cnt<4){const log=S.getLog(dt);h+=`<div class="uitem"><span class="ud">${d.name} ${fmtD(dt)}</span><div><div class="ut">${d.type}</div><div class="uk">${d.km} km</div></div><span class="ub">${log.status==='done'?'\u2705':''}</span></div>`;cnt++}}}
@@ -115,7 +109,7 @@ function saveRecovery(){
   rDash();
 }
 
-// ─── PLAN ───
+// --- PLAN ---
 function rPlan(){
   const el=document.getElementById('s-plan');
   const w=PLAN[WI],t=today();
@@ -129,7 +123,6 @@ function rPlan(){
     const si=log.status==='done'?'\u2705':log.status==='skipped'?'\u23ED\uFE0F':d.rest?'\uD83D\uDECB\uFE0F':d.race?'\uD83C\uDFC1':'\u2B1C';
     h+=`<div class="${cls}" id="dc-${WI}-${i}"><div class="dh" onclick="toggleDay(${WI},${i})"><div class="dl"><span class="ds">${si}</span><div><div class="dn-l">${d.name} <span class="dd-l">${fmtD(dt)}</span></div><div class="dt-l">${d.type}</div></div></div><div class="dr">${d.km>0?`<span class="dk-l">${d.km} km</span>`:''}<span class="ei">\u25BC</span></div></div><div class="db"><div class="db-d">${d.desc}</div>${d.pace!=='-'?`<div class="db-p">Tempo: ${d.pace}</div>`:''}`;
 
-    // Strength training panel
     if(d.rest&&d.desc.toLowerCase().includes('silowy')){
       STR.initDay(dt);
       const stl=STR.getLog(dt);
@@ -151,7 +144,6 @@ function rPlan(){
       h+=`<div class="lf" id="lf-${WI}-${i}"><div class="fr"><div class="fg"><label>Dystans (km)</label><input type="number" step="0.1" id="ld-${WI}-${i}" value="${log.distance||''}"></div><div class="fg"><label>Tempo</label><input type="text" placeholder="6:30" id="lp-${WI}-${i}" value="${log.pace||''}"></div><div class="fg"><label>HR sr.</label><input type="number" id="lh-${WI}-${i}" value="${log.hr||''}"></div></div><div class="fg"><label>Samopoczucie</label><div class="fs">`;
       for(let f=1;f<=10;f++)h+=`<div class="fb${log.feeling==f?' act':''}" onclick="setFeeling(${WI},${i},${f})" data-f="${f}">${EMO[f]}</div>`;
       h+=`</div></div>`;
-      // Shoe selector (Sprint 3)
       const shoes=Shoes.getAll().filter(s=>!s.retired);
       const curShoe=Shoes.getForDate(dt);
       if(shoes.length){
@@ -161,11 +153,11 @@ function rPlan(){
       }
       h+=`<div class="fg"><label>Notatki</label><textarea id="ln-${WI}-${i}">${log.notes||''}</textarea></div><div class="fa"><button class="bs${log.status==='done'?' act':''}" onclick="setStatus(${WI},${i},'done')">\u2705 Wykonany</button><button class="bs${log.status==='skipped'?' act':''}" onclick="setStatus(${WI},${i},'skipped')">\u23ED\uFE0F Pominiety</button><button class="bsv" onclick="saveLog(${WI},${i})">Zapisz</button></div></div>`;
     }
-    
+
     h+=`</div></div>`;
   });
 
-  // ═══ DODATKOWE TRENINGI W TYM TYGODNIU (Sprint 3.5) ═══
+  // === DODATKOWE TRENINGI W TYM TYGODNIU ===
   const wStart=w.start;
   const wEnd=getDayDate(wStart,6);
   const wPlannedDates={};
@@ -181,13 +173,12 @@ function rPlan(){
     }
   });
 
-  // Shift hints: check if unlogged training days have a matching workout ±1 day
+  // Shift hints
   w.days.forEach(d=>{
     if(d.rest||d.km<=0)return;
     const dt=getDayDate(wStart,d.dow);
     const log=S.getLog(dt);
-    if(log&&log.distance)return; // already logged
-    // Check ±1 day
+    if(log&&log.distance)return;
     for(const offset of [-1,1]){
       const nearby=getDayDate(dt,offset);
       if(nearby<wStart||nearby>wEnd)continue;
@@ -223,7 +214,7 @@ function setFeeling(wi,di,f){document.querySelectorAll('#lf-'+wi+'-'+di+' .fb').
 function setStatus(wi,di,st){const w=PLAN[wi],d=w.days[di],dt=getDayDate(w.start,d.dow);const log=S.getLog(dt);log.status=log.status===st?'':st;S.setLog(dt,log);rPlan()}
 function saveLog(wi,di){const w=PLAN[wi],d=w.days[di],dt=getDayDate(w.start,d.dow);const dist=document.getElementById('ld-'+wi+'-'+di).value;const pace=document.getElementById('lp-'+wi+'-'+di).value;const hr=document.getElementById('lh-'+wi+'-'+di).value;const notes=document.getElementById('ln-'+wi+'-'+di).value;const fb=document.querySelector('#lf-'+wi+'-'+di+' .fb.act');const feeling=fb?fb.dataset.f:'';S.setLog(dt,{distance:dist,pace:pace,hr:hr,feeling:feeling,notes:notes,status:'done'});TL.update();toast('Trening zapisany! \uD83D\uDCAA');rPlan()}
 
-// ─── NUTRITION ───
+// --- NUTRITION ---
 let nutrTab='today';
 function rNutr(){
   const el=document.getElementById('s-nutr');
@@ -247,8 +238,7 @@ function rNutr(){
 }
 function toggleCheck(i,v){const cl=S.getChecklist();cl[i]=v;S.setChecklist(cl)}
 
-// ─── STATS ───
-
+// --- STATS ---
 function rStat(){
   const el=document.getElementById('s-stat');
   const t=today();
@@ -280,13 +270,12 @@ function rStat(){
   h+=`<div class="hmap-leg"><div class="hmap-li"><div class="hmap-lc" style="background:var(--g)"></div>Wykonany</div><div class="hmap-li"><div class="hmap-lc" style="background:var(--o)"></div>Brak logu</div><div class="hmap-li"><div class="hmap-lc" style="background:var(--r)"></div>Pominiety</div><div class="hmap-li"><div class="hmap-lc" style="background:var(--c3);opacity:.3"></div>Rest</div><div class="hmap-li"><div class="hmap-lc" style="background:var(--c2);border:.5px solid var(--c3)"></div>Przyszlosc</div></div>`;
   h+=`</div>`;
 
-  // ═══ HISTORIA TRENINGOW ═══
+  // === HISTORIA TRENINGOW ===
   const logs=S.getAllLogs();
   const sortedDates=Object.keys(logs).filter(d=>logs[d].distance).sort((a,b)=>b.localeCompare(a));
   let totalKm=0;
   sortedDates.forEach(d=>{if(logs[d].distance)totalKm+=parseFloat(logs[d].distance)});
 
-  // Build set of planned training dates for matching
   const plannedDates={};
   PLAN.forEach(w=>{w.days.forEach(d=>{
     const dt=getDayDate(w.start,d.dow);
@@ -329,15 +318,11 @@ function rStat(){
   setTimeout(()=>{Charts.weeklyKm('ch1');Charts.paceTrend('ch2');Charts.feelingTrend('ch3');Charts.monthlyVol('ch4');Charts.trainingLoad('ch-tl');Charts.predTrend('ch-pred')},100);
 }
 
-
-  
-
-// ─── SETTINGS ───
+// --- SETTINGS ---
 function rSett(){
   const el=document.getElementById('s-sett');const set=S.getSettings();
   let h=`<h1>Ustawienia</h1><p class="sub">Konfiguracja</p>`;
   h+=`<div class="ss"><div class="stit">Dane osobowe</div><div class="card"><div class="lf"><div class="fr"><div class="fg"><label>Waga (kg)</label><input type="number" id="sw" value="${set.weight||75}"></div><div class="fg"><label>Spoczynkowe HR</label><input type="number" id="srhr" value="${set.rhr||50}"></div></div><button class="bsv" onclick="S.setSettings({weight:+document.getElementById('sw').value,rhr:+document.getElementById('srhr').value});TL.update();toast('Zapisano!')">Zapisz</button></div></div></div>`;
-  // Shoes (Sprint 3)
   h+=`<div class="ss"><div class="stit">\uD83D\uDC5F Buty</div><div class="card"><div class="shoe-add"><input type="text" id="shoe-name" placeholder="Nazwa (np. Nike Vaporfly 3)"><select id="shoe-type"><option>Startowe</option><option>Treningowe</option><option>Trail</option></select><input type="number" id="shoe-max" placeholder="Max km" value="600" style="max-width:80px"></div><button class="bsv" onclick="Shoes.add(document.getElementById('shoe-name').value,document.getElementById('shoe-type').value,+document.getElementById('shoe-max').value);toast('Dodano!');rSett()" style="margin-bottom:12px">Dodaj buty</button>`;
   const stats=Shoes.getStats();
   if(stats.length){
@@ -347,18 +332,16 @@ function rSett(){
     });
   }else{h+=`<div class="empty">Brak butow. Dodaj swoja pierwsza pare!</div>`}
   h+=`</div></div>`;
-  // Strava
   h+=`<div class="ss"><div class="stit">Strava</div><div class="card"><p style="font-size:13px;color:var(--fg2);margin-bottom:12px">${Strava.isConnected()?'\u2705 Polaczono ze Strava':'Polacz konto Strava aby importowac treningi.'}</p>${Strava.isConnected()?'<button class="btns" onclick="syncStr()">\uD83D\uDD04 Synchronizuj</button><button class="btnd" onclick="Strava.disconnect();rSett();toast(\'Rozlaczono\')">Rozlacz</button>':'<button class="btn-str" onclick="Strava.authorize()">Polacz ze Strava</button>'}</div></div>`;
-  // Data
   h+=`<div class="ss"><div class="stit">Dane</div><button class="btns" onclick="exportData()">\uD83D\uDCE4 Eksportuj (JSON)</button><button class="btnd" onclick="if(confirm('Na pewno?')){S.clearAll();toast('Usunieto');rSett()}">\uD83D\uDDD1\uFE0F Usun dane</button></div>`;
-  h+=`<div class="ainfo"><p>HM Tracker v4.0 (Sprint 3)</p><p>Sub 1:45 \uD83C\uDFC3</p></div>`;
+  h+=`<div class="ainfo"><p>HM Tracker v4.1 (Sprint 3 + History)</p><p>Sub 1:45 \uD83C\uDFC3</p></div>`;
   el.innerHTML=h;
 }
 
 async function syncStr(){toast('Synchronizuje...');const n=await Strava.syncWorkouts();toast(n>0?'Zsynchronizowano '+n+' treningow!':'Brak nowych');rPlan()}
 function exportData(){const d=S.exportAll();const b=new Blob([d],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='hm-tracker-backup.json';a.click();toast('Wyeksportowano!')}
 
-// ─── STRENGTH (Sprint 3) ───
+// --- STRENGTH ---
 function strToggle(dt,idx){STR.toggleSet(dt,idx);rPlan()}
 function strTimer(btn){
   let sec=90;btn.disabled=true;
@@ -369,6 +352,6 @@ function strTimer(btn){
   },1000);
 }
 
-// ─── INIT ───
+// --- INIT ---
 document.querySelector('.tabs').addEventListener('click',e=>{const tab=e.target.closest('.tab');if(tab)nav(tab.dataset.s)});
 (async()=>{if(window.location.search.includes('code=')){const ok=await Strava.handleCallback();if(ok){toast('Strava polaczona!');await Strava.syncWorkouts()}}nav('dash')})();
