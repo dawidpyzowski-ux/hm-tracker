@@ -1,4 +1,4 @@
-// HM Tracker v4.0 - Sprint 1+2+3 + History
+// HM Tracker v4.1 - Sprint 1+2+3 + History + Auto-Shift
 let CUR='dash',WI=0;
 const EMO=['','\uD83D\uDE2B','\uD83D\uDE23','\uD83D\uDE15','\uD83D\uDE10','\uD83D\uDE42','\uD83D\uDE0A','\uD83D\uDE04','\uD83D\uDE03','\uD83E\uDD29','\uD83D\uDD25'];
 const TAGS={baza:'#0A84FF',budowa:'#BF5AF2',szczyt:'#FF9F0A',peak:'#FF453A',deload:'#30D158',taper:'#64D2FF',race:'#FF453A'};
@@ -8,6 +8,25 @@ function fmtD(s){const p=s.split('-');return p[2]+'.'+p[1]}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
 function autoWeek(){const t=today();for(let i=0;i<PLAN.length;i++){const w=PLAN[i],end=getDayDate(w.start,6);if(t>=w.start&&t<=end)return i}return 0}
 WI=autoWeek();
+
+// --- SHIFT MATCHING HELPER ---
+function findShiftedLog(wStart,wEnd,targetDate,targetKm){
+  for(const offset of [-1,1,-2,2]){
+    const d=new Date(targetDate+'T12:00:00');
+    d.setDate(d.getDate()+offset);
+    const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dy=String(d.getDate()).padStart(2,'0');
+    const nearby=y+'-'+m+'-'+dy;
+    if(nearby<wStart||nearby>wEnd)continue;
+    const nLog=S.getLog(nearby);
+    if(nLog&&nLog.distance){
+      const nKm=parseFloat(nLog.distance);
+      if(nKm>=targetKm*0.6&&nKm<=targetKm*1.4){
+        return {date:nearby,log:nLog};
+      }
+    }
+  }
+  return null;
+}
 
 function nav(s){CUR=s;document.querySelectorAll('.scr').forEach(el=>el.classList.remove('act'));document.querySelectorAll('.tab').forEach(el=>el.classList.remove('act'));document.getElementById('s-'+s).classList.add('act');document.querySelector(`.tab[data-s="${s}"]`).classList.add('act');({dash:rDash,plan:rPlan,nutr:rNutr,stat:rStat,sett:rSett})[s]()}
 
@@ -109,20 +128,40 @@ function saveRecovery(){
   rDash();
 }
 
-// --- PLAN ---
+// --- PLAN (with auto-shift matching) ---
 function rPlan(){
   const el=document.getElementById('s-plan');
   const w=PLAN[WI],t=today();
   const endD=getDayDate(w.start,6);
+  const wStart=w.start,wEnd=endD;
   const tc=TAGS[w.tag]||'var(--fg2)';
   let h=`<h1>Plan treningowy</h1><p class="sub">Tydzien ${w.weekNum} / 13 \u2022 ${w.phase}</p>`;
   h+=`<div class="wnav"><button class="nbtn" onclick="WI=Math.max(0,WI-1);rPlan()" ${WI===0?'disabled':''}>&#9664;</button><div class="winfo"><div class="wn">Tydzien ${w.weekNum}</div><div class="wp" style="color:${tc}">${w.phase}</div><div class="wd">${fmtD(w.start)} - ${fmtD(endD)}</div><div class="wk">\uD83D\uDCCF ${w.km} km</div></div><button class="nbtn" onclick="WI=Math.min(PLAN.length-1,WI+1);rPlan()" ${WI===PLAN.length-1?'disabled':''}>&#9654;</button></div>`;
   w.days.forEach((d,i)=>{
     const dt=getDayDate(w.start,d.dow);const log=S.getLog(dt);const isToday=dt===t;
-    let cls='dc';if(isToday)cls+=' today';if(d.rest)cls+=' rs';if(d.opt)cls+=' op';if(d.race)cls+=' rc';if(log.status==='done')cls+=' dn';if(log.status==='skipped')cls+=' sk';
-    const si=log.status==='done'?'\u2705':log.status==='skipped'?'\u23ED\uFE0F':d.rest?'\uD83D\uDECB\uFE0F':d.race?'\uD83C\uDFC1':'\u2B1C';
+
+    // --- AUTO-SHIFT MATCHING ---
+    let shifted=null;
+    let effLog=log;
+    let effStatus=log.status||'';
+    if(!d.rest&&d.km>0&&!log.distance){
+      shifted=findShiftedLog(wStart,wEnd,dt,d.km);
+      if(shifted){effLog=shifted.log;effStatus='done'}
+    }
+
+    let cls='dc';if(isToday)cls+=' today';if(d.rest)cls+=' rs';if(d.opt)cls+=' op';if(d.race)cls+=' rc';if(effStatus==='done')cls+=' dn';if(effStatus==='skipped')cls+=' sk';
+    const si=effStatus==='done'?(shifted?'\uD83D\uDD04':'\u2705'):effStatus==='skipped'?'\u23ED\uFE0F':d.rest?'\uD83D\uDECB\uFE0F':d.race?'\uD83C\uDFC1':'\u2B1C';
     h+=`<div class="${cls}" id="dc-${WI}-${i}"><div class="dh" onclick="toggleDay(${WI},${i})"><div class="dl"><span class="ds">${si}</span><div><div class="dn-l">${d.name} <span class="dd-l">${fmtD(dt)}</span></div><div class="dt-l">${d.type}</div></div></div><div class="dr">${d.km>0?`<span class="dk-l">${d.km} km</span>`:''}<span class="ei">\u25BC</span></div></div><div class="db"><div class="db-d">${d.desc}</div>${d.pace!=='-'?`<div class="db-p">Tempo: ${d.pace}</div>`:''}`;
 
+    // Show shift info
+    if(shifted){
+      h+=`<div class="shift-hint">\uD83D\uDD04 Przesuniety z ${fmtD(shifted.date)}: ${shifted.log.distance} km`;
+      if(shifted.log.pace)h+=` @ ${shifted.log.pace}`;
+      if(shifted.log.hr)h+=` \u2764 ${shifted.log.hr} bpm`;
+      h+=`</div>`;
+    }
+
+    // Strength training panel
     if(d.rest&&d.desc.toLowerCase().includes('silowy')){
       STR.initDay(dt);
       const stl=STR.getLog(dt);
@@ -141,8 +180,8 @@ function rPlan(){
     }
 
     if(!d.rest){
-      h+=`<div class="lf" id="lf-${WI}-${i}"><div class="fr"><div class="fg"><label>Dystans (km)</label><input type="number" step="0.1" id="ld-${WI}-${i}" value="${log.distance||''}"></div><div class="fg"><label>Tempo</label><input type="text" placeholder="6:30" id="lp-${WI}-${i}" value="${log.pace||''}"></div><div class="fg"><label>HR sr.</label><input type="number" id="lh-${WI}-${i}" value="${log.hr||''}"></div></div><div class="fg"><label>Samopoczucie</label><div class="fs">`;
-      for(let f=1;f<=10;f++)h+=`<div class="fb${log.feeling==f?' act':''}" onclick="setFeeling(${WI},${i},${f})" data-f="${f}">${EMO[f]}</div>`;
+      h+=`<div class="lf" id="lf-${WI}-${i}"><div class="fr"><div class="fg"><label>Dystans (km)</label><input type="number" step="0.1" id="ld-${WI}-${i}" value="${effLog.distance||''}"></div><div class="fg"><label>Tempo</label><input type="text" placeholder="6:30" id="lp-${WI}-${i}" value="${effLog.pace||''}"></div><div class="fg"><label>HR sr.</label><input type="number" id="lh-${WI}-${i}" value="${effLog.hr||''}"></div></div><div class="fg"><label>Samopoczucie</label><div class="fs">`;
+      for(let f=1;f<=10;f++)h+=`<div class="fb${effLog.feeling==f?' act':''}" onclick="setFeeling(${WI},${i},${f})" data-f="${f}">${EMO[f]}</div>`;
       h+=`</div></div>`;
       const shoes=Shoes.getAll().filter(s=>!s.retired);
       const curShoe=Shoes.getForDate(dt);
@@ -151,44 +190,22 @@ function rPlan(){
         shoes.forEach(s=>{h+=`<option value="${s.id}"${curShoe===s.id?' selected':''}>&#x1f45f; ${s.name}</option>`});
         h+=`</select></div>`;
       }
-      h+=`<div class="fg"><label>Notatki</label><textarea id="ln-${WI}-${i}">${log.notes||''}</textarea></div><div class="fa"><button class="bs${log.status==='done'?' act':''}" onclick="setStatus(${WI},${i},'done')">\u2705 Wykonany</button><button class="bs${log.status==='skipped'?' act':''}" onclick="setStatus(${WI},${i},'skipped')">\u23ED\uFE0F Pominiety</button><button class="bsv" onclick="saveLog(${WI},${i})">Zapisz</button></div></div>`;
+      h+=`<div class="fg"><label>Notatki</label><textarea id="ln-${WI}-${i}">${effLog.notes||''}</textarea></div><div class="fa"><button class="bs${effStatus==='done'?' act':''}" onclick="setStatus(${WI},${i},'done')">\u2705 Wykonany</button><button class="bs${effStatus==='skipped'?' act':''}" onclick="setStatus(${WI},${i},'skipped')">\u23ED\uFE0F Pominiety</button><button class="bsv" onclick="saveLog(${WI},${i})">Zapisz</button></div></div>`;
     }
 
     h+=`</div></div>`;
   });
 
   // === DODATKOWE TRENINGI W TYM TYGODNIU ===
-  const wStart=w.start;
-  const wEnd=getDayDate(wStart,6);
   const wPlannedDates={};
   w.days.forEach(d=>{wPlannedDates[getDayDate(wStart,d.dow)]=d});
-  const logs=S.getAllLogs();
+  const allLogs=S.getAllLogs();
   const extraLogs=[];
-  Object.entries(logs).forEach(([date,l])=>{
+  Object.entries(allLogs).forEach(([date,l])=>{
     if(date>=wStart&&date<=wEnd&&l.distance){
       const planned=wPlannedDates[date];
       if(!planned||planned.rest){
         extraLogs.push({date,log:l});
-      }
-    }
-  });
-
-  // Shift hints
-  w.days.forEach(d=>{
-    if(d.rest||d.km<=0)return;
-    const dt=getDayDate(wStart,d.dow);
-    const log=S.getLog(dt);
-    if(log&&log.distance)return;
-    for(const offset of [-1,1]){
-      const nearby=getDayDate(dt,offset);
-      if(nearby<wStart||nearby>wEnd)continue;
-      const nLog=S.getLog(nearby);
-      if(nLog&&nLog.distance){
-        const nKm=parseFloat(nLog.distance);
-        if(nKm>=d.km*0.7&&nKm<=d.km*1.3){
-          h+=`<div class="shift-hint">\uD83D\uDD04 ${d.name} (${d.type}, ${d.km} km) \u2192 mozliwy przesuniety trening z ${fmtD(nearby)} (${nLog.distance} km @ ${nLog.pace||'?'})</div>`;
-          break;
-        }
       }
     }
   });
@@ -246,7 +263,6 @@ function rStat(){
   const DOW=['Niedz','Pon','Wt','Sr','Czw','Pt','Sob'];
   let h=`<h1>Statystyki</h1><p class="sub">Postepy treningowe</p>`;
 
-  // Heat map
   h+=`<div class="hmap"><div class="hmap-title">\uD83D\uDFE9 Mapa aktywnosci (13 tygodni)</div>`;
   const dayH=['Pn','Wt','Sr','Cz','Pt','Sb','Nd'];
   h+=`<div class="hmap-days"><div></div>`;dayH.forEach(d=>{h+=`<div class="hmap-dh">${d}</div>`});h+=`</div>`;
@@ -307,7 +323,6 @@ function rStat(){
     });
   }else{h+=`<div class="empty">Brak zalogowanych treningow</div>`}
 
-  // Charts
   h+=`<div class="chc"><div class="ch-t">\u2764\uFE0F\u200D\uD83D\uDD25 Training Load (CTL / ATL / TSB)</div><canvas id="ch-tl"></canvas></div>`;
   h+=`<div class="chc"><div class="ch-t">\uD83C\uDFAF Prognoza polmaratonu - trend</div><canvas id="ch-pred"></canvas></div>`;
   h+=`<div class="chc"><div class="ch-t">\uD83D\uDCCA Km tygodniowy (plan vs realizacja)</div><canvas id="ch1"></canvas></div>`;
@@ -334,7 +349,7 @@ function rSett(){
   h+=`</div></div>`;
   h+=`<div class="ss"><div class="stit">Strava</div><div class="card"><p style="font-size:13px;color:var(--fg2);margin-bottom:12px">${Strava.isConnected()?'\u2705 Polaczono ze Strava':'Polacz konto Strava aby importowac treningi.'}</p>${Strava.isConnected()?'<button class="btns" onclick="syncStr()">\uD83D\uDD04 Synchronizuj</button><button class="btnd" onclick="Strava.disconnect();rSett();toast(\'Rozlaczono\')">Rozlacz</button>':'<button class="btn-str" onclick="Strava.authorize()">Polacz ze Strava</button>'}</div></div>`;
   h+=`<div class="ss"><div class="stit">Dane</div><button class="btns" onclick="exportData()">\uD83D\uDCE4 Eksportuj (JSON)</button><button class="btnd" onclick="if(confirm('Na pewno?')){S.clearAll();toast('Usunieto');rSett()}">\uD83D\uDDD1\uFE0F Usun dane</button></div>`;
-  h+=`<div class="ainfo"><p>HM Tracker v4.1 (Sprint 3 + History)</p><p>Sub 1:45 \uD83C\uDFC3</p></div>`;
+  h+=`<div class="ainfo"><p>HM Tracker v4.1 (Sprint 3 + Shift)</p><p>Sub 1:45 \uD83C\uDFC3</p></div>`;
   el.innerHTML=h;
 }
 
