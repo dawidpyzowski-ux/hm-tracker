@@ -235,3 +235,31 @@ h1{font-size:28px;font-weight:700;padding:48px 0 4px;letter-spacing:-.3px}
 .str-timer-display{font-size:28px;font-weight:700;color:var(--b);margin-top:8px}
 .str-week{font-size:12px;color:var(--fg2);margin-top:4px}
 
+
+/* ═══ WORKOUT HISTORY ═══ */
+.hist-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.hist-count{font-size:13px;color:var(--fglog{background:var(--c1);border-radius:10px;padding:12px;margin-bottom:6px;border:.5px solid var(--bd);display:flex;gap:12px;align-items:center}.hist-count{font-size:13px;color:var(--fg2)}
+.wlog.extra{border-left:3px solid var(--o)}
+.wlog-date{min-width:55px}
+.wlog-d{font-size:14px;font-weight:600}
+.wlog-dow{font-size:11px;color:var(--fg2)}
+.wlog-info{flex:1}
+.wlog-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.wlog-km{font-size:15px;font-weight:700;color:var(--g)}
+.wlog-pace{font-size:13px;color:var(--b)}
+.wlog-hr{font-size:13px;color:var(--r)}
+.wlog-feel{font-size:16px}
+.wlog-note{font-size:12px;color:var(--fg3);margin-top:4px}
+.wlog-tag{font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(255,159,10,.12);color:var(--o)}
+.wlog-match{font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(48,209,88,.12);color:var(--g)}
+/* ═══ EXTRA WORKOUTS IN PLAN ═══ */
+.extra-section{margin-top:12px;padding-top:12px;border-top:.5px solid var(--bd)}
+.extra-title{font-size:13px;color:var(--o);font-weight:600;margin-bottom:8px}
+.extra-card{background:var(--bg);border-radius:8px;padding:10px;margin-bottom:6px;border:.5px solid var(--bd);display:flex;gap:10px;align-items:center}
+.extra-dt{font-size:13px;font-weight:600;min-width:50px}
+.extra-km{font-size:14px;font-weight:700;color:var(--g)}
+.extra-pace{font-size:12px;color:var(--b)}
+.extra-hr{font-size:12px;color:var(--r)}
+.shift-hint{font-size:11px;color:var(--o);margin-top:4px;padding:4px 8px;background:rgba(255,159,10,.08);border-radius:6px}
+.hist-total{font-size:13px;color:var(--g);font-weight:600}
+
