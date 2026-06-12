@@ -1,4 +1,4 @@
-// HM Tracker - Advanced Analytics (Sprint 6 v4)
+// HM Tracker - Advanced Analytics (Sprint 6 v5 - Smart Drift)
 const Analytics={
   _ch(id,cfg){var el=document.getElementById(id);if(!el)return null;var x=Chart.getChart(el);if(x)x.destroy();return new Chart(el,cfg)},
   _pp(p){if(!p||p==='-')return 0;var s=p.split(':');return parseInt(s[0])+parseInt(s[1]||0)/60},
@@ -6,6 +6,32 @@ const Analytics={
     var logs=S.getAllLogs();var arr=[];
     Object.entries(logs).forEach(function(e){var d=e[0],l=e[1];if(l.distance)arr.push(Object.assign({date:d},l))});
     arr.sort(function(a,b){return a.date.localeCompare(b.date)});return arr;
+  },
+
+  // Trim warmup (2km) and cooldown (1.5km) from splits, return working portion
+  _trimSplits(splits){
+    if(!splits||splits.length<5)return null;
+    var cumDist=[];var total=0;
+    for(var i=0;i<splits.length;i++){total+=(splits[i].distance||0);cumDist.push(total)}
+    var totalKm=total/1000;
+    if(totalKm<8)return null;
+    // Find first split where cumDist >= 2000m (after 2km warmup)
+    var startIdx=0;
+    for(var i=0;i<cumDist.length;i++){if(cumDist[i]>=2000){startIdx=i+1;break}}
+    // Find last split where remaining >= 1500m (before 1.5km cooldown)
+    var endIdx=splits.length-1;
+    for(var i=splits.length-1;i>=0;i--){if(total-cumDist[i]>=1500){endIdx=i;break}}
+    if(endIdx<=startIdx||endIdx-startIdx<3)return null;
+    var working=splits.slice(startIdx,endIdx+1);
+    // Check if steady run (not intervals): stddev of pace < 20% of mean
+    var paces=[];
+    working.forEach(function(sp){if(sp.distance>0&&sp.moving_time>0)paces.push(sp.moving_time/sp.distance*1000)});
+    if(paces.length<4)return null;
+    var mean=paces.reduce(function(a,b){return a+b},0)/paces.length;
+    var variance=paces.reduce(function(a,b){return a+(b-mean)*(b-mean)},0)/paces.length;
+    var stddev=Math.sqrt(variance);
+    if(stddev/mean>0.20)return null; // too variable = intervals
+    return working;
   },
 
   getAE(){
@@ -51,7 +77,6 @@ const Analytics={
       }
       if(bestVO2>20&&bestVO2<90)trend.push({date:l.date,vo2:Math.round(bestVO2*10)/10});
     });
-    // Uth formula ONLY as fallback when no trend data
     if(trend.length===0){
       var rhr=S.getSettings().rhr||0;
       if(rhr>0){
@@ -76,35 +101,28 @@ const Analytics={
     var self=this;
     var z={easy:{km:0,label:'Easy (>5:30)'},tempo:{km:0,label:'Tempo (5:00-5:30)'},threshold:{km:0,label:'Threshold (4:30-5:00)'},interval:{km:0,label:'Interval (<4:30)'}};
     var total=0;
-    var usedSplits=false;
     this._logs().forEach(function(l){
       var km=parseFloat(l.distance);if(km<=0)return;
-      // Try per-km splits from Strava detail
       if(l.strava_id){
         var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
         if(det&&det.splits&&det.splits.length>0){
-          usedSplits=true;
           det.splits.forEach(function(sp){
             if(!sp.distance||sp.distance<100||!sp.moving_time)return;
             var spKm=sp.distance/1000;
             var spPace=sp.moving_time/sp.distance*1000/60;
             total+=spKm;
-            if(spPace>5.5)z.easy.km+=spKm;
-            else if(spPace>5)z.tempo.km+=spKm;
-            else if(spPace>4.5)z.threshold.km+=spKm;
-            else z.interval.km+=spKm;
+            if(spPace>5.5)z.easy.km+=spKm;else if(spPace>5)z.tempo.km+=spKm;else if(spPace>4.5)z.threshold.km+=spKm;else z.interval.km+=spKm;
           });
           return;
         }
       }
-      // Fallback: use avg pace for whole workout
       if(!l.pace)return;
       var p=self._pp(l.pace);if(p<=0)return;
       total+=km;
       if(p>5.5)z.easy.km+=km;else if(p>5)z.tempo.km+=km;else if(p>4.5)z.threshold.km+=km;else z.interval.km+=km;
     });
     Object.values(z).forEach(function(v){v.km=Math.round(v.km*10)/10;v.pct=total>0?Math.round(v.km/total*100):0});
-    return{zones:z,total:Math.round(total*10)/10,usedSplits:usedSplits};
+    return{zones:z,total:Math.round(total*10)/10};
   },
 
   getCumDist(){
@@ -177,19 +195,49 @@ const Analytics={
     return arr;
   },
 
-  getFI(){
+  // Smart Pace Drift: first half vs second half of WORKING portion (no warmup/cooldown)
+  getPaceDrift(){
+    var self=this;
     var arr=[];
     this._logs().forEach(function(l){
-      if(!l.strava_id||parseFloat(l.distance)<6)return;
+      if(!l.strava_id||parseFloat(l.distance)<8)return;
       var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
-      if(!det||!det.splits||det.splits.length<6)return;
-      var sp=det.splits;
-      var f3=0,l3x=0;
-      for(var i=0;i<3;i++){if(sp[i]&&sp[i].distance>0)f3+=(sp[i].moving_time||0)/(sp[i].distance)*1000}
-      for(var i=sp.length-3;i<sp.length;i++){if(sp[i]&&sp[i].distance>0)l3x+=(sp[i].moving_time||0)/(sp[i].distance)*1000}
-      f3/=3;l3x/=3;if(f3<=0)return;
-      var idx=Math.round((l3x-f3)/f3*100);
-      arr.push({date:l.date,index:idx});
+      if(!det||!det.splits)return;
+      var working=self._trimSplits(det.splits);
+      if(!working)return;
+      var mid=Math.floor(working.length/2);
+      var firstPace=0,secondPace=0;
+      for(var i=0;i<mid;i++){if(working[i].distance>0)firstPace+=working[i].moving_time/working[i].distance*1000}
+      for(var i=mid;i<working.length;i++){if(working[i].distance>0)secondPace+=working[i].moving_time/working[i].distance*1000}
+      firstPace/=mid;secondPace/=(working.length-mid);
+      if(firstPace<=0)return;
+      var drift=Math.round((secondPace-firstPace)/firstPace*100);
+      arr.push({date:l.date,drift:drift,splits:working.length});
+    });
+    return arr;
+  },
+
+  // Cardiac Drift: HR rise in second half at similar pace
+  getCardiacDrift(){
+    var self=this;
+    var arr=[];
+    this._logs().forEach(function(l){
+      if(!l.strava_id||parseFloat(l.distance)<8)return;
+      var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
+      if(!det||!det.splits)return;
+      var working=self._trimSplits(det.splits);
+      if(!working)return;
+      // Check that splits have HR data
+      var hasHR=working.every(function(sp){return sp.average_heartrate>0});
+      if(!hasHR)return;
+      var mid=Math.floor(working.length/2);
+      var firstHR=0,secondHR=0;
+      for(var i=0;i<mid;i++)firstHR+=working[i].average_heartrate;
+      for(var i=mid;i<working.length;i++)secondHR+=working[i].average_heartrate;
+      firstHR/=mid;secondHR/=(working.length-mid);
+      if(firstHR<=0)return;
+      var drift=Math.round((secondHR-firstHR)/firstHR*100*10)/10;
+      arr.push({date:l.date,drift:drift,firstHR:Math.round(firstHR),secondHR:Math.round(secondHR)});
     });
     return arr;
   },
@@ -252,7 +300,8 @@ const Analytics={
     var rr=this.getRR();var str=this.getStreak();var con=this.getConsistency();var vo2=this.getVO2();
     var h='';
 
-    h+='<div class="an-section"><div class="an-title">\uD83C\uDFC1 Race Readiness</div>';
+    h+='<div class="an-section"><div class="an-title">';
+    h+='\uD83C\uDFC1 Race Readiness</div>';
     h+='<div class="an-gauge-wrap"><div class="an-gauge" style="--pct:'+rr.score+'"><div class="an-gauge-val">'+rr.score+'</div></div><div class="an-gauge-label">'+rr.label+'</div></div>';
     h+='<div class="an-rr-row"><div class="an-rr-item"><div class="an-rr-v">'+rr.components.fitness+'</div><div class="an-rr-l">Fitness</div></div><div class="an-rr-item"><div class="an-rr-v">'+rr.components.volume+'</div><div class="an-rr-l">Objetosc</div></div><div class="an-rr-item"><div class="an-rr-v">'+rr.components.consistency+'</div><div class="an-rr-l">Stalosc</div></div><div class="an-rr-item"><div class="an-rr-v">'+rr.components.freshness+'</div><div class="an-rr-l">Swiezosc</div></div></div></div>';
 
@@ -272,7 +321,8 @@ const Analytics={
     h+='<div class="an-section"><div class="an-title">\uD83D\uDCC8 Dystans narastajacy (plan vs realizacja)</div><canvas id="an-cum"></canvas></div>';
     h+='<div class="an-section"><div class="an-title">\u26A1 Tempo @ HR 150 (nizszy = lepiej)</div><canvas id="an-hr150"></canvas></div>';
     h+='<div class="an-section"><div class="an-title">\uD83D\uDCCA Tydzien po tygodniu</div><canvas id="an-wow"></canvas></div>';
-    h+='<div class="an-section"><div class="an-title">\uD83D\uDCA4 Fatigue Index (% spadku tempa)</div><canvas id="an-fi"></canvas></div>';
+    h+='<div class="an-section"><div class="an-title">\uD83D\uDCC9 Pace Drift (bez rozgrzewki/schlodzenia)</div><canvas id="an-pdrift"></canvas></div>';
+    h+='<div class="an-section"><div class="an-title">\uD83D\uDC93 Cardiac Drift (wzrost HR w 2. polowie)</div><canvas id="an-cdrift"></canvas></div>';
     h+='<div class="an-section"><div class="an-title">\uD83D\uDC63 Kadencja vs Tempo</div><canvas id="an-cad"></canvas></div>';
     h+='<div class="an-section"><div class="an-title">\u26F0\uFE0F Narastajace przewyzszenie</div><canvas id="an-elev"></canvas></div>';
 
@@ -305,7 +355,7 @@ const Analytics={
     if(vo2.trend.length>1){try{this._ch('an-vo2',{type:'line',data:{labels:vo2.trend.map(function(v){return v.date.substring(5)}),datasets:[{data:vo2.trend.map(function(v){return v.vo2}),borderColor:'#30D158',borderWidth:2,pointRadius:3,pointBackgroundColor:'#30D158',fill:true,backgroundColor:'rgba(48,209,88,.1)',tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:8}},y:{ticks:{color:'#999'}}}}})}catch(e){console.warn('VO2 err',e)}}
 
     var dist=this.getDist();var dz=dist.zones;
-    console.log('Dist:',dz.easy.km,'e',dz.tempo.km,'t',dz.threshold.km,'th',dz.interval.km,'i','splits:',dist.usedSplits);
+    console.log('Dist:',dz.easy.km,'e',dz.tempo.km,'t',dz.threshold.km,'th',dz.interval.km,'i');
     try{this._ch('an-dist',{type:'doughnut',data:{labels:[dz.easy.label+' '+dz.easy.pct+'%',dz.tempo.label+' '+dz.tempo.pct+'%',dz.threshold.label+' '+dz.threshold.pct+'%',dz.interval.label+' '+dz.interval.pct+'%'],datasets:[{data:[dz.easy.km,dz.tempo.km,dz.threshold.km,dz.interval.km],backgroundColor:['#30D158','#0A84FF','#FF9F0A','#FF453A'],borderWidth:0}]},options:{responsive:true,plugins:{legend:{display:true,position:'bottom',labels:{color:'#ccc',font:{size:11}}}}}})}catch(e){console.warn('Dist err',e)}
 
     var cd=this.getCumDist();
@@ -320,9 +370,15 @@ const Analytics={
     console.log('WoW:',wow.length);
     try{this._ch('an-wow',{type:'bar',data:{labels:wow.map(function(w){return 'T'+w.week}),datasets:[{label:'km',data:wow.map(function(w){return w.km}),backgroundColor:'rgba(10,132,255,.6)',borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999'}},y:{ticks:{color:'#999'}}}}})}catch(e){console.warn('WoW err',e)}
 
-    var fi=this.getFI();
-    console.log('FI:',fi.length);
-    if(fi.length>0){try{this._ch('an-fi',{type:'bar',data:{labels:fi.map(function(f){return f.date.substring(5)}),datasets:[{data:fi.map(function(f){return f.index}),backgroundColor:fi.map(function(f){return f.index<=0?'#30D158':f.index<=3?'#0A84FF':f.index<=6?'#FF9F0A':'#FF453A'}),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:10}},y:{ticks:{color:'#999',callback:function(v){return v+'%'}}}}}})}catch(e){console.warn('FI err',e)}}
+    // Pace Drift chart
+    var pd=this.getPaceDrift();
+    console.log('PaceDrift:',pd.length);
+    if(pd.length>0){try{this._ch('an-pdrift',{type:'bar',data:{labels:pd.map(function(p){return p.date.substring(5)}),datasets:[{data:pd.map(function(p){return p.drift}),backgroundColor:pd.map(function(p){return p.drift<=0?'#30D158':p.drift<=3?'#0A84FF':p.drift<=6?'#FF9F0A':'#FF453A'}),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){var v=ctx.raw;return(v<=0?'':'+')+v+'% '+(v<=0?'Negative split!':v<=3?'Stabilne':v<=6?'Lekki drift':'Duzy drift')}}}},scales:{x:{ticks:{color:'#999',maxTicksLimit:10}},y:{ticks:{color:'#999',callback:function(v){return(v>0?'+':'')+v+'%'}}}}}})}catch(e){console.warn('PaceDrift err',e)}}
+
+    // Cardiac Drift chart
+    var cdr=this.getCardiacDrift();
+    console.log('CardiacDrift:',cdr.length);
+    if(cdr.length>0){try{this._ch('an-cdrift',{type:'bar',data:{labels:cdr.map(function(c){return c.date.substring(5)}),datasets:[{data:cdr.map(function(c){return c.drift}),backgroundColor:cdr.map(function(c){return c.drift<=2?'#30D158':c.drift<=5?'#FF9F0A':'#FF453A'}),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){var i=ctx.dataIndex;var c=cdr[i];return c.firstHR+' -> '+c.secondHR+' bpm ('+(c.drift>0?'+':'')+c.drift+'%)'}}}},scales:{x:{ticks:{color:'#999',maxTicksLimit:10}},y:{ticks:{color:'#999',callback:function(v){return(v>0?'+':'')+v+'%'}}}}}})}catch(e){console.warn('CardiacDrift err',e)}}
 
     var cp=this.getCadPace();
     console.log('CadPace:',cp.length);
@@ -333,6 +389,6 @@ const Analytics={
     if(elev.byWeek.length>0&&elev.total>0){try{this._ch('an-elev',{type:'bar',data:{labels:elev.byWeek.map(function(e){return 'T'+e.week}),datasets:[{label:'Tygodniowe (m)',data:elev.byWeek.map(function(e){return e.elev}),backgroundColor:'rgba(100,210,255,.5)',borderRadius:4},{label:'Narastajace (m)',data:elev.byWeek.map(function(e){return e.cum}),type:'line',borderColor:'#FF9F0A',borderWidth:2,pointRadius:2,fill:false,yAxisID:'y2'}]},options:{responsive:true,plugins:{legend:{display:true,labels:{color:'#ccc'}}},scales:{x:{ticks:{color:'#999'}},y:{position:'left',ticks:{color:'#999'}},y2:{position:'right',grid:{display:false},ticks:{color:'#999'}}}}})}catch(e){console.warn('Elev err',e)}}
 
     console.log('Analytics drawCharts DONE');
-    }catch(e){console.error('Analytics drawCharts global error:',e)}
+    }catch(e){console.error('drawCharts global error:',e)}
   }
 };
