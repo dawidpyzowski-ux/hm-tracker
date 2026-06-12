@@ -161,10 +161,63 @@ function rPlan(){
       }
       h+=`<div class="fg"><label>Notatki</label><textarea id="ln-${WI}-${i}">${log.notes||''}</textarea></div><div class="fa"><button class="bs${log.status==='done'?' act':''}" onclick="setStatus(${WI},${i},'done')">\u2705 Wykonany</button><button class="bs${log.status==='skipped'?' act':''}" onclick="setStatus(${WI},${i},'skipped')">\u23ED\uFE0F Pominiety</button><button class="bsv" onclick="saveLog(${WI},${i})">Zapisz</button></div></div>`;
     }
+    
     h+=`</div></div>`;
   });
+
+  // ═══ DODATKOWE TRENINGI W TYM TYGODNIU (Sprint 3.5) ═══
+  const wStart=w.start;
+  const wEnd=getDayDate(wStart,6);
+  const wPlannedDates={};
+  w.days.forEach(d=>{wPlannedDates[getDayDate(wStart,d.dow)]=d});
+  const logs=S.getAllLogs();
+  const extraLogs=[];
+  Object.entries(logs).forEach(([date,l])=>{
+    if(date>=wStart&&date<=wEnd&&l.distance){
+      const planned=wPlannedDates[date];
+      if(!planned||planned.rest){
+        extraLogs.push({date,log:l});
+      }
+    }
+  });
+
+  // Shift hints: check if unlogged training days have a matching workout ±1 day
+  w.days.forEach(d=>{
+    if(d.rest||d.km<=0)return;
+    const dt=getDayDate(wStart,d.dow);
+    const log=S.getLog(dt);
+    if(log&&log.distance)return; // already logged
+    // Check ±1 day
+    for(const offset of [-1,1]){
+      const nearby=getDayDate(dt,offset);
+      if(nearby<wStart||nearby>wEnd)continue;
+      const nLog=S.getLog(nearby);
+      if(nLog&&nLog.distance){
+        const nKm=parseFloat(nLog.distance);
+        if(nKm>=d.km*0.7&&nKm<=d.km*1.3){
+          h+=`<div class="shift-hint">\uD83D\uDD04 ${d.name} (${d.type}, ${d.km} km) \u2192 mozliwy przesuniety trening z ${fmtD(nearby)} (${nLog.distance} km @ ${nLog.pace||'?'})</div>`;
+          break;
+        }
+      }
+    }
+  });
+
+  if(extraLogs.length){
+    h+=`<div class="extra-section"><div class="extra-title">\u2728 Dodatkowe treningi w tym tygodniu (${extraLogs.length})</div>`;
+    extraLogs.forEach(e=>{
+      const dd=new Date(e.date+'T12:00:00');
+      const DOW=['Nd','Pn','Wt','Sr','Cz','Pt','Sb'];
+      h+=`<div class="extra-card"><span class="extra-dt">${DOW[dd.getDay()]} ${fmtD(e.date)}</span><span class="extra-km">${e.log.distance} km</span>`;
+      if(e.log.pace)h+=`<span class="extra-pace">\u23F1 ${e.log.pace}</span>`;
+      if(e.log.hr)h+=`<span class="extra-hr">\u2764 ${e.log.hr}</span>`;
+      h+=`</div>`;
+    });
+    h+=`</div>`;
+  }
+
   el.innerHTML=h;
 }
+
 function toggleDay(wi,di){document.getElementById('dc-'+wi+'-'+di).classList.toggle('exp')}
 function setFeeling(wi,di,f){document.querySelectorAll('#lf-'+wi+'-'+di+' .fb').forEach(b=>b.classList.remove('act'));document.querySelector('#lf-'+wi+'-'+di+' .fb[data-f="'+f+'"]').classList.add('act')}
 function setStatus(wi,di,st){const w=PLAN[wi],d=w.days[di],dt=getDayDate(w.start,d.dow);const log=S.getLog(dt);log.status=log.status===st?'':st;S.setLog(dt,log);rPlan()}
