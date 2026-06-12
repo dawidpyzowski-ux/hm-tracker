@@ -19,19 +19,25 @@ const Analytics={
   },
 
   // 2. VO2max (Jack Daniels simplified from best pace)
+  
   getVO2(){
     const logs=this._logs().filter(l=>l.pace&&parseFloat(l.distance)>=3);
     const trend=[];
     logs.forEach(l=>{
-      const pMin=this._pp(l.pace); if(pMin<=0)return;
-      const vm=1000/pMin; // m/min
-      const vo2=-4.60+0.182258*vm+0.000104*vm*vm;
+      const pMin=this._pp(l.pace);if(pMin<=0)return;
+      const km=parseFloat(l.distance);
+      const vm=1000/pMin;
+      const tMin=pMin*km;
+      const oc=-4.60+0.182258*vm+0.000104*vm*vm;
+      const frac=0.8+0.1894393*Math.exp(-0.012778*tMin)+0.2989558*Math.exp(-0.1932605*tMin);
+      const vo2=oc/frac;
       if(vo2>20&&vo2<90)trend.push({date:l.date,vo2:Math.round(vo2*10)/10});
     });
     const cur=trend.length?trend[trend.length-1].vo2:0;
-    const lvl=cur>=55?'Elitarny':cur>=50?'Swietny':cur>=45?'Bardzo dobry':cur>=40?'Dobry':cur>=35?'Sredni':'Poczatkujacy';
+    const lvl=cur>=60?'Elitarny':cur>=55?'Swietny':cur>=50?'Bardzo dobry':cur>=45?'Dobry':cur>=40?'Sredni':'Poczatkujacy';
     return{current:cur,trend,level:lvl};
   },
+
 
   // 3. Training Distribution (by pace zones)
   getDist(){
