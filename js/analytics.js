@@ -141,12 +141,26 @@ const Analytics={
       if(!det||!det.max_hr||!l.hr)return;arr.push({date:l.date,spread:det.max_hr-parseFloat(l.hr)});
     });return arr;
   },
+
   getCadPace(){
     var arr=[];this._logs().forEach(function(l){
-      if(!l.strava_id||!l.pace)return;var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
-      if(!det||!det.cadence)return;arr.push({pace:Analytics._pp(l.pace),cadence:Math.round(det.cadence*2),date:l.date});
+      if(!l.strava_id||!l.pace)return;
+      var cad=0;
+      var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
+      if(det&&det.cadence){cad=Math.round(det.cadence*2)}
+      else{
+        var str=JSON.parse(localStorage.getItem('strava_streams_'+l.strava_id)||'null');
+        if(str){
+          var cd=null;
+          if(Array.isArray(str)){var f=str.find(function(s){return s.type==='cadence'});if(f)cd=f.data}
+          else if(str.cadence&&str.cadence.data){cd=str.cadence.data}
+          if(cd&&cd.length>0){var sum=0,cnt=0;cd.forEach(function(v){if(v>0){sum+=v;cnt++}});if(cnt>0)cad=Math.round(sum/cnt*2)}
+        }
+      }
+      if(cad>0)arr.push({pace:Analytics._pp(l.pace),cadence:cad,date:l.date});
     });return arr;
   },
+
   getPaceDrift(){
     var self=this;var arr=[];
     this._logs().forEach(function(l){
