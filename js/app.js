@@ -267,7 +267,7 @@ if(typeof Analytics!=='undefined'){h+=Analytics.render()}
   h+=`<div class="chc"><div class="ch-t">\uD83D\uDE0A Samopoczucie</div><canvas id="ch3"></canvas></div>`;
   h+=`<div class="chc"><div class="ch-t">\uD83D\uDCC5 Objetosc miesieczna</div><canvas id="ch4"></canvas></div>`;
   el.innerHTML=h;
-  setTimeout(()=>{Charts.weeklyKm('ch1');Charts.paceTrend('ch2');Charts.feelingTrend('ch3');Charts.monthlyVol('ch4');Charts.trainingLoad('ch-tl');Charts.predTrend('ch-pred')},100);
+  setTimeout(()=>{if(typeof Analytics!=='undefined')try{Analytics.drawCharts()}catch(e){console.warn(e)};Charts.weeklyKm('ch1');Charts.paceTrend('ch2');Charts.feelingTrend('ch3');Charts.monthlyVol('ch4');Charts.trainingLoad('ch-tl');Charts.predTrend('ch-pred')},100);
 }
 
 // --- SPRINT 4: Toggle detail view for a workout ---
