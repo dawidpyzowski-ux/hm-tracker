@@ -218,7 +218,7 @@ function rStat(){
   h+=`</div>`;
 
   // Personal Records (Sprint 4)
-  if(typeof PR!=='undefined')h+=PR.render();
+if(typeof Analytics!=='undefined'){h+=Analytics.render()}
 
   // History (shift-aware + clickable detail expand)
   const logs=S.getAllLogs();
