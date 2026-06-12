@@ -269,19 +269,28 @@ function rStat(){
 }
 
 // --- SPRINT 4: Toggle detail view for a workout ---
+
 function toggleDetail(el,sid){
-  el.classList.toggle('expanded');
+  if(el.classList.contains('expanded')){
+    el.classList.remove('expanded');
+    const det=document.getElementById('det-'+sid);
+    if(det)det.innerHTML='';
+    return;
+  }
+  document.querySelectorAll('.wlog.expanded').forEach(w=>{
+    w.classList.remove('expanded');
+    const d=w.querySelector('.wlog-detail');
+    if(d)d.innerHTML='';
+  });
+  el.classList.add('expanded');
   const det=document.getElementById('det-'+sid);
   if(!det)return;
-  if(el.classList.contains('expanded')&&!det.innerHTML){
-    if(typeof ActDetail!=='undefined'){
-      det.innerHTML=ActDetail.render(sid);
-      setTimeout(()=>ActDetail.drawCharts(sid),100);
-    }else{
-      det.innerHTML='<div class="empty">Modul ActDetail nie zaladowany. Sprawdz index.html.</div>';
-    }
+  if(typeof ActDetail!=='undefined'){
+    det.innerHTML=ActDetail.render(sid);
+    setTimeout(()=>ActDetail.drawCharts(sid),100);
   }
 }
+
 
 // --- SETTINGS ---
 function rSett(){
