@@ -1,4 +1,4 @@
-// HM Tracker - Activity Detail Module (Sprint 4)
+// HM Tracker - Activity Detail Module (Sprint 4) - Fixed unique IDs
 const ActDetail={
   ZONES:[
     {name:'Z1 Recovery',min:0,max:130,color:'#30D158'},
@@ -15,7 +15,6 @@ const ActDetail={
     return {detail,streams};
   },
 
-  // Extract stream data (handles both array-of-objects and keyed-object formats)
   _s(streams,key){
     if(!streams)return null;
     if(streams[key]&&streams[key].data)return streams[key].data;
@@ -23,10 +22,20 @@ const ActDetail={
     return null;
   },
 
+  // Safe chart create - destroy existing first
+  _ch(id,cfg){
+    const el=document.getElementById(id);
+    if(!el)return null;
+    const existing=Chart.getChart(el);
+    if(existing)existing.destroy();
+    return new Chart(el,cfg);
+  },
+
   render(sid,logData){
     const d=this.getData(sid);
     if(!d||!d.detail)return '<div class="empty">Brak szczegolowych danych. Zsynchronizuj Strave.</div>';
     const det=d.detail;
+    const id=sid; // unique suffix
     let h='';
 
     // Summary row
@@ -55,12 +64,12 @@ const ActDetail={
         const pm=Math.floor(pace/60),ps=Math.round(pace%60);
         const pStr=pm+':'+String(ps).padStart(2,'0');
         const cls=i===fi?' class="ad-split-fast"':i===si?' class="ad-split-slow"':'';
-        h+=`<tr${cls}><td>${i+1}</td><td>${pStr}</td><td>${sp.average_heartrate?Math.round(sp.average_heartrate):'-'}</td><td>${sp.elevation_difference?sp.elevation_difference.toFixed(0)+'m':'-'}</td></tr>`;
+        h+=`<tr${cls}><td>${i+1}</td><td>${pStr}</td><td>${sp.average_heartrate?Math.round(sp.average_heartrate):'-'}</td><td>${sp.elevation_difference!=null?sp.elevation_difference.toFixed(0)+'m':'-'}</td></tr>`;
       });
       h+='</tbody></table></div>';
     }
 
-    // Chart sections
+    // Chart sections - ALL with unique IDs using sid
     const str=d.streams;
     const hasHR=!!this._s(str,'heartrate');
     const hasVel=!!this._s(str,'velocity_smooth');
@@ -68,24 +77,21 @@ const ActDetail={
     const hasCad=!!this._s(str,'cadence');
     const hasGPS=!!this._s(str,'latlng');
 
-    if(hasHR)h+='<div class="ad-section"><div class="ad-title">\u2764\uFE0F Tetno</div><canvas id="ad-hr"></canvas></div>';
-    if(hasVel)h+='<div class="ad-section"><div class="ad-title">\uD83D\uDCC9 Tempo</div><canvas id="ad-pace"></canvas></div>';
-    if(hasAlt)h+='<div class="ad-section"><div class="ad-title">\u26F0\uFE0F Profil wysokosci</div><canvas id="ad-alt"></canvas></div>';
-    if(hasCad)h+='<div class="ad-section"><div class="ad-title">\uD83D\uDC63 Kadencja</div><canvas id="ad-cad"></canvas></div>';
-    if(hasHR)h+='<div class="ad-section"><div class="ad-title">\uD83D\uDCCA Strefy HR</div><canvas id="ad-zones"></canvas></div>';
-    if(hasGPS)h+='<div class="ad-section"><div class="ad-title">\uD83D\uDDFA\uFE0F Trasa</div><div id="ad-map" style="height:250px;border-radius:10px;z-index:1"></div></div>';
+    if(hasHR)h+=`<div class="ad-section"><div class="ad-title">\u2764\uFE0F Tetno</div><canvas id="ad-hr-${id}"></canvas></div>`;
+    if(hasVel)h+=`<div class="ad-section"><div class="ad-title">\uD83D\uDCC9 Tempo</div><canvas id="ad-pace-${id}"></canvas></div>`;
+    if(hasAlt)h+=`<div class="ad-section"><div class="ad-title">\u26F0\uFE0F Profil wysokosci</div><canvas id="ad-alt-${id}"></canvas></div>`;
+    if(hasCad)h+=`<div class="ad-section"><div class="ad-title">\uD83D\uDC63 Kadencja</div><canvas id="ad-cad-${id}"></canvas></div>`;
+    if(hasHR)h+=`<div class="ad-section"><div class="ad-title">\uD83D\uDCCA Strefy HR</div><canvas id="ad-zones-${id}"></canvas></div>`;
+    if(hasGPS)h+=`<div class="ad-section"><div class="ad-title">\uD83D\uDDFA\uFE0F Trasa</div><div id="ad-map-${id}" style="height:250px;border-radius:10px;z-index:1"></div></div>`;
 
     return h;
   },
 
- 
-  _ch(id,cfg){const c=Chart.getChart(id);if(c)c.destroy();return new Chart(id,cfg)},
-
   drawCharts(sid){
     const d=this.getData(sid);
     if(!d||!d.streams)return;
-
     const str=d.streams;
+    const id=sid;
     const dist=this._s(str,'distance');
     const hr=this._s(str,'heartrate');
     const vel=this._s(str,'velocity_smooth');
@@ -94,45 +100,35 @@ const ActDetail={
     const latlng=this._s(str,'latlng');
     const time=this._s(str,'time');
 
-    // Convert distance to km for x-axis
     const distKm=dist?dist.map(d=>Math.round(d/10)/100):null;
-
-    // Downsample for performance (every Nth point)
     const maxPts=300;
     const step=distKm?Math.max(1,Math.floor(distKm.length/maxPts)):1;
     const ds=(arr)=>{if(!arr)return[];const r=[];for(let i=0;i<arr.length;i+=step)r.push(arr[i]);return r};
-
     const dkm=ds(distKm);
     const labels=dkm.map(d=>d.toFixed(1));
 
-    if(hr&&document.getElementById('ad-hr')){
+    if(hr&&document.getElementById('ad-hr-'+id)){
       const hrDs=ds(hr);
-      const colors=hrDs.map(v=>{
-        for(let i=this.ZONES.length-1;i>=0;i--){if(v>=this.ZONES[i].min)return this.ZONES[i].color}
-        return '#999';
-      });
-      this._ch('ad-hr',{type:'line',data:{labels,datasets:[{data:hrDs,borderColor:colors,segment:{borderColor:ctx=>{const v=hrDs[ctx.p1DataIndex];for(let i=this.ZONES.length-1;i>=0;i--){if(v>=this.ZONES[i].min)return this.ZONES[i].color}return '#999'}},borderWidth:1.5,pointRadius:0,fill:false,tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:true,title:{display:true,text:'km',color:'#999'},ticks:{color:'#999',maxTicksLimit:8}},y:{title:{display:true,text:'bpm',color:'#999'},ticks:{color:'#999'}}}}});
+      this._ch('ad-hr-'+id,{type:'line',data:{labels,datasets:[{data:hrDs,borderColor:'#FF453A',borderWidth:1.5,pointRadius:0,fill:false,tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:true,title:{display:true,text:'km',color:'#999'},ticks:{color:'#999',maxTicksLimit:8}},y:{title:{display:true,text:'bpm',color:'#999'},ticks:{color:'#999'}}}}});
     }
 
-    if(vel&&document.getElementById('ad-pace')){
+    if(vel&&document.getElementById('ad-pace-'+id)){
       const velDs=ds(vel);
-      // Convert velocity to pace (min/km) - invert
       const paceData=velDs.map(v=>v>0?1000/v/60:0);
-      this._ch('ad-pace',{type:'line',data:{labels,datasets:[{data:paceData,borderColor:'#0A84FF',borderWidth:1.5,pointRadius:0,fill:true,backgroundColor:'rgba(10,132,255,.15)',tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:8}},y:{reverse:true,title:{display:true,text:'min/km',color:'#999'},ticks:{color:'#999',callback:v=>{const m=Math.floor(v);const s=Math.round((v-m)*60);return m+':'+String(s).padStart(2,'0')}}}}}});
+      this._ch('ad-pace-'+id,{type:'line',data:{labels,datasets:[{data:paceData,borderColor:'#0A84FF',borderWidth:1.5,pointRadius:0,fill:true,backgroundColor:'rgba(10,132,255,.15)',tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:8}},y:{reverse:true,title:{display:true,text:'min/km',color:'#999'},ticks:{color:'#999',callback:v=>{const m=Math.floor(v);const s=Math.round((v-m)*60);return m+':'+String(s).padStart(2,'0')}}}}}});
     }
 
-    if(alt&&document.getElementById('ad-alt')){
+    if(alt&&document.getElementById('ad-alt-'+id)){
       const altDs=ds(alt);
-      this._ch('ad-alt',{type:'line',data:{labels,datasets:[{data:altDs,borderColor:'#64D2FF',borderWidth:1.5,pointRadius:0,fill:true,backgroundColor:'rgba(100,210,255,.2)',tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:8}},y:{title:{display:true,text:'m n.p.m.',color:'#999'},ticks:{color:'#999'}}}}});
+      this._ch('ad-alt-'+id,{type:'line',data:{labels,datasets:[{data:altDs,borderColor:'#64D2FF',borderWidth:1.5,pointRadius:0,fill:true,backgroundColor:'rgba(100,210,255,.2)',tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:8}},y:{title:{display:true,text:'m n.p.m.',color:'#999'},ticks:{color:'#999'}}}}});
     }
 
-    if(cad&&document.getElementById('ad-cad')){
-      const cadDs=ds(cad).map(c=>c*2); // Strava half-cadence for running
-      this._ch('ad-cad',{type:'line',data:{labels,datasets:[{data:cadDs,borderColor:'#BF5AF2',borderWidth:1.5,pointRadius:0,fill:true,backgroundColor:'rgba(191,90,242,.15)',tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:8}},y:{title:{display:true,text:'kroki/min',color:'#999'},ticks:{color:'#999'}}}}});
+    if(cad&&document.getElementById('ad-cad-'+id)){
+      const cadDs=ds(cad).map(c=>c*2);
+      this._ch('ad-cad-'+id,{type:'line',data:{labels,datasets:[{data:cadDs,borderColor:'#BF5AF2',borderWidth:1.5,pointRadius:0,fill:true,backgroundColor:'rgba(191,90,242,.15)',tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:8}},y:{title:{display:true,text:'kroki/min',color:'#999'},ticks:{color:'#999'}}}}});
     }
 
-    if(hr&&document.getElementById('ad-zones')){
-      // Calculate time in each zone
+    if(hr&&document.getElementById('ad-zones-'+id)){
       const zoneSec=this.ZONES.map(()=>0);
       const dt=time?time.map((t,i)=>i>0?t-time[i-1]:1):hr.map(()=>1);
       hr.forEach((v,i)=>{
@@ -143,13 +139,15 @@ const ActDetail={
       const total=zoneSec.reduce((a,b)=>a+b,1);
       const pcts=zoneSec.map(s=>Math.round(s/total*100));
       const mins=zoneSec.map(s=>Math.round(s/60));
-      this._ch('ad-zones',{type:'doughnut',data:{labels:this.ZONES.map((z,i)=>`${z.name} ${pcts[i]}% (${mins[i]}min)`),datasets:[{data:zoneSec,backgroundColor:this.ZONES.map(z=>z.color),borderWidth:0}]},options:{responsive:true,plugins:{legend:{display:true,position:'bottom',labels:{color:'#ccc',font:{size:11},padding:8}}}}});
+      this._ch('ad-zones-'+id,{type:'doughnut',data:{labels:this.ZONES.map((z,i)=>`${z.name} ${pcts[i]}% (${mins[i]}min)`),datasets:[{data:zoneSec,backgroundColor:this.ZONES.map(z=>z.color),borderWidth:0}]},options:{responsive:true,plugins:{legend:{display:true,position:'bottom',labels:{color:'#ccc',font:{size:11},padding:8}}}}});
     }
 
-    if(latlng&&document.getElementById('ad-map')&&typeof L!=='undefined'){
+    if(latlng&&document.getElementById('ad-map-'+id)&&typeof L!=='undefined'){
+      const mapEl=document.getElementById('ad-map-'+id);
+      if(mapEl._leaflet_id){mapEl._leaflet_id=null;mapEl.innerHTML=''}
       const coords=latlng.filter(c=>c&&c.length===2);
       if(coords.length){
-        const map=L.map('ad-map',{zoomControl:false,attributionControl:false});
+        const map=L.map('ad-map-'+id,{zoomControl:false,attributionControl:false});
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18}).addTo(map);
         const line=L.polyline(coords,{color:'#0A84FF',weight:3,opacity:.8}).addTo(map);
         map.fitBounds(line.getBounds(),{padding:[20,20]});
