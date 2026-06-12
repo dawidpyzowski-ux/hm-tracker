@@ -263,30 +263,54 @@ function rStat(){
   const DOW=['Niedz','Pon','Wt','Sr','Czw','Pt','Sob'];
   let h=`<h1>Statystyki</h1><p class="sub">Postepy treningowe</p>`;
 
+  // ═══ BUILD SHIFT MAP (used by heatmap + history) ═══
+  const shiftMap={};
+  PLAN.forEach(w=>{
+    const wEnd=getDayDate(w.start,6);
+    w.days.forEach(d=>{
+      if(d.rest||d.km<=0)return;
+      const dt=getDayDate(w.start,d.dow);
+      const log=S.getLog(dt);
+      if(log&&log.distance)return;
+      const shifted=findShiftedLog(w.start,wEnd,dt,d.km);
+      if(shifted){
+        shiftMap[shifted.date]={week:w.weekNum,type:d.type,plannedDate:dt,km:d.km};
+      }
+    });
+  });
+
+  // ═══ HEAT MAP (shift-aware) ═══
   h+=`<div class="hmap"><div class="hmap-title">\uD83D\uDFE9 Mapa aktywnosci (13 tygodni)</div>`;
   const dayH=['Pn','Wt','Sr','Cz','Pt','Sb','Nd'];
   h+=`<div class="hmap-days"><div></div>`;dayH.forEach(d=>{h+=`<div class="hmap-dh">${d}</div>`});h+=`</div>`;
   h+=`<div class="hmap-grid">`;
   PLAN.forEach(w=>{
+    const wEnd=getDayDate(w.start,6);
     h+=`<div class="hmap-wk">T${w.weekNum}</div>`;
     w.days.forEach(d=>{
       const dt=getDayDate(w.start,d.dow);const log=S.getLog(dt);const past=dt<t;const isToday=dt===t;
+      // Check if this planned day has a shifted match
+      let hasShifted=false;
+      if(!d.rest&&d.km>0&&!log.distance&&!log.status){
+        const sh=findShiftedLog(w.start,wEnd,dt,d.km);
+        if(sh)hasShifted=true;
+      }
       let cls='hm-cell';
       if(d.rest)cls+=' rest';
       else if(!past&&!isToday)cls+=' future';
-      else if(log.status==='done')cls+=' done';
+      else if(log.status==='done'||hasShifted)cls+=' done';
       else if(log.status==='skipped')cls+=' skip';
       else if(past)cls+=' miss';
       else cls+=' future';
       if(isToday)cls+=' today-cell';
-      h+=`<div class="${cls}" title="${d.name} ${fmtD(dt)} - ${d.type}${d.km>0?' ('+d.km+' km)':''}"></div>`;
+      h+=`<div class="${cls}" title="${d.name} ${fmtD(dt)} - ${d.type}${d.km>0?' ('+d.km+' km)':''}${hasShifted?' (przesuniety)':''}"></div>`;
     });
   });
   h+=`</div>`;
   h+=`<div class="hmap-leg"><div class="hmap-li"><div class="hmap-lc" style="background:var(--g)"></div>Wykonany</div><div class="hmap-li"><div class="hmap-lc" style="background:var(--o)"></div>Brak logu</div><div class="hmap-li"><div class="hmap-lc" style="background:var(--r)"></div>Pominiety</div><div class="hmap-li"><div class="hmap-lc" style="background:var(--c3);opacity:.3"></div>Rest</div><div class="hmap-li"><div class="hmap-lc" style="background:var(--c2);border:.5px solid var(--c3)"></div>Przyszlosc</div></div>`;
   h+=`</div>`;
 
-  // === HISTORIA TRENINGOW ===
+  // ═══ HISTORIA TRENINGOW (shift-aware) ═══
   const logs=S.getAllLogs();
   const sortedDates=Object.keys(logs).filter(d=>logs[d].distance).sort((a,b)=>b.localeCompare(a));
   let totalKm=0;
@@ -307,22 +331,28 @@ function rStat(){
       const dd=new Date(date+'T12:00:00');
       const dowName=DOW[dd.getDay()];
       const planned=plannedDates[date];
-      const isExtra=!planned;
-      h+=`<div class="wlog${isExtra?' extra':''}">`;
+      const shiftInfo=shiftMap[date];
+      h+=`<div class="wlog${!planned&&!shiftInfo?' extra':''}">`;
       h+=`<div class="wlog-date"><div class="wlog-d">${fmtD(date)}</div><div class="wlog-dow">${dowName}</div></div>`;
       h+=`<div class="wlog-info"><div class="wlog-top">`;
       h+=`<span class="wlog-km">${l.distance} km</span>`;
       if(l.pace)h+=`<span class="wlog-pace">\u23F1 ${l.pace}/km</span>`;
       if(l.hr)h+=`<span class="wlog-hr">\u2764 ${l.hr} bpm</span>`;
       if(l.feeling)h+=`<span class="wlog-feel">${EMO[+l.feeling]||''}</span>`;
-      if(planned)h+=`<span class="wlog-match">\u2705 T${planned.week}: ${planned.type}</span>`;
-      else h+=`<span class="wlog-tag">\u2728 Poza planem</span>`;
+      if(planned){
+        h+=`<span class="wlog-match">\u2705 T${planned.week}: ${planned.type}</span>`;
+      }else if(shiftInfo){
+        h+=`<span class="wlog-match">\uD83D\uDD04 T${shiftInfo.week}: ${shiftInfo.type}</span>`;
+      }else{
+        h+=`<span class="wlog-tag">\u2728 Poza planem</span>`;
+      }
       h+=`</div>`;
       if(l.notes)h+=`<div class="wlog-note">${l.notes}</div>`;
       h+=`</div></div>`;
     });
   }else{h+=`<div class="empty">Brak zalogowanych treningow</div>`}
 
+  // Charts
   h+=`<div class="chc"><div class="ch-t">\u2764\uFE0F\u200D\uD83D\uDD25 Training Load (CTL / ATL / TSB)</div><canvas id="ch-tl"></canvas></div>`;
   h+=`<div class="chc"><div class="ch-t">\uD83C\uDFAF Prognoza polmaratonu - trend</div><canvas id="ch-pred"></canvas></div>`;
   h+=`<div class="chc"><div class="ch-t">\uD83D\uDCCA Km tygodniowy (plan vs realizacja)</div><canvas id="ch1"></canvas></div>`;
@@ -332,6 +362,7 @@ function rStat(){
   el.innerHTML=h;
   setTimeout(()=>{Charts.weeklyKm('ch1');Charts.paceTrend('ch2');Charts.feelingTrend('ch3');Charts.monthlyVol('ch4');Charts.trainingLoad('ch-tl');Charts.predTrend('ch-pred')},100);
 }
+
 
 // --- SETTINGS ---
 function rSett(){
