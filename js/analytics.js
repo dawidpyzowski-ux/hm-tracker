@@ -1,52 +1,48 @@
-// HM Tracker - Advanced Analytics (Sprint 6) - FIXED
+// HM Tracker - Advanced Analytics (Sprint 6) - FIXED v2
 const Analytics={
-  _ch(id,cfg){const el=document.getElementById(id);if(!el)return null;const x=Chart.getChart(el);if(x)x.destroy();return new Chart(el,cfg)},
-  _pp(p){if(!p||p==='-')return 0;const s=p.split(':');return parseInt(s[0])+parseInt(s[1]||0)/60},
+  _ch(id,cfg){var el=document.getElementById(id);if(!el)return null;var x=Chart.getChart(el);if(x)x.destroy();return new Chart(el,cfg)},
+  _pp(p){if(!p||p==='-')return 0;var s=p.split(':');return parseInt(s[0])+parseInt(s[1]||0)/60},
   _logs(){
-    const logs=S.getAllLogs();const arr=[];
-    Object.entries(logs).forEach(([d,l])=>{if(l.distance)arr.push({date:d,...l})});
-    arr.sort((a,b)=>a.date.localeCompare(b.date));return arr;
+    var logs=S.getAllLogs();var arr=[];
+    Object.entries(logs).forEach(function(e){var d=e[0],l=e[1];if(l.distance)arr.push(Object.assign({date:d},l))});
+    arr.sort(function(a,b){return a.date.localeCompare(b.date)});return arr;
   },
 
-  // ═══ TIER 1 ═══
-
-  // 1. Aerobic Efficiency: HR / speed (lower=fitter)
   getAE(){
-    return this._logs().filter(l=>l.hr&&l.pace&&this._pp(l.pace)>0).map(l=>{
-      const spdKmh=60/this._pp(l.pace);
+    var self=this;
+    return this._logs().filter(function(l){return l.hr&&l.pace&&self._pp(l.pace)>0}).map(function(l){
+      var spdKmh=60/self._pp(l.pace);
       return{date:l.date,ae:Math.round(parseFloat(l.hr)/spdKmh*10)/10};
     });
   },
 
-  // 2. VO2max (Jack Daniels) - uses BEST effort per session, rolling max
-  _vo2calc(paceMinKm, distKm){
+  _vo2calc(paceMinKm,distKm){
     if(paceMinKm<=0||distKm<=0)return 0;
-    const vm=1000/paceMinKm; // velocity m/min
-    const tMin=paceMinKm*distKm; // total time in minutes
-    const oc=-4.60+0.182258*vm+0.000104*vm*vm; // oxygen cost
-    const frac=0.8+0.1894393*Math.exp(-0.012778*tMin)+0.2989558*Math.exp(-0.1932605*tMin);
+    var vm=1000/paceMinKm;
+    var tMin=paceMinKm*distKm;
+    var oc=-4.60+0.182258*vm+0.000104*vm*vm;
+    var frac=0.8+0.1894393*Math.exp(-0.012778*tMin)+0.2989558*Math.exp(-0.1932605*tMin);
     if(frac<=0)return 0;
     return oc/frac;
   },
-  
   getVO2(){
-    const logs=this._logs().filter(l=>l.pace&&parseFloat(l.distance)>=3);
-    const all=[];
-    // Method 1: Jack Daniels from best splits
-    logs.forEach(l=>{
-      const pMin=this._pp(l.pace);if(pMin<=0)return;
-      const km=parseFloat(l.distance);
-      let bestVO2=this._vo2calc(pMin,km);
+    var self=this;
+    var logs=this._logs().filter(function(l){return l.pace&&parseFloat(l.distance)>=3});
+    var all=[];
+    logs.forEach(function(l){
+      var pMin=self._pp(l.pace);if(pMin<=0)return;
+      var km=parseFloat(l.distance);
+      var bestVO2=self._vo2calc(pMin,km);
       if(l.strava_id){
-        const det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
+        var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
         if(det&&det.splits&&det.splits.length>=3){
-          const sp=det.splits;
-          for(let len=3;len<=Math.min(sp.length,10);len++){
-            for(let start=0;start<=sp.length-len;start++){
-              let d=0,t=0;
-              for(let i=start;i<start+len;i++){d+=sp[i].distance||0;t+=sp[i].moving_time||0}
+          var sp=det.splits;
+          for(var len=3;len<=Math.min(sp.length,10);len++){
+            for(var start=0;start<=sp.length-len;start++){
+              var d=0,t=0;
+              for(var i=start;i<start+len;i++){d+=(sp[i].distance||0);t+=(sp[i].moving_time||0)}
               if(d>0&&t>0){
-                const v=this._vo2calc(t/d*1000/60,d/1000);
+                var v=self._vo2calc(t/d*1000/60,d/1000);
                 if(v>bestVO2)bestVO2=v;
               }
             }
@@ -55,299 +51,268 @@ const Analytics={
       }
       if(bestVO2>20&&bestVO2<90)all.push({date:l.date,vo2:Math.round(bestVO2*10)/10});
     });
-    // Method 2: Uth formula (15 * maxHR/restHR) - often more accurate for training data
-    let uthVO2=0;
-    const rhr=S.getSettings().rhr||0;
+    var uthVO2=0;
+    var rhr=S.getSettings().rhr||0;
     if(rhr>0){
-      let maxHR=0;
-      logs.forEach(l=>{
+      var maxHR=0;
+      logs.forEach(function(l){
         if(!l.strava_id)return;
-        const det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
+        var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
         if(det&&det.max_hr&&det.max_hr>maxHR)maxHR=det.max_hr;
       });
       if(maxHR>0)uthVO2=Math.round(15.3*(maxHR/rhr)*10)/10;
     }
-    // Use higher of both methods
-    const trend=[];
-    for(let i=0;i<all.length;i++){
-      let max=uthVO2;
-      for(let j=Math.max(0,i-4);j<=i;j++){if(all[j].vo2>max)max=all[j].vo2}
+    var trend=[];
+    for(var i=0;i<all.length;i++){
+      var max=uthVO2;
+      for(var j=Math.max(0,i-4);j<=i;j++){if(all[j].vo2>max)max=all[j].vo2}
       trend.push({date:all[i].date,vo2:max});
     }
-    const cur=trend.length?trend[trend.length-1].vo2:(uthVO2||0);
-    const lvl=cur>=60?'Elitarny':cur>=55?'Swietny':cur>=50?'Bardzo dobry':cur>=45?'Dobry':cur>=40?'Sredni':'Poczatkujacy';
-    return{current:cur,trend,level:lvl};
+    var cur=trend.length?trend[trend.length-1].vo2:(uthVO2||0);
+    var lvl=cur>=60?'Elitarny':cur>=55?'Swietny':cur>=50?'Bardzo dobry':cur>=45?'Dobry':cur>=40?'Sredni':'Poczatkujacy';
+    return{current:cur,trend:trend,level:lvl};
   },
 
-    });
-    // Build trend: rolling max of last 5 sessions
-    const trend=[];
-    for(let i=0;i<all.length;i++){
-      let max=0;
-      for(let j=Math.max(0,i-4);j<=i;j++){if(all[j].vo2>max)max=all[j].vo2}
-      trend.push({date:all[i].date,vo2:max});
-    }
-    const cur=trend.length?trend[trend.length-1].vo2:0;
-    const lvl=cur>=60?'Elitarny':cur>=55?'Swietny':cur>=50?'Bardzo dobry':cur>=45?'Dobry':cur>=40?'Sredni':'Poczatkujacy';
-    return{current:cur,trend,level:lvl};
-  },
-
-  // 3. Training Distribution (by pace zones)
   getDist(){
-    const z={easy:{km:0,label:'Easy (>5:30)'},tempo:{km:0,label:'Tempo (5:00-5:30)'},threshold:{km:0,label:'Threshold (4:30-5:00)'},interval:{km:0,label:'Interval (<4:30)'}};
-    let total=0;
-    this._logs().forEach(l=>{
-      if(!l.pace)return;const p=this._pp(l.pace);const km=parseFloat(l.distance);if(p<=0||km<=0)return;
+    var self=this;
+    var z={easy:{km:0,label:'Easy (>5:30)'},tempo:{km:0,label:'Tempo (5:00-5:30)'},threshold:{km:0,label:'Threshold (4:30-5:00)'},interval:{km:0,label:'Interval (<4:30)'}};
+    var total=0;
+    this._logs().forEach(function(l){
+      if(!l.pace)return;var p=self._pp(l.pace);var km=parseFloat(l.distance);if(p<=0||km<=0)return;
       total+=km;
       if(p>5.5)z.easy.km+=km;else if(p>5)z.tempo.km+=km;else if(p>4.5)z.threshold.km+=km;else z.interval.km+=km;
     });
-    Object.values(z).forEach(v=>{v.km=Math.round(v.km*10)/10;v.pct=total>0?Math.round(v.km/total*100):0});
+    Object.values(z).forEach(function(v){v.km=Math.round(v.km*10)/10;v.pct=total>0?Math.round(v.km/total*100):0});
     return{zones:z,total:Math.round(total*10)/10};
   },
 
-  // 4. Cumulative Distance (actual vs planned)
   getCumDist(){
-    const labels=[],actual=[],planned=[];let ca=0,cp=0;const t=today();
-    PLAN.forEach(w=>{
-      let wkA=0;
-      for(let d=0;d<7;d++){const dt=getDayDate(w.start,d);const log=S.getLog(dt);if(log&&log.distance)wkA+=parseFloat(log.distance)}
+    var labels=[],actual=[],planned=[];var ca=0,cp=0;
+    PLAN.forEach(function(w){
+      var wkA=0;
+      for(var d=0;d<7;d++){var dt=getDayDate(w.start,d);var log=S.getLog(dt);if(log&&log.distance)wkA+=parseFloat(log.distance)}
       ca+=wkA;cp+=w.km;
-      labels.push('T'+w.weekNum);
-      actual.push(Math.round(ca*10)/10);
-      planned.push(Math.round(cp*10)/10);
+      labels.push('T'+w.weekNum);actual.push(Math.round(ca*10)/10);planned.push(Math.round(cp*10)/10);
     });
-    return{labels,actual,planned};
+    return{labels:labels,actual:actual,planned:planned};
   },
 
-  // 5. Race Readiness Score (0-100)
   getRR(){
-    const fit=typeof TL!=='undefined'?TL.get():{ctl:0,atl:0,tsb:0};
-    const con=this.getConsistency();
-    const cd=this.getCumDist();
-    const lastPlan=cd.planned[cd.planned.length-1]||1;
-    const lastActual=cd.actual[cd.actual.length-1]||0;
-    const fitScore=Math.min(100,Math.round(fit.ctl*2));
-    const volScore=Math.min(100,Math.round(lastActual/lastPlan*100));
-    const conScore=con.score;
-    const freshScore=Math.min(100,Math.max(0,50+fit.tsb*2));
-    const score=Math.round(fitScore*0.3+volScore*0.25+conScore*0.25+freshScore*0.2);
-    const lbl=score>=80?'Gotowy na wyscig!':score>=60?'Dobra forma':score>=40?'W budowie':'Poczatek drogi';
-    return{score,components:{fitness:fitScore,volume:volScore,consistency:conScore,freshness:freshScore},label:lbl};
+    var fit=typeof TL!=='undefined'?TL.get():{ctl:0,atl:0,tsb:0};
+    var con=this.getConsistency();
+    var cd=this.getCumDist();
+    var lastPlan=cd.planned[cd.planned.length-1]||1;
+    var lastActual=cd.actual[cd.actual.length-1]||0;
+    var fitScore=Math.min(100,Math.round(fit.ctl*2));
+    var volScore=Math.min(100,Math.round(lastActual/lastPlan*100));
+    var conScore=con.score;
+    var freshScore=Math.min(100,Math.max(0,50+fit.tsb*2));
+    var score=Math.round(fitScore*0.3+volScore*0.25+conScore*0.25+freshScore*0.2);
+    var lbl=score>=80?'Gotowy na wyscig!':score>=60?'Dobra forma':score>=40?'W budowie':'Poczatek drogi';
+    return{score:score,components:{fitness:fitScore,volume:volScore,consistency:conScore,freshness:freshScore},label:lbl};
   },
 
-  // ═══ TIER 2 ═══
-
-  // 6. Pace at HR 150 (normalized)
   getPaceHR150(){
-    return this._logs().filter(l=>l.hr&&l.pace&&this._pp(l.pace)>0&&parseFloat(l.hr)>100).map(l=>{
-      const p=this._pp(l.pace);const hr=parseFloat(l.hr);
-      const norm=p*(hr/150);
-      return{date:l.date,pace:Math.round(norm*100)/100};
+    var self=this;
+    return this._logs().filter(function(l){return l.hr&&l.pace&&self._pp(l.pace)>0&&parseFloat(l.hr)>100}).map(function(l){
+      var p=self._pp(l.pace);var hr=parseFloat(l.hr);
+      return{date:l.date,pace:Math.round(p*(hr/150)*100)/100};
     });
   },
 
-  // 7. Week-over-Week
   getWoW(){
-    return PLAN.map(w=>{
-      let km=0,ttime=0,thr=0,hrc=0,cnt=0;
-      for(let d=0;d<7;d++){const dt=getDayDate(w.start,d);const log=S.getLog(dt);
+    return PLAN.map(function(w){
+      var km=0,ttime=0,thr=0,hrc=0,cnt=0;
+      for(var d=0;d<7;d++){var dt=getDayDate(w.start,d);var log=S.getLog(dt);
         if(log&&log.distance){cnt++;km+=parseFloat(log.distance);
-          if(log.pace){const p=this._pp(log.pace);if(p>0)ttime+=p*parseFloat(log.distance)}
+          if(log.pace){var p=Analytics._pp(log.pace);if(p>0)ttime+=p*parseFloat(log.distance)}
           if(log.hr){thr+=parseFloat(log.hr);hrc++}
         }
       }
-      const ap=km>0&&ttime>0?ttime/km:0;
+      var ap=km>0&&ttime>0?ttime/km:0;
       return{week:w.weekNum,km:Math.round(km*10)/10,avgPace:ap>0?Math.round(ap*100)/100:0,avgHR:hrc>0?Math.round(thr/hrc):0,workouts:cnt};
     });
   },
 
-  // 8. HR Recovery (max HR - avg HR per workout)
   getHRRec(){
-    const arr=[];
-    this._logs().forEach(l=>{
+    var arr=[];
+    this._logs().forEach(function(l){
       if(!l.strava_id)return;
-      const det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
+      var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
       if(!det||!det.max_hr||!l.hr)return;
       arr.push({date:l.date,spread:det.max_hr-parseFloat(l.hr)});
     });
     return arr;
   },
 
-  // 9. Cadence vs Pace
   getCadPace(){
-    const arr=[];
-    this._logs().forEach(l=>{
+    var arr=[];
+    this._logs().forEach(function(l){
       if(!l.strava_id||!l.pace)return;
-      const det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
+      var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
       if(!det||!det.cadence)return;
-      arr.push({pace:this._pp(l.pace),cadence:Math.round(det.cadence*2),date:l.date});
+      arr.push({pace:Analytics._pp(l.pace),cadence:Math.round(det.cadence*2),date:l.date});
     });
     return arr;
   },
 
-  // 10. Fatigue Index (last 3km vs first 3km pace from splits)
   getFI(){
-    const arr=[];
-    this._logs().forEach(l=>{
+    var arr=[];
+    this._logs().forEach(function(l){
       if(!l.strava_id||parseFloat(l.distance)<6)return;
-      const det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
+      var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
       if(!det||!det.splits||det.splits.length<6)return;
-      const sp=det.splits;
-      let f3=0,l3=0;
-      for(let i=0;i<3;i++){if(sp[i]&&sp[i].distance>0)f3+=(sp[i].moving_time||0)/(sp[i].distance)*1000}
-      for(let i=sp.length-3;i<sp.length;i++){if(sp[i]&&sp[i].distance>0)l3+=(sp[i].moving_time||0)/(sp[i].distance)*1000}
-      f3/=3;l3/=3;
-      if(f3<=0)return;
-      const idx=Math.round((l3-f3)/f3*100);
-      const lbl=idx<=0?'Negative split!':idx<=3?'Rowne tempo':idx<=6?'Lekki spadek':'Duzy spadek';
-      arr.push({date:l.date,index:idx,label:lbl});
+      var sp=det.splits;
+      var f3=0,l3=0;
+      for(var i=0;i<3;i++){if(sp[i]&&sp[i].distance>0)f3+=(sp[i].moving_time||0)/(sp[i].distance)*1000}
+      for(var i=sp.length-3;i<sp.length;i++){if(sp[i]&&sp[i].distance>0)l3+=(sp[i].moving_time||0)/(sp[i].distance)*1000}
+      f3/=3;l3/=3;if(f3<=0)return;
+      var idx=Math.round((l3-f3)/f3*100);
+      arr.push({date:l.date,index:idx});
     });
     return arr;
   },
 
-  // ═══ TIER 3 ═══
-
-  // 11. Streak (weeks >=80% plan)
   getStreak(){
-    let cur=0,best=0;const t=today();
-    for(let i=0;i<PLAN.length;i++){
-      const w=PLAN[i];const we=getDayDate(w.start,6);
-      if(w.start>t)break;
-      let km=0;
-      for(let d=0;d<7;d++){const dt=getDayDate(w.start,d);const log=S.getLog(dt);if(log&&log.distance)km+=parseFloat(log.distance)}
+    var cur=0,best=0;var t=today();
+    for(var i=0;i<PLAN.length;i++){
+      var w=PLAN[i];var we=getDayDate(w.start,6);if(w.start>t)break;
+      var km=0;
+      for(var d=0;d<7;d++){var dt=getDayDate(w.start,d);var log=S.getLog(dt);if(log&&log.distance)km+=parseFloat(log.distance)}
       if(w.km>0&&km/w.km>=0.8){cur++;if(cur>best)best=cur}else{if(we<t)cur=0}
     }
-    return{current:cur,best};
+    return{current:cur,best:best};
   },
 
-  // 12. Consistency
   getConsistency(){
-    let done=0,total=0;const t=today();
-    PLAN.forEach(w=>{w.days.forEach(d=>{
-      if(d.rest)return;const dt=getDayDate(w.start,d.dow);if(dt>t)return;
-      total++;const log=S.getLog(dt);if(log&&(log.distance||log.status==='done'))done++;
+    var done=0,total=0;var t=today();
+    PLAN.forEach(function(w){w.days.forEach(function(d){
+      if(d.rest)return;var dt=getDayDate(w.start,d.dow);if(dt>t)return;
+      total++;var log=S.getLog(dt);if(log&&(log.distance||log.status==='done'))done++;
     })});
-    return{score:total>0?Math.round(done/total*100):0,done,total};
+    return{score:total>0?Math.round(done/total*100):0,done:done,total:total};
   },
 
-  // 13. Monthly comparison
   getMonthly(){
-    const months={};
-    this._logs().forEach(l=>{
-      const m=l.date.substring(0,7);
+    var months={};
+    this._logs().forEach(function(l){
+      var m=l.date.substring(0,7);
       if(!months[m])months[m]={km:0,workouts:0,ttime:0,thr:0,hrc:0};
-      const mo=months[m];mo.km+=parseFloat(l.distance);mo.workouts++;
-      if(l.pace){const p=this._pp(l.pace);if(p>0)mo.ttime+=p*parseFloat(l.distance)}
+      var mo=months[m];mo.km+=parseFloat(l.distance);mo.workouts++;
+      if(l.pace){var p=Analytics._pp(l.pace);if(p>0)mo.ttime+=p*parseFloat(l.distance)}
       if(l.hr){mo.thr+=parseFloat(l.hr);mo.hrc++}
     });
-    return Object.entries(months).sort().map(([m,d])=>({
-      month:m,km:Math.round(d.km*10)/10,workouts:d.workouts,
-      avgPace:d.km>0&&d.ttime>0?Math.round(d.ttime/d.km*100)/100:0,
-      avgHR:d.hrc>0?Math.round(d.thr/d.hrc):0
-    }));
+    return Object.entries(months).sort().map(function(e){
+      var m=e[0],d=e[1];
+      return{month:m,km:Math.round(d.km*10)/10,workouts:d.workouts,
+        avgPace:d.km>0&&d.ttime>0?Math.round(d.ttime/d.km*100)/100:0,
+        avgHR:d.hrc>0?Math.round(d.thr/d.hrc):0};
+    });
   },
 
-  // 14. Cumulative elevation
   getCumElev(){
-    let total=0;const byWeek=[];
-    PLAN.forEach(w=>{
-      let wElev=0;
-      for(let d=0;d<7;d++){
-        const dt=getDayDate(w.start,d);const log=S.getLog(dt);
+    var total=0;var byWeek=[];
+    PLAN.forEach(function(w){
+      var wElev=0;
+      for(var d=0;d<7;d++){
+        var dt=getDayDate(w.start,d);var log=S.getLog(dt);
         if(log&&log.strava_id){
-          const det=JSON.parse(localStorage.getItem('strava_detail_'+log.strava_id)||'null');
+          var det=JSON.parse(localStorage.getItem('strava_detail_'+log.strava_id)||'null');
           if(det&&det.total_elevation_gain)wElev+=det.total_elevation_gain;
         }
       }
       total+=wElev;byWeek.push({week:w.weekNum,elev:Math.round(wElev),cum:Math.round(total)});
     });
-    return{total:Math.round(total),byWeek};
+    return{total:Math.round(total),byWeek:byWeek};
   },
 
-  // ═══ RENDER ═══
   render(){
     try{
-    const rr=this.getRR();const str=this.getStreak();const con=this.getConsistency();const vo2=this.getVO2();
-    let h='';
+    var rr=this.getRR();var str=this.getStreak();var con=this.getConsistency();var vo2=this.getVO2();
+    var h='';
 
-    // Race Readiness Gauge
-    h+=`<div class="an-section"><div class="an-title">\uD83C\uDFC1 Race Readiness</div>`;
-    h+=`<div class="an-gauge-wrap"><div class="an-gauge" style="--pct:${rr.score}"><div class="an-gauge-val">${rr.score}</div></div><div class="an-gauge-label">${rr.label}</div></div>`;
-    h+=`<div class="an-rr-row"><div class="an-rr-item"><div class="an-rr-v">${rr.components.fitness}</div><div class="an-rr-l">Fitness</div></div><div class="an-rr-item"><div class="an-rr-v">${rr.components.volume}</div><div class="an-rr-l">Objetosc</div></div><div class="an-rr-item"><div class="an-rr-v">${rr.components.consistency}</div><div class="an-rr-l">Stalosc</div></div><div class="an-rr-item"><div class="an-rr-v">${rr.components.freshness}</div><div class="an-rr-l">Swiezosc</div></div></div></div>`;
+    h+='<div class="an-section"><div class="an-title">\uD83C\uDFC1 Race Readiness</div>';
+    h+='<div class="an-gauge-wrap"><div class="an-gauge" style="--pct:'+rr.score+'"><div class="an-gauge-val">'+rr.score+'</div></div><div class="an-gauge-label">'+rr.label+'</div></div>';
+    h+='<div class="an-rr-row"><div class="an-rr-item"><div class="an-rr-v">'+rr.components.fitness+'</div><div class="an-rr-l">Fitness</div></div><div class="an-rr-item"><div class="an-rr-v">'+rr.components.volume+'</div><div class="an-rr-l">Objetosc</div></div><div class="an-rr-item"><div class="an-rr-v">'+rr.components.consistency+'</div><div class="an-rr-l">Stalosc</div></div><div class="an-rr-item"><div class="an-rr-v">'+rr.components.freshness+'</div><div class="an-rr-l">Swiezosc</div></div></div></div>';
 
-    // Badges row
-    h+=`<div class="an-badges"><div class="an-badge fire"><span class="an-badge-icon">\uD83D\uDD25</span><span class="an-badge-val">${str.current}</span><span class="an-badge-l">Streak (tyg.)</span></div>`;
-    h+=`<div class="an-badge check"><span class="an-badge-icon">\u2705</span><span class="an-badge-val">${con.score}%</span><span class="an-badge-l">Stalosc (${con.done}/${con.total})</span></div>`;
-    if(str.best>str.current)h+=`<div class="an-badge trophy"><span class="an-badge-icon">\uD83C\uDFC6</span><span class="an-badge-val">${str.best}</span><span class="an-badge-l">Najlepszy streak</span></div>`;
-    h+=`</div>`;
+    h+='<div class="an-badges"><div class="an-badge fire"><span class="an-badge-icon">\uD83D\uDD25</span><span class="an-badge-val">'+str.current+'</span><span class="an-badge-l">Streak (tyg.)</span></div>';
+    h+='<div class="an-badge check"><span class="an-badge-icon">\u2705</span><span class="an-badge-val">'+con.score+'%</span><span class="an-badge-l">Stalosc ('+con.done+'/'+con.total+')</span></div>';
+    if(str.best>str.current)h+='<div class="an-badge trophy"><span class="an-badge-icon">\uD83C\uDFC6</span><span class="an-badge-val">'+str.best+'</span><span class="an-badge-l">Najlepszy streak</span></div>';
+    h+='</div>';
 
-    // VO2max card
     if(vo2.current>0){
-      h+=`<div class="an-section"><div class="an-title">\uD83E\uDEC0 VO2max</div><div class="an-vo2-row"><div class="an-vo2-val">${vo2.current}</div><div class="an-vo2-info"><div class="an-vo2-level">${vo2.level}</div><div class="an-vo2-sub">ml/kg/min</div></div></div>`;
-      if(vo2.trend.length>1)h+=`<canvas id="an-vo2"></canvas>`;
-      h+=`</div>`;
+      h+='<div class="an-section"><div class="an-title">\uD83E\uDEC0 VO2max</div><div class="an-vo2-row"><div class="an-vo2-val">'+vo2.current+'</div><div class="an-vo2-info"><div class="an-vo2-level">'+vo2.level+'</div><div class="an-vo2-sub">ml/kg/min</div></div></div>';
+      if(vo2.trend.length>1)h+='<canvas id="an-vo2"></canvas>';
+      h+='</div>';
     }
 
-    // Charts
-    h+=`<div class="an-section"><div class="an-title">\u2764\uFE0F Aerobic Efficiency (nizszy = lepiej)</div><canvas id="an-ae"></canvas></div>`;
-    h+=`<div class="an-section"><div class="an-title">\uD83C\uDFAF Training Distribution (80/20)</div><canvas id="an-dist"></canvas></div>`;
-    h+=`<div class="an-section"><div class="an-title">\uD83D\uDCC8 Dystans narastajacy (plan vs realizacja)</div><canvas id="an-cum"></canvas></div>`;
-    h+=`<div class="an-section"><div class="an-title">\u26A1 Tempo @ HR 150 (nizszy = lepiej)</div><canvas id="an-hr150"></canvas></div>`;
-    h+=`<div class="an-section"><div class="an-title">\uD83D\uDCCA Tydzien po tygodniu</div><canvas id="an-wow"></canvas></div>`;
-    h+=`<div class="an-section"><div class="an-title">\uD83D\uDCA4 Fatigue Index (% spadku tempa)</div><canvas id="an-fi"></canvas></div>`;
-    h+=`<div class="an-section"><div class="an-title">\uD83D\uDC63 Kadencja vs Tempo</div><canvas id="an-cad"></canvas></div>`;
-    h+=`<div class="an-section"><div class="an-title">\u26F0\uFE0F Narastajace przewyzszenie</div><canvas id="an-elev"></canvas></div>`;
+    h+='<div class="an-section"><div class="an-title">\u2764\uFE0F Aerobic Efficiency (nizszy = lepiej)</div><canvas id="an-ae"></canvas></div>';
+    h+='<div class="an-section"><div class="an-title">\uD83C\uDFAF Training Distribution (80/20)</div><canvas id="an-dist"></canvas></div>';
+    h+='<div class="an-section"><div class="an-title">\uD83D\uDCC8 Dystans narastajacy (plan vs realizacja)</div><canvas id="an-cum"></canvas></div>';
+    h+='<div class="an-section"><div class="an-title">\u26A1 Tempo @ HR 150 (nizszy = lepiej)</div><canvas id="an-hr150"></canvas></div>';
+    h+='<div class="an-section"><div class="an-title">\uD83D\uDCCA Tydzien po tygodniu</div><canvas id="an-wow"></canvas></div>';
+    h+='<div class="an-section"><div class="an-title">\uD83D\uDCA4 Fatigue Index (% spadku tempa)</div><canvas id="an-fi"></canvas></div>';
+    h+='<div class="an-section"><div class="an-title">\uD83D\uDC63 Kadencja vs Tempo</div><canvas id="an-cad"></canvas></div>';
+    h+='<div class="an-section"><div class="an-title">\u26F0\uFE0F Narastajace przewyzszenie</div><canvas id="an-elev"></canvas></div>';
 
-    // Monthly comparison cards
-    const mo=this.getMonthly();
+    var mo=this.getMonthly();
     if(mo.length){
-      h+=`<div class="an-section"><div class="an-title">\uD83D\uDCC5 Porownanie miesieczne</div><div class="an-months">`;
-      const MN=['','Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paz','Lis','Gru'];
-      mo.forEach(m=>{
-        const mi=parseInt(m.month.split('-')[1]);
-        const ap=m.avgPace>0?Math.floor(m.avgPace)+':'+String(Math.round((m.avgPace%1)*60)).padStart(2,'0'):'-';
-        h+=`<div class="an-month"><div class="an-month-name">${MN[mi]} ${m.month.split('-')[0]}</div><div class="an-month-km">${m.km} km</div><div class="an-month-det">${m.workouts} treningow \u2022 ${ap}/km${m.avgHR?' \u2022 \u2764 '+m.avgHR:''}</div></div>`;
+      h+='<div class="an-section"><div class="an-title">\uD83D\uDCC5 Porownanie miesieczne</div><div class="an-months">';
+      var MN=['','Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paz','Lis','Gru'];
+      mo.forEach(function(m){
+        var mi=parseInt(m.month.split('-')[1]);
+        var ap=m.avgPace>0?Math.floor(m.avgPace)+':'+String(Math.round((m.avgPace%1)*60)).padStart(2,'0'):'-';
+        h+='<div class="an-month"><div class="an-month-name">'+MN[mi]+' '+m.month.split('-')[0]+'</div><div class="an-month-km">'+m.km+' km</div><div class="an-month-det">'+m.workouts+' treningow \u2022 '+ap+'/km'+(m.avgHR?' \u2022 \u2764 '+m.avgHR:'')+'</div></div>';
       });
-      h+=`</div></div>`;
+      h+='</div></div>';
     }
 
     return h;
     }catch(e){console.error('Analytics render error:',e);return '<div class="empty">Blad Analytics: '+e.message+'</div>'}
   },
 
-
   drawCharts(){
     try{
-    const ae=this.getAE();
-    console.log('Analytics data:','AE:',ae.length,'logs:',this._logs().length);
+    console.log('Analytics drawCharts START');
+    var self=this;
 
-    if(ae.length)try{this._ch('an-ae',{type:'line',data:{labels:ae.map(a=>a.date.substring(5)),datasets:[{data:ae.map(a=>a.ae),borderColor:'#FF9F0A',borderWidth:2,pointRadius:3,pointBackgroundColor:'#FF9F0A',fill:false,tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:10}},y:{reverse:true,ticks:{color:'#999'}}}}})}catch(e){console.warn('AE chart error',e)}
+    var ae=this.getAE();
+    console.log('AE data:',ae.length);
+    if(ae.length>0){try{this._ch('an-ae',{type:'line',data:{labels:ae.map(function(a){return a.date.substring(5)}),datasets:[{data:ae.map(function(a){return a.ae}),borderColor:'#FF9F0A',borderWidth:2,pointRadius:3,pointBackgroundColor:'#FF9F0A',fill:false,tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:10}},y:{reverse:true,ticks:{color:'#999'}}}}})}catch(e){console.warn('AE chart err',e)}}
 
-    const vo2=this.getVO2();
-    if(vo2.trend.length>1)try{this._ch('an-vo2',{type:'line',data:{labels:vo2.trend.map(v=>v.date.substring(5)),datasets:[{data:vo2.trend.map(v=>v.vo2),borderColor:'#30D158',borderWidth:2,pointRadius:3,pointBackgroundColor:'#30D158',fill:true,backgroundColor:'rgba(48,209,88,.1)',tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:8}},y:{ticks:{color:'#999'}}}}})}catch(e){console.warn('VO2 chart error',e)}
+    var vo2=this.getVO2();
+    console.log('VO2 data:',vo2.trend.length,'current:',vo2.current);
+    if(vo2.trend.length>1){try{this._ch('an-vo2',{type:'line',data:{labels:vo2.trend.map(function(v){return v.date.substring(5)}),datasets:[{data:vo2.trend.map(function(v){return v.vo2}),borderColor:'#30D158',borderWidth:2,pointRadius:3,pointBackgroundColor:'#30D158',fill:true,backgroundColor:'rgba(48,209,88,.1)',tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:8}},y:{ticks:{color:'#999'}}}}})}catch(e){console.warn('VO2 chart err',e)}}
 
-    const dist=this.getDist();
-    const dz=dist.zones;
-    try{this._ch('an-dist',{type:'doughnut',data:{labels:[dz.easy.label+' '+dz.easy.pct+'%',dz.tempo.label+' '+dz.tempo.pct+'%',dz.threshold.label+' '+dz.threshold.pct+'%',dz.interval.label+' '+dz.interval.pct+'%'],datasets:[{data:[dz.easy.km,dz.tempo.km,dz.threshold.km,dz.interval.km],backgroundColor:['#30D158','#0A84FF','#FF9F0A','#FF453A'],borderWidth:0}]},options:{responsive:true,plugins:{legend:{display:true,position:'bottom',labels:{color:'#ccc',font:{size:11}}}}}})}catch(e){console.warn('Dist chart error',e)}
+    var dist=this.getDist();var dz=dist.zones;
+    console.log('Dist data:',dz.easy.km,dz.tempo.km,dz.threshold.km,dz.interval.km);
+    try{this._ch('an-dist',{type:'doughnut',data:{labels:[dz.easy.label+' '+dz.easy.pct+'%',dz.tempo.label+' '+dz.tempo.pct+'%',dz.threshold.label+' '+dz.threshold.pct+'%',dz.interval.label+' '+dz.interval.pct+'%'],datasets:[{data:[dz.easy.km,dz.tempo.km,dz.threshold.km,dz.interval.km],backgroundColor:['#30D158','#0A84FF','#FF9F0A','#FF453A'],borderWidth:0}]},options:{responsive:true,plugins:{legend:{display:true,position:'bottom',labels:{color:'#ccc',font:{size:11}}}}}})}catch(e){console.warn('Dist chart err',e)}
 
-    const cd=this.getCumDist();
-    try{this._ch('an-cum',{type:'line',data:{labels:cd.labels,datasets:[{label:'Plan',data:cd.planned,borderColor:'#555',borderWidth:2,borderDash:[5,5],pointRadius:0,fill:false},{label:'Realizacja',data:cd.actual,borderColor:'#0A84FF',borderWidth:2,pointRadius:3,pointBackgroundColor:'#0A84FF',fill:true,backgroundColor:'rgba(10,132,255,.1)'}]},options:{responsive:true,plugins:{legend:{display:true,labels:{color:'#ccc'}}},scales:{x:{ticks:{color:'#999'}},y:{ticks:{color:'#999'}}}}})}catch(e){console.warn('Cum dist chart error',e)}
+    var cd=this.getCumDist();
+    console.log('CumDist:',cd.actual.length,'weeks');
+    try{this._ch('an-cum',{type:'line',data:{labels:cd.labels,datasets:[{label:'Plan',data:cd.planned,borderColor:'#555',borderWidth:2,borderDash:[5,5],pointRadius:0,fill:false},{label:'Realizacja',data:cd.actual,borderColor:'#0A84FF',borderWidth:2,pointRadius:3,pointBackgroundColor:'#0A84FF',fill:true,backgroundColor:'rgba(10,132,255,.1)'}]},options:{responsive:true,plugins:{legend:{display:true,labels:{color:'#ccc'}}},scales:{x:{ticks:{color:'#999'}},y:{ticks:{color:'#999'}}}}})}catch(e){console.warn('CumDist chart err',e)}
 
-    const hr150=this.getPaceHR150();
-    if(hr150.length)try{this._ch('an-hr150',{type:'line',data:{labels:hr150.map(h=>h.date.substring(5)),datasets:[{data:hr150.map(h=>h.pace),borderColor:'#BF5AF2',borderWidth:2,pointRadius:3,pointBackgroundColor:'#BF5AF2',fill:false,tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:10}},y:{reverse:true,ticks:{color:'#999',callback:v=>{const m=Math.floor(v);const s=Math.round((v-m)*60);return m+':'+String(s).padStart(2,'0')}}}}}})}catch(e){console.warn('HR150 chart error',e)}
+    var hr150=this.getPaceHR150();
+    console.log('HR150 data:',hr150.length);
+    if(hr150.length>0){try{this._ch('an-hr150',{type:'line',data:{labels:hr150.map(function(h){return h.date.substring(5)}),datasets:[{data:hr150.map(function(h){return h.pace}),borderColor:'#BF5AF2',borderWidth:2,pointRadius:3,pointBackgroundColor:'#BF5AF2',fill:false,tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:10}},y:{reverse:true,ticks:{color:'#999',callback:function(v){var m=Math.floor(v);var s=Math.round((v-m)*60);return m+':'+String(s).padStart(2,'0')}}}}}})}catch(e){console.warn('HR150 chart err',e)}}
 
-    const wow=this.getWoW();
-    try{this._ch('an-wow',{type:'bar',data:{labels:wow.map(w=>'T'+w.week),datasets:[{label:'km',data:wow.map(w=>w.km),backgroundColor:'rgba(10,132,255,.6)',borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999'}},y:{ticks:{color:'#999'}}}}})}catch(e){console.warn('WoW chart error',e)}
+    var wow=this.getWoW();
+    console.log('WoW data:',wow.length);
+    try{this._ch('an-wow',{type:'bar',data:{labels:wow.map(function(w){return 'T'+w.week}),datasets:[{label:'km',data:wow.map(function(w){return w.km}),backgroundColor:'rgba(10,132,255,.6)',borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999'}},y:{ticks:{color:'#999'}}}}})}catch(e){console.warn('WoW chart err',e)}
 
-    const fi=this.getFI();
-    if(fi.length)try{this._ch('an-fi',{type:'bar',data:{labels:fi.map(f=>f.date.substring(5)),datasets:[{data:fi.map(f=>f.index),backgroundColor:fi.map(f=>f.index<=0?'#30D158':f.index<=3?'#0A84FF':f.index<=6?'#FF9F0A':'#FF453A'),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:10}},y:{ticks:{color:'#999',callback:v=>v+'%'}}}}})}catch(e){console.warn('FI chart error',e)}
+    var fi=this.getFI();
+    console.log('FI data:',fi.length);
+    if(fi.length>0){try{this._ch('an-fi',{type:'bar',data:{labels:fi.map(function(f){return f.date.substring(5)}),datasets:[{data:fi.map(function(f){return f.index}),backgroundColor:fi.map(function(f){return f.index<=0?'#30D158':f.index<=3?'#0A84FF':f.index<=6?'#FF9F0A':'#FF453A'}),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:10}},y:{ticks:{color:'#999',callback:function(v){return v+'%'}}}}}})}catch(e){console.warn('FI chart err',e)}}
 
-    const cp=this.getCadPace();
-    if(cp.length)try{this._ch('an-cad',{type:'scatter',data:{datasets:[{data:cp.map(c=>({x:c.pace,y:c.cadence})),backgroundColor:'#64D2FF',pointRadius:5}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{reverse:true,title:{display:true,text:'Tempo (min/km)',color:'#999'},ticks:{color:'#999',callback:v=>{const m=Math.floor(v);const s=Math.round((v-m)*60);return m+':'+String(s).padStart(2,'0')}}},y:{title:{display:true,text:'Kadencja (kroki/min)',color:'#999'},ticks:{color:'#999'}}}}})}catch(e){console.warn('Cad chart error',e)}
+    var cp=this.getCadPace();
+    console.log('CadPace data:',cp.length);
+    if(cp.length>0){try{this._ch('an-cad',{type:'scatter',data:{datasets:[{data:cp.map(function(c){return{x:c.pace,y:c.cadence}}),backgroundColor:'#64D2FF',pointRadius:5}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{reverse:true,title:{display:true,text:'Tempo (min/km)',color:'#999'},ticks:{color:'#999',callback:function(v){var m=Math.floor(v);var s=Math.round((v-m)*60);return m+':'+String(s).padStart(2,'0')}}},y:{title:{display:true,text:'Kadencja (kroki/min)',color:'#999'},ticks:{color:'#999'}}}}})}catch(e){console.warn('Cad chart err',e)}}
 
-    const elev=this.getCumElev();
-    if(elev.byWeek.length&&elev.total>0)try{this._ch('an-elev',{type:'bar',data:{labels:elev.byWeek.map(e=>'T'+e.week),datasets:[{label:'Tygodniowe (m)',data:elev.byWeek.map(e=>e.elev),backgroundColor:'rgba(100,210,255,.5)',borderRadius:4},{label:'Narastajace (m)',data:elev.byWeek.map(e=>e.cum),type:'line',borderColor:'#FF9F0A',borderWidth:2,pointRadius:2,fill:false,yAxisID:'y2'}]},options:{responsive:true,plugins:{legend:{display:true,labels:{color:'#ccc'}}},scales:{x:{ticks:{color:'#999'}},y:{position:'left',ticks:{color:'#999'}},y2:{position:'right',grid:{display:false},ticks:{color:'#999'}}}}})}catch(e){console.warn('Elev chart error',e)}
+    var elev=this.getCumElev();
+    console.log('Elev data:',elev.total);
+    if(elev.byWeek.length>0&&elev.total>0){try{this._ch('an-elev',{type:'bar',data:{labels:elev.byWeek.map(function(e){return 'T'+e.week}),datasets:[{label:'Tygodniowe (m)',data:elev.byWeek.map(function(e){return e.elev}),backgroundColor:'rgba(100,210,255,.5)',borderRadius:4},{label:'Narastajace (m)',data:elev.byWeek.map(function(e){return e.cum}),type:'line',borderColor:'#FF9F0A',borderWidth:2,pointRadius:2,fill:false,yAxisID:'y2'}]},options:{responsive:true,plugins:{legend:{display:true,labels:{color:'#ccc'}}},scales:{x:{ticks:{color:'#999'}},y:{position:'left',ticks:{color:'#999'}},y2:{position:'right',grid:{display:false},ticks:{color:'#999'}}}}})}catch(e){console.warn('Elev chart err',e)}}
 
-    }catch(e){console.error('Analytics drawCharts error:',e)}
+    console.log('Analytics drawCharts DONE');
+    }catch(e){console.error('Analytics drawCharts global error:',e)}
   }
 };
