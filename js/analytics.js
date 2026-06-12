@@ -315,9 +315,12 @@ const Analytics={
     }catch(e){console.error('Analytics render error:',e);return '<div class="empty">Blad Analytics: '+e.message+'</div>'}
   },
 
+
   drawCharts(){
     try{
     const ae=this.getAE();
+    console.log('Analytics data:','AE:',ae.length,'logs:',this._logs().length);
+
     if(ae.length)try{this._ch('an-ae',{type:'line',data:{labels:ae.map(a=>a.date.substring(5)),datasets:[{data:ae.map(a=>a.ae),borderColor:'#FF9F0A',borderWidth:2,pointRadius:3,pointBackgroundColor:'#FF9F0A',fill:false,tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:10}},y:{reverse:true,ticks:{color:'#999'}}}}})}catch(e){console.warn('AE chart error',e)}
 
     const vo2=this.getVO2();
