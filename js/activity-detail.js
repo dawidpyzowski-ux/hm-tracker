@@ -78,9 +78,13 @@ const ActDetail={
     return h;
   },
 
+ 
+  _ch(id,cfg){const c=Chart.getChart(id);if(c)c.destroy();return new Chart(id,cfg)},
+
   drawCharts(sid){
     const d=this.getData(sid);
     if(!d||!d.streams)return;
+
     const str=d.streams;
     const dist=this._s(str,'distance');
     const hr=this._s(str,'heartrate');
@@ -107,24 +111,24 @@ const ActDetail={
         for(let i=this.ZONES.length-1;i>=0;i--){if(v>=this.ZONES[i].min)return this.ZONES[i].color}
         return '#999';
       });
-      new Chart('ad-hr',{type:'line',data:{labels,datasets:[{data:hrDs,borderColor:colors,segment:{borderColor:ctx=>{const v=hrDs[ctx.p1DataIndex];for(let i=this.ZONES.length-1;i>=0;i--){if(v>=this.ZONES[i].min)return this.ZONES[i].color}return '#999'}},borderWidth:1.5,pointRadius:0,fill:false,tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:true,title:{display:true,text:'km',color:'#999'},ticks:{color:'#999',maxTicksLimit:8}},y:{title:{display:true,text:'bpm',color:'#999'},ticks:{color:'#999'}}}}});
+      this._ch('ad-hr',{type:'line',data:{labels,datasets:[{data:hrDs,borderColor:colors,segment:{borderColor:ctx=>{const v=hrDs[ctx.p1DataIndex];for(let i=this.ZONES.length-1;i>=0;i--){if(v>=this.ZONES[i].min)return this.ZONES[i].color}return '#999'}},borderWidth:1.5,pointRadius:0,fill:false,tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{display:true,title:{display:true,text:'km',color:'#999'},ticks:{color:'#999',maxTicksLimit:8}},y:{title:{display:true,text:'bpm',color:'#999'},ticks:{color:'#999'}}}}});
     }
 
     if(vel&&document.getElementById('ad-pace')){
       const velDs=ds(vel);
       // Convert velocity to pace (min/km) - invert
       const paceData=velDs.map(v=>v>0?1000/v/60:0);
-      new Chart('ad-pace',{type:'line',data:{labels,datasets:[{data:paceData,borderColor:'#0A84FF',borderWidth:1.5,pointRadius:0,fill:true,backgroundColor:'rgba(10,132,255,.15)',tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:8}},y:{reverse:true,title:{display:true,text:'min/km',color:'#999'},ticks:{color:'#999',callback:v=>{const m=Math.floor(v);const s=Math.round((v-m)*60);return m+':'+String(s).padStart(2,'0')}}}}}});
+      this._ch('ad-pace',{type:'line',data:{labels,datasets:[{data:paceData,borderColor:'#0A84FF',borderWidth:1.5,pointRadius:0,fill:true,backgroundColor:'rgba(10,132,255,.15)',tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:8}},y:{reverse:true,title:{display:true,text:'min/km',color:'#999'},ticks:{color:'#999',callback:v=>{const m=Math.floor(v);const s=Math.round((v-m)*60);return m+':'+String(s).padStart(2,'0')}}}}}});
     }
 
     if(alt&&document.getElementById('ad-alt')){
       const altDs=ds(alt);
-      new Chart('ad-alt',{type:'line',data:{labels,datasets:[{data:altDs,borderColor:'#64D2FF',borderWidth:1.5,pointRadius:0,fill:true,backgroundColor:'rgba(100,210,255,.2)',tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:8}},y:{title:{display:true,text:'m n.p.m.',color:'#999'},ticks:{color:'#999'}}}}});
+      this._ch('ad-alt',{type:'line',data:{labels,datasets:[{data:altDs,borderColor:'#64D2FF',borderWidth:1.5,pointRadius:0,fill:true,backgroundColor:'rgba(100,210,255,.2)',tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:8}},y:{title:{display:true,text:'m n.p.m.',color:'#999'},ticks:{color:'#999'}}}}});
     }
 
     if(cad&&document.getElementById('ad-cad')){
       const cadDs=ds(cad).map(c=>c*2); // Strava half-cadence for running
-      new Chart('ad-cad',{type:'line',data:{labels,datasets:[{data:cadDs,borderColor:'#BF5AF2',borderWidth:1.5,pointRadius:0,fill:true,backgroundColor:'rgba(191,90,242,.15)',tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:8}},y:{title:{display:true,text:'kroki/min',color:'#999'},ticks:{color:'#999'}}}}});
+      this._ch('ad-cad',{type:'line',data:{labels,datasets:[{data:cadDs,borderColor:'#BF5AF2',borderWidth:1.5,pointRadius:0,fill:true,backgroundColor:'rgba(191,90,242,.15)',tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:8}},y:{title:{display:true,text:'kroki/min',color:'#999'},ticks:{color:'#999'}}}}});
     }
 
     if(hr&&document.getElementById('ad-zones')){
@@ -139,7 +143,7 @@ const ActDetail={
       const total=zoneSec.reduce((a,b)=>a+b,1);
       const pcts=zoneSec.map(s=>Math.round(s/total*100));
       const mins=zoneSec.map(s=>Math.round(s/60));
-      new Chart('ad-zones',{type:'doughnut',data:{labels:this.ZONES.map((z,i)=>`${z.name} ${pcts[i]}% (${mins[i]}min)`),datasets:[{data:zoneSec,backgroundColor:this.ZONES.map(z=>z.color),borderWidth:0}]},options:{responsive:true,plugins:{legend:{display:true,position:'bottom',labels:{color:'#ccc',font:{size:11},padding:8}}}}});
+      this._ch('ad-zones',{type:'doughnut',data:{labels:this.ZONES.map((z,i)=>`${z.name} ${pcts[i]}% (${mins[i]}min)`),datasets:[{data:zoneSec,backgroundColor:this.ZONES.map(z=>z.color),borderWidth:0}]},options:{responsive:true,plugins:{legend:{display:true,position:'bottom',labels:{color:'#ccc',font:{size:11},padding:8}}}}});
     }
 
     if(latlng&&document.getElementById('ad-map')&&typeof L!=='undefined'){
