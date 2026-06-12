@@ -351,7 +351,10 @@ function rStat(){
       h+=`</div></div>`;
     });
   }else{h+=`<div class="empty">Brak zalogowanych treningow</div>`}
-
+  
+  // === PERSONAL RECORDS ===
+  h+=PR.render();
+  
   // Charts
   h+=`<div class="chc"><div class="ch-t">\u2764\uFE0F\u200D\uD83D\uDD25 Training Load (CTL / ATL / TSB)</div><canvas id="ch-tl"></canvas></div>`;
   h+=`<div class="chc"><div class="ch-t">\uD83C\uDFAF Prognoza polmaratonu - trend</div><canvas id="ch-pred"></canvas></div>`;
