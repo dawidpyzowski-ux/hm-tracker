@@ -195,10 +195,12 @@ function rNutr(){
 function toggleCheck(i,v){const cl=S.getChecklist();cl[i]=v;S.setChecklist(cl)}
 
 // ─── STATS ───
+
 function rStat(){
   const el=document.getElementById('s-stat');
   const t=today();
   TL.update();
+  const DOW=['Niedz','Pon','Wt','Sr','Czw','Pt','Sob'];
   let h=`<h1>Statystyki</h1><p class="sub">Postepy treningowe</p>`;
 
   // Heat map
@@ -224,6 +226,56 @@ function rStat(){
   h+=`</div>`;
   h+=`<div class="hmap-leg"><div class="hmap-li"><div class="hmap-lc" style="background:var(--g)"></div>Wykonany</div><div class="hmap-li"><div class="hmap-lc" style="background:var(--o)"></div>Brak logu</div><div class="hmap-li"><div class="hmap-lc" style="background:var(--r)"></div>Pominiety</div><div class="hmap-li"><div class="hmap-lc" style="background:var(--c3);opacity:.3"></div>Rest</div><div class="hmap-li"><div class="hmap-lc" style="background:var(--c2);border:.5px solid var(--c3)"></div>Przyszlosc</div></div>`;
   h+=`</div>`;
+
+  // ═══ HISTORIA TRENINGOW ═══
+  const logs=S.getAllLogs();
+  const sortedDates=Object.keys(logs).filter(d=>logs[d].distance).sort((a,b)=>b.localeCompare(a));
+  let totalKm=0;
+  sortedDates.forEach(d=>{if(logs[d].distance)totalKm+=parseFloat(logs[d].distance)});
+
+  // Build set of planned training dates for matching
+  const plannedDates={};
+  PLAN.forEach(w=>{w.days.forEach(d=>{
+    const dt=getDayDate(w.start,d.dow);
+    if(!d.rest)plannedDates[dt]={type:d.type,km:d.km,week:w.weekNum};
+  })});
+
+  h+=`<div class="stit">\uD83C\uDFC3 Historia treningow</div>`;
+  h+=`<div class="hist-head"><span class="hist-count">${sortedDates.length} treningow</span><span class="hist-total">${Math.round(totalKm*10)/10} km lacznie</span></div>`;
+
+  if(sortedDates.length){
+    sortedDates.forEach(date=>{
+      const l=logs[date];
+      const dd=new Date(date+'T12:00:00');
+      const dowName=DOW[dd.getDay()];
+      const planned=plannedDates[date];
+      const isExtra=!planned;
+      h+=`<div class="wlog${isExtra?' extra':''}">`;
+      h+=`<div class="wlog-date"><div class="wlog-d">${fmtD(date)}</div><div class="wlog-dow">${dowName}</div></div>`;
+      h+=`<div class="wlog-info"><div class="wlog-top">`;
+      h+=`<span class="wlog-km">${l.distance} km</span>`;
+      if(l.pace)h+=`<span class="wlog-pace">\u23F1 ${l.pace}/km</span>`;
+      if(l.hr)h+=`<span class="wlog-hr">\u2764 ${l.hr} bpm</span>`;
+      if(l.feeling)h+=`<span class="wlog-feel">${EMO[+l.feeling]||''}</span>`;
+      if(planned)h+=`<span class="wlog-match">\u2705 T${planned.week}: ${planned.type}</span>`;
+      else h+=`<span class="wlog-tag">\u2728 Poza planem</span>`;
+      h+=`</div>`;
+      if(l.notes)h+=`<div class="wlog-note">${l.notes}</div>`;
+      h+=`</div></div>`;
+    });
+  }else{h+=`<div class="empty">Brak zalogowanych treningow</div>`}
+
+  // Charts
+  h+=`<div class="chc"><div class="ch-t">\u2764\uFE0F\u200D\uD83D\uDD25 Training Load (CTL / ATL / TSB)</div><canvas id="ch-tl"></canvas></div>`;
+  h+=`<div class="chc"><div class="ch-t">\uD83C\uDFAF Prognoza polmaratonu - trend</div><canvas id="ch-pred"></canvas></div>`;
+  h+=`<div class="chc"><div class="ch-t">\uD83D\uDCCA Km tygodniowy (plan vs realizacja)</div><canvas id="ch1"></canvas></div>`;
+  h+=`<div class="chc"><div class="ch-t">\u23F1\uFE0F Trend tempa</div><canvas id="ch2"></canvas></div>`;
+  h+=`<div class="chc"><div class="ch-t">\uD83D\uDE0A Samopoczucie</div><canvas id="ch3"></canvas></div>`;
+  h+=`<div class="chc"><div class="ch-t">\uD83D\uDCC5 Objetosc miesieczna</div><canvas id="ch4"></canvas></div>`;
+  el.innerHTML=h;
+  setTimeout(()=>{Charts.weeklyKm('ch1');Charts.paceTrend('ch2');Charts.feelingTrend('ch3');Charts.monthlyVol('ch4');Charts.trainingLoad('ch-tl');Charts.predTrend('ch-pred')},100);
+}
+
 
   h+=`<div class="chc"><div class="ch-t">\u2764\uFE0F\u200D\uD83D\uDD25 Training Load (CTL / ATL / TSB)</div><canvas id="ch-tl"></canvas></div>`;
   h+=`<div class="chc"><div class="ch-t">\uD83C\uDFAF Prognoza polmaratonu - trend</div><canvas id="ch-pred"></canvas></div>`;
