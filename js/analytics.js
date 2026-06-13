@@ -1,5 +1,5 @@
 /**
- * HM Tracker PWA - analytics.js (Sprint 7: Power / GAP / Split analytics)
+ * HM Tracker PWA - analytics.js (Sprint 7)
  * Global: Analytics.render(), Analytics.drawCharts()
  */
 var Analytics = (function() {
@@ -31,8 +31,7 @@ var Analytics = (function() {
   }
 
   function _getStrava(sid) {
-    var det = null, str = null;
-    var sidStr = String(sid);
+    var det = null, str = null, sidStr = String(sid);
     var dP = ['strava_detail_','hm_strava_detail_','hm_detail_','detail_'];
     var sP = ['strava_streams_','hm_strava_streams_','hm_streams_','streams_'];
     var i, raw;
@@ -91,10 +90,10 @@ var Analytics = (function() {
     var cf = _minettiCost(0), n = vel.length, g = [], i;
     for (i = 0; i < n; i++) g.push(0);
     for (i = 1; i < n - 1; i++) {
-      var dd = (dst ? dst[i+1]-dst[i-1] : vel[i]*(tm[i+1]-tm[i-1])) || 1;
-      var gr = (alt[i+1]-alt[i-1]) / Math.max(dd, 0.1);
-      gr = Math.max(-0.5, Math.min(0.5, gr));
-      var cg = _minettiCost(gr);
+      var dd2 = (dst ? dst[i+1]-dst[i-1] : vel[i]*(tm[i+1]-tm[i-1])) || 1;
+      var gr2 = (alt[i+1]-alt[i-1]) / Math.max(dd2, 0.1);
+      gr2 = Math.max(-0.5, Math.min(0.5, gr2));
+      var cg = _minettiCost(gr2);
       g[i] = (cf > 0 && cg > 0) ? vel[i]*(cg/cf) : vel[i];
     }
     g[0] = g[1]; g[n-1] = g[n-2];
@@ -173,6 +172,20 @@ var Analytics = (function() {
       var avgGapSpd = null;
       if (gs) { var gSum = 0; for (var gi = 0; gi < gs.length; gi++) gSum += gs[gi]; avgGapSpd = gSum / gs.length; }
 
+      // HR < 150 minutes
+      var hr150mins = null;
+      if (str) {
+        var hrArr = _sa(str, 'heartrate');
+        var tmArr = _sa(str, 'time');
+        if (hrArr && tmArr && hrArr.length > 1) {
+          var below = 0;
+          for (var hi = 1; hi < hrArr.length; hi++) {
+            if (hrArr[hi] < 150) below += (tmArr[hi] - tmArr[hi-1]);
+          }
+          hr150mins = Math.round(below / 6) / 10;
+        }
+      }
+
       var splits = det ? det.splits : null;
       var bestKm = null, splitRatio = null, consistency = null;
       if (splits && splits.length > 0) {
@@ -212,7 +225,8 @@ var Analytics = (function() {
         avgPwr: avgPwr,
         pwRatio: avgPwr ? (avgPwr / _weight()).toFixed(2) : null,
         avgGapSpd: avgGapSpd, bestKm: bestKm,
-        splitRatio: splitRatio, consistency: consistency
+        splitRatio: splitRatio, consistency: consistency,
+        hr150mins: hr150mins
       });
     }
     items.sort(function(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
@@ -248,33 +262,38 @@ var Analytics = (function() {
   function render() {
     var items = _collectAll();
     if (items.length < 2) return '';
+    var i;
 
-    var h = '<div class="stit">\uD83D\uDCC8 Zaawansowana analityka</div>';
+    var h = '<div class="stit">' + '\uD83D\uDCC8 Zaawansowana analityka</div>';
 
     var prs = _findPRs(items);
     if (prs.length) {
-      h += '<div class="chart-section"><h3>\uD83C\uDFC6 Rekordy osobiste</h3><div class="stat-grid">';
-      for (var pi = 0; pi < prs.length; pi++) {
-        h += '<div class="stat"><span class="stat-label">' + prs[pi].label + '</span><span class="stat-value">' + prs[pi].value + '</span></div>';
+      h += '<div class="chart-section"><h3>' + '\uD83C\uDFC6 Rekordy osobiste</h3><div class="stat-grid">';
+      for (i = 0; i < prs.length; i++) {
+        h += '<div class="stat"><span class="stat-label">' + prs[i].label + '</span><span class="stat-value">' + prs[i].value + '</span></div>';
       }
       h += '</div></div>';
     }
 
-    h += '<div class="chart-section"><h3>\uD83E\uDEC1 Trend VO\u2082max</h3><canvas id="an-vo2"></canvas></div>';
-    h += '<div class="chart-section"><h3>\uD83C\uDFCB Rozklad typow treningu</h3><canvas id="an-tdist"></canvas></div>';
+    h += '<div class="chart-section"><h3>' + '\uD83E\uDEC1 Trend VO\u2082max</h3><canvas id="an-vo2"></canvas></div>';
+    h += '<div class="chart-section"><h3>' + '\uD83C\uDFCB Rozklad typow treningu</h3><canvas id="an-tdist"></canvas></div>';
+    h += '<div class="chart-section"><h3>' + '\uD83D\uDCCF Dystans narastajaco</h3><canvas id="an-cumdist"></canvas></div>';
 
-    var hasPwr = false, hasGap = false, hasBest = false, hasCon = false;
-    for (var i = 0; i < items.length; i++) {
+    var hasPwr = false, hasGap = false, hasBest = false, hasCon = false, hasHR150 = false;
+    for (i = 0; i < items.length; i++) {
       if (items[i].avgPwr) hasPwr = true;
       if (items[i].avgGapSpd) hasGap = true;
       if (items[i].bestKm) hasBest = true;
       if (items[i].consistency !== null) hasCon = true;
+      if (items[i].hr150mins !== null) hasHR150 = true;
     }
-    if (hasPwr) h += '<div class="chart-section"><h3>\u26A1 Trend mocy</h3><canvas id="an-pwr"></canvas></div>';
-    if (hasGap) h += '<div class="chart-section"><h3>\uD83C\uDFD4 GAP vs Tempo</h3><canvas id="an-gap"></canvas></div>';
-    if (hasBest) h += '<div class="chart-section"><h3>\uD83D\uDE80 Najszybszy km</h3><canvas id="an-bestkm"></canvas></div>';
-    if (hasCon) h += '<div class="chart-section"><h3>\uD83D\uDCCA Rownomiernosc / Split ratio</h3><canvas id="an-consist"></canvas></div>';
+    if (hasPwr) h += '<div class="chart-section"><h3>' + '\u26A1 Trend mocy</h3><canvas id="an-pwr"></canvas></div>';
+    if (hasGap) h += '<div class="chart-section"><h3>' + '\uD83C\uDFD4 GAP vs Tempo</h3><canvas id="an-gap"></canvas></div>';
+    if (hasBest) h += '<div class="chart-section"><h3>' + '\uD83D\uDE80 Najszybszy km - trend</h3><canvas id="an-bestkm"></canvas></div>';
+    if (hasCon) h += '<div class="chart-section"><h3>' + '\uD83D\uDCCA Rownomiernosc / Split ratio</h3><canvas id="an-consist"></canvas></div>';
+    if (hasHR150) h += '<div class="chart-section"><h3>' + '\u2764\uFE0F HR < 150 bpm (minuty)</h3><canvas id="an-hr150"></canvas></div>';
 
+    // Weekly table
     var wm = {};
     for (i = 0; i < items.length; i++) {
       var a = items[i];
@@ -284,7 +303,7 @@ var Analytics = (function() {
       if (a.avgPwr) wm[a.week].pwr.push(a.avgPwr);
     }
     var weeks = Object.keys(wm).sort();
-    h += '<div class="table-section"><h3>\uD83D\uDCCB Podsumowanie tygodniowe</h3>';
+    h += '<div class="table-section"><h3>' + '\uD83D\uDCCB Podsumowanie tygodniowe</h3>';
     h += '<table class="analytics-table"><thead><tr><th>Tydzien</th><th>Biegi</th><th>Dystans</th><th>VO\u2082max</th><th>Moc</th></tr></thead><tbody>';
     for (i = 0; i < weeks.length; i++) {
       var wd = wm[weeks[i]];
@@ -339,7 +358,26 @@ var Analytics = (function() {
       });
     }
 
-    // 3. Power trend
+    // 3. Cumulative Distance
+    _destroy('an-cumdist');
+    cv = document.getElementById('an-cumdist');
+    if (cv) {
+      labels = []; var cumData = []; var cumSum = 0;
+      for (i = 0; i < items.length; i++) {
+        cumSum += items[i].distKm;
+        labels.push(items[i].date.slice(5));
+        cumData.push(Math.round(cumSum * 10) / 10);
+      }
+      _charts['an-cumdist'] = new Chart(cv.getContext('2d'), {
+        type: 'line',
+        data: { labels: labels, datasets: [{ label: 'Dystans (km)', data: cumData,
+          borderColor: 'rgba(86,180,233,0.9)', backgroundColor: 'rgba(86,180,233,0.1)',
+          fill: true, tension: 0.3, pointRadius: 2 }] },
+        options: { responsive: true, scales: { y: { title: { display: true, text: 'km' }, beginAtZero: true } } }
+      });
+    }
+
+    // 4. Power trend
     wArr = [];
     for (i = 0; i < items.length; i++) { if (items[i].avgPwr) wArr.push(items[i]); }
     if (wArr.length) {
@@ -362,7 +400,7 @@ var Analytics = (function() {
       }
     }
 
-    // 4. GAP vs Pace
+    // 5. GAP vs Pace
     wArr = [];
     for (i = 0; i < items.length; i++) { if (items[i].avgGapSpd && items[i].spd) wArr.push(items[i]); }
     if (wArr.length) {
@@ -385,7 +423,7 @@ var Analytics = (function() {
       }
     }
 
-    // 5. Best km
+    // 6. Best km
     wArr = [];
     for (i = 0; i < items.length; i++) { if (items[i].bestKm) wArr.push(items[i]); }
     if (wArr.length) {
@@ -396,15 +434,19 @@ var Analytics = (function() {
         for (i = 0; i < wArr.length; i++) { labels.push(wArr[i].date.slice(5)); bkD.push(Math.round(wArr[i].bestKm)); }
         _charts['an-bestkm'] = new Chart(cv.getContext('2d'), {
           type: 'line',
-          data: { labels: labels, datasets: [{ label: 'Najszybszy km (s/km)', data: bkD,
+          data: { labels: labels, datasets: [{ label: 'Najszybszy km', data: bkD,
             borderColor: 'rgba(213,94,0,0.9)', backgroundColor: 'rgba(213,94,0,0.1)',
             fill: true, tension: 0.3, pointRadius: 3 }] },
-          options: { responsive: true, scales: { y: { reverse: true, title: { display: true, text: 's/km' }, ticks: { callback: _pTick } } } }
+          options: { responsive: true,
+            scales: { y: { reverse: true, title: { display: true, text: 'min/km' },
+              ticks: { callback: _pTick } } },
+            plugins: { tooltip: { callbacks: { label: function(ctx) { return 'Najszybszy km: ' + _pTick(ctx.raw) + '/km'; } } } }
+          }
         });
       }
     }
 
-    // 6. Consistency
+    // 7. Consistency + split ratio
     wArr = [];
     for (i = 0; i < items.length; i++) { if (items[i].consistency !== null && items[i].splitRatio !== null) wArr.push(items[i]); }
     if (wArr.length) {
@@ -423,6 +465,24 @@ var Analytics = (function() {
             y: { title: { display: true, text: '%' }, position: 'left', min: 0, max: 100 },
             y1: { title: { display: true, text: 'Ratio' }, position: 'right', grid: { drawOnChartArea: false } }
           }}
+        });
+      }
+    }
+
+    // 8. HR < 150 bpm
+    wArr = [];
+    for (i = 0; i < items.length; i++) { if (items[i].hr150mins !== null) wArr.push(items[i]); }
+    if (wArr.length) {
+      _destroy('an-hr150');
+      cv = document.getElementById('an-hr150');
+      if (cv) {
+        labels = []; var hrData = [];
+        for (i = 0; i < wArr.length; i++) { labels.push(wArr[i].date.slice(5)); hrData.push(wArr[i].hr150mins); }
+        _charts['an-hr150'] = new Chart(cv.getContext('2d'), {
+          type: 'bar',
+          data: { labels: labels, datasets: [{ label: 'Minuty HR < 150', data: hrData,
+            backgroundColor: 'rgba(0,158,115,0.6)' }] },
+          options: { responsive: true, scales: { y: { title: { display: true, text: 'min' }, beginAtZero: true } } }
         });
       }
     }
