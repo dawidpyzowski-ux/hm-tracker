@@ -1,0 +1,266 @@
+/* =============================================================
+   HM Tracker PWA – sprint7-styles.css
+   Dark-theme styles for Power / GAP / Laps features
+   ============================================================= */
+
+:root {
+  --bg-primary:    #1a1a2e;
+  --bg-secondary:  #16213e;
+  --bg-card:       #0f3460;
+  --bg-card-hover: #1a4a7a;
+  --accent:        #e94560;
+  --accent-soft:   rgba(233, 69, 96, 0.15);
+  --text-primary:  #eeeeee;
+  --text-secondary:#aaaaaa;
+  --text-muted:    #777777;
+  --border:        rgba(255,255,255,0.08);
+  --radius:        10px;
+  --radius-sm:     6px;
+  --shadow:        0 2px 12px rgba(0,0,0,0.35);
+  --shadow-lg:     0 4px 24px rgba(0,0,0,0.5);
+  --transition:    all 0.25s ease;
+}
+
+/* ---- Detail Summary ---- */
+.detail-summary {
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.detail-summary h2 {
+  color: var(--text-primary);
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--accent);
+}
+
+/* ---- Stat Grid ---- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.stat {
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: var(--shadow);
+  transition: var(--transition);
+}
+
+.stat:hover {
+  background: var(--bg-card-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.stat-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+/* ---- Chart Section ---- */
+.chart-section {
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin: 16px 0;
+  box-shadow: var(--shadow);
+}
+
+.chart-section h3 {
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.chart-section canvas {
+  width: 100% !important;
+  max-height: 280px;
+}
+
+/* ---- Table Section ---- */
+.table-section {
+  margin: 16px 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-section h3 {
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 10px 0;
+  padding: 0 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---- Laps Table ---- */
+.laps-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  min-width: 600px;
+}
+
+.laps-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.laps-table thead tr {
+  background: var(--bg-card);
+}
+
+.laps-table th {
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 10px 8px;
+  text-align: center;
+  border-bottom: 2px solid var(--accent);
+  white-space: nowrap;
+}
+
+.laps-table td {
+  padding: 8px;
+  text-align: center;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  transition: var(--transition);
+}
+
+.laps-table tbody tr {
+  transition: var(--transition);
+}
+
+.laps-table tbody tr:hover {
+  background: var(--bg-card-hover) !important;
+}
+
+.laps-table tbody tr:nth-child(even) {
+  background: rgba(255,255,255,0.02);
+}
+
+.laps-table td strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ---- Analytics Table (Weekly Summary) ---- */
+.analytics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  min-width: 450px;
+}
+
+.analytics-table thead tr {
+  background: var(--bg-card);
+}
+
+.analytics-table th {
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 10px 12px;
+  text-align: center;
+  border-bottom: 2px solid var(--accent);
+}
+
+.analytics-table td {
+  padding: 8px 12px;
+  text-align: center;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+}
+
+.analytics-table tbody tr:hover {
+  background: var(--bg-card-hover);
+}
+
+.analytics-table tbody tr:nth-child(even) {
+  background: rgba(255,255,255,0.02);
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 600px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .stat {
+    padding: 10px 8px;
+  }
+
+  .stat-label {
+    font-size: 0.6rem;
+  }
+
+  .stat-value {
+    font-size: 1rem;
+  }
+
+  .detail-summary h2 {
+    font-size: 1.15rem;
+  }
+
+  .chart-section {
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: var(--radius-sm);
+  }
+
+  .chart-section canvas {
+    max-height: 220px;
+  }
+
+  .chart-section h3,
+  .table-section h3 {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .stat-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .stat-value {
+    font-size: 0.9rem;
+  }
+
+  .laps-table,
+  .analytics-table {
+    font-size: 0.72rem;
+  }
+}
