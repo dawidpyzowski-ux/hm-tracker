@@ -1,298 +1,661 @@
-// HM Tracker - Advanced Analytics (Sprint 6 v5 - Smart Drift)
-const Analytics={
-  _ch(id,cfg){var el=document.getElementById(id);if(!el)return null;var x=Chart.getChart(el);if(x)x.destroy();return new Chart(el,cfg)},
-  _pp(p){if(!p||p==='-')return 0;var s=p.split(':');return parseInt(s[0])+parseInt(s[1]||0)/60},
-  _logs(){
-    var logs=S.getAllLogs();var arr=[];
-    Object.entries(logs).forEach(function(e){var d=e[0],l=e[1];if(l.distance)arr.push(Object.assign({date:d},l))});
-    arr.sort(function(a,b){return a.date.localeCompare(b.date)});return arr;
-  },
-  _trimSplits(splits){
-    if(!splits||splits.length<5)return null;
-    var cumDist=[];var total=0;
-    for(var i=0;i<splits.length;i++){total+=(splits[i].distance||0);cumDist.push(total)}
-    if(total/1000<8)return null;
-    var startIdx=0;
-    for(var i=0;i<cumDist.length;i++){if(cumDist[i]>=2000){startIdx=i+1;break}}
-    var endIdx=splits.length-1;
-    for(var i=splits.length-1;i>=0;i--){if(total-cumDist[i]>=1500){endIdx=i;break}}
-    if(endIdx<=startIdx||endIdx-startIdx<3)return null;
-    var working=splits.slice(startIdx,endIdx+1);
-    var paces=[];
-    working.forEach(function(sp){if(sp.distance>0&&sp.moving_time>0)paces.push(sp.moving_time/sp.distance*1000)});
-    if(paces.length<4)return null;
-    var mean=paces.reduce(function(a,b){return a+b},0)/paces.length;
-    var variance=paces.reduce(function(a,b){return a+(b-mean)*(b-mean)},0)/paces.length;
-    var stddev=Math.sqrt(variance);
-    if(stddev/mean>0.20)return null;
-    return working;
-  },
-  getAE(){
-    var self=this;
-    return this._logs().filter(function(l){return l.hr&&l.pace&&self._pp(l.pace)>0}).map(function(l){
-      var spdKmh=60/self._pp(l.pace);
-      return{date:l.date,ae:Math.round(parseFloat(l.hr)/spdKmh*10)/10};
+/**
+ * HM Tracker PWA – analytics.js  (Sprint 7)
+ * ------------------------------------------
+ * Features:
+ *   1. VO2max trend (per-activity estimation)
+ *   2. Training distribution (interval detection via pace variance)
+ *   3. Cumulative distance
+ *   4. Time below HR 150
+ *   5. NEW – Power analytics (avg power trend, P:W ratio, power zones)
+ *   6. NEW – GAP analytics (GAP trend, GAP vs actual pace)
+ *   7. NEW – Split analytics (best km trend, split consistency, neg/pos split ratio)
+ *
+ * Dependencies: Chart.js, activity-detail.js (for computePowerStream, computeGAPStream, etc.)
+ */
+
+// --------------- Chart Registry ---------------
+const AnalyticsChartRegistry = {};
+
+function destroyAnalyticsChart(key) {
+  if (AnalyticsChartRegistry[key]) {
+    AnalyticsChartRegistry[key].destroy();
+    delete AnalyticsChartRegistry[key];
+  }
+}
+
+function destroyAllAnalyticsCharts() {
+  Object.keys(AnalyticsChartRegistry).forEach(destroyAnalyticsChart);
+}
+
+// --------------- Helpers ---------------
+function getUserWeightAnalytics() {
+  const w = parseFloat(localStorage.getItem('hm_user_weight'));
+  return (w && w > 0) ? w : 75;
+}
+
+function getMaxHRAnalytics() {
+  const m = parseInt(localStorage.getItem('hm_user_max_hr'), 10);
+  return (m && m > 100) ? m : 190;
+}
+
+function getRestHR() {
+  const r = parseInt(localStorage.getItem('hm_user_rest_hr'), 10);
+  return (r && r > 30) ? r : 50;
+}
+
+function weekKey(dateStr) {
+  const d = new Date(dateStr);
+  const jan1 = new Date(d.getFullYear(), 0, 1);
+  const weekNum = Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+  return `${d.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`;
+}
+
+function formatPaceAnalytics(speedMs) {
+  if (!speedMs || speedMs <= 0) return '--:--';
+  const s = 1000 / speedMs;
+  const m = Math.floor(s / 60);
+  const sec = Math.round(s % 60);
+  return `${m}:${sec.toString().padStart(2, '0')}`;
+}
+
+// --------------- VO2max Estimation (per activity) ---------------
+/**
+ * Uses a Firstbeat-inspired approach:
+ *   - %HRR (heart rate reserve) as fraction of effort
+ *   - speed as proxy for oxygen cost
+ *   VO2max ≈ (speed_ml_O2) / (fractional_utilization)
+ *
+ * Running economy: VO2 (ml/kg/min) ≈ speed(m/min) × 0.2 + 3.5  (ACSM flat running)
+ * Fractional utilization from %HRR: frac ≈ 0.8 × %HRR + 0.15 (simplified Swain)
+ *
+ * We use the activity's average speed and average HR.
+ */
+function estimateVO2max(activity) {
+  const avgSpeed = activity.average_speed; // m/s
+  const avgHR    = activity.average_heartrate;
+  if (!avgSpeed || avgSpeed <= 0 || !avgHR || avgHR <= 0) return null;
+
+  const maxHR  = activity.max_heartrate || getMaxHRAnalytics();
+  const restHR = getRestHR();
+
+  // %HRR – fraction of heart-rate reserve used
+  const hrReserve = maxHR - restHR;
+  if (hrReserve <= 0) return null;
+  const pctHRR = (avgHR - restHR) / hrReserve;
+
+  // fractional VO2max utilisation from %HRR (Swain et al.)
+  const fracUtil = Math.max(0.3, Math.min(1.0, 0.8 * pctHRR + 0.15));
+
+  // Oxygen cost of running (ml/kg/min) – ACSM running equation
+  const speedMperMin = avgSpeed * 60;
+  // Add grade component if we have elevation data
+  let gradeComponent = 0;
+  if (activity.total_elevation_gain && activity.distance > 0) {
+    const avgGrade = activity.total_elevation_gain / activity.distance;
+    gradeComponent = speedMperMin * 0.9 * avgGrade;
+  }
+  const vo2atPace = speedMperMin * 0.2 + gradeComponent + 3.5;
+
+  // VO2max = actual_VO2 / fractional_utilisation
+  const vo2max = vo2atPace / fracUtil;
+
+  // Clamp to reasonable range
+  return (vo2max > 20 && vo2max < 90) ? Math.round(vo2max * 10) / 10 : null;
+}
+
+// --------------- Training Type Detection ---------------
+/**
+ * Classify activity into Easy / Tempo / Interval / Long Run.
+ *
+ * Uses pace variance within the run (from velocity_smooth) to detect intervals.
+ *   – High CV (coeff. of variation) of pace in middle portion → Intervals
+ *   – Steady moderate pace → Tempo
+ *   – Lower pace, longer duration → Easy / Long Run
+ *
+ * Also trims warmup (~2 km) and cooldown (~1.5 km) for analysis.
+ */
+function classifyTraining(activity) {
+  const distKm = activity.distance / 1000;
+  const avgSpeed = activity.average_speed; // m/s
+  const avgPace  = avgSpeed > 0 ? (1000 / avgSpeed) : 999; // sec/km
+
+  const streams = activity.streams || {};
+  const velData  = streams.velocity_smooth?.data;
+  const distData = streams.distance?.data;
+
+  let cv = 0; // coefficient of variation of pace in the "work" portion
+
+  if (velData && distData && velData.length > 20) {
+    // Trim warmup (first 2 km) and cooldown (last 1.5 km)
+    const totalDist = distData[distData.length - 1];
+    const warmupEnd   = 2000;
+    const cooldownStart = Math.max(totalDist - 1500, warmupEnd + 500);
+
+    const workSpeeds = [];
+    for (let i = 0; i < velData.length; i++) {
+      if (distData[i] >= warmupEnd && distData[i] <= cooldownStart && velData[i] > 0.5) {
+        workSpeeds.push(velData[i]);
+      }
+    }
+
+    if (workSpeeds.length > 10) {
+      const mean = workSpeeds.reduce((a, b) => a + b, 0) / workSpeeds.length;
+      const variance = workSpeeds.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / workSpeeds.length;
+      const stddev = Math.sqrt(variance);
+      cv = stddev / mean;
+    }
+  }
+
+  // Classification logic
+  if (cv > 0.25) {
+    return 'Interval';
+  } else if (distKm >= 18) {
+    return 'Long Run';
+  } else if (avgPace < 300) {
+    // faster than 5:00/km → Tempo
+    return 'Tempo';
+  } else if (distKm >= 12 && avgPace < 360) {
+    return 'Tempo';
+  } else {
+    return 'Easy';
+  }
+}
+
+// --------------- Power Zones ---------------
+const POWER_ZONES = [
+  { name: 'Z1 Recovery',    max: 0.55, color: 'rgba(150,150,150,0.7)' },
+  { name: 'Z2 Endurance',   max: 0.75, color: 'rgba(86,180,233,0.7)' },
+  { name: 'Z3 Tempo',       max: 0.90, color: 'rgba(0,158,115,0.7)' },
+  { name: 'Z4 Threshold',   max: 1.05, color: 'rgba(240,228,66,0.7)' },
+  { name: 'Z5 VO2max',      max: 1.20, color: 'rgba(230,159,0,0.7)' },
+  { name: 'Z6 Anaerobic',   max: Infinity, color: 'rgba(213,94,0,0.7)' },
+];
+
+// ============================================================
+//   PUBLIC – render all analytics charts
+// ============================================================
+/**
+ * renderAnalytics(activities, containerEl)
+ *
+ * @param {Array}       activities   – array of activity objects (with streams)
+ * @param {HTMLElement}  containerEl  – DOM element to inject content into
+ */
+function renderAnalytics(activities, containerEl) {
+  destroyAllAnalyticsCharts();
+  containerEl.innerHTML = '';
+
+  if (!activities || activities.length === 0) {
+    containerEl.innerHTML = '<p>No activities found. Import or sync data first.</p>';
+    return;
+  }
+
+  // Sort chronologically
+  const sorted = [...activities].sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+
+  // ---- Pre-compute per-activity data ----
+  const perActivity = sorted.map(act => {
+    const powerStream = (typeof computePowerStream === 'function') ? computePowerStream(act) : null;
+    const gapStream   = (typeof computeGAPStream === 'function')   ? computeGAPStream(act)   : null;
+
+    const avgPower = powerStream
+      ? Math.round(powerStream.reduce((a,b) => a+b, 0) / powerStream.length)
+      : null;
+
+    const avgGapSpeed = gapStream
+      ? gapStream.reduce((a,b) => a+b, 0) / gapStream.length
+      : null;
+
+    // Best km (fastest split)
+    const splits = act.splits_metric;
+    let bestKmPace = null;
+    if (splits && splits.length > 0) {
+      const fullKms = splits.filter(s => s.distance >= 900); // nearly 1 km
+      if (fullKms.length > 0) {
+        const fastest = fullKms.reduce((best, s) => s.average_speed > best.average_speed ? s : best);
+        bestKmPace = 1000 / fastest.average_speed; // sec/km
+      }
+    }
+
+    // Negative/positive split analysis
+    let splitRatio = null;
+    if (splits && splits.length >= 2) {
+      const half = Math.floor(splits.length / 2);
+      const firstHalfAvg = splits.slice(0, half).reduce((s, sp) => s + sp.average_speed, 0) / half;
+      const secondHalfAvg = splits.slice(half).reduce((s, sp) => s + sp.average_speed, 0) / (splits.length - half);
+      splitRatio = secondHalfAvg / firstHalfAvg; // >1 = negative split (faster second half)
+    }
+
+    // Consistency score: 1 - CV of pace across splits (1 = perfectly even)
+    let consistency = null;
+    if (splits && splits.length >= 3) {
+      const fullKms = splits.filter(s => s.distance >= 900);
+      if (fullKms.length >= 3) {
+        const speeds = fullKms.map(s => s.average_speed);
+        const mean = speeds.reduce((a,b) => a+b, 0) / speeds.length;
+        const std  = Math.sqrt(speeds.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / speeds.length);
+        consistency = Math.max(0, Math.round((1 - std / mean) * 100));
+      }
+    }
+
+    return {
+      date:        act.start_date,
+      week:        weekKey(act.start_date),
+      name:        act.name,
+      distKm:      act.distance / 1000,
+      movingTime:  act.moving_time,
+      avgSpeed:    act.average_speed,
+      avgHR:       act.average_heartrate,
+      vo2max:      estimateVO2max(act),
+      type:        classifyTraining(act),
+      avgPower:    avgPower,
+      pwRatio:     avgPower ? (avgPower / getUserWeightAnalytics()).toFixed(2) : null,
+      avgGapSpeed: avgGapSpeed,
+      bestKmPace:  bestKmPace,
+      splitRatio:  splitRatio,
+      consistency: consistency,
+      powerStream: powerStream,
+      hrData:      act.streams?.heartrate?.data,
+      timeData:    act.streams?.time?.data,
+    };
+  });
+
+  // ======================== 1. VO2max Trend ========================
+  {
+    const section = document.createElement('div');
+    section.className = 'chart-section';
+    section.innerHTML = '<h3>VO₂max Trend</h3><canvas id="vo2maxChart"></canvas>';
+    containerEl.appendChild(section);
+
+    const withVO2 = perActivity.filter(a => a.vo2max !== null);
+    const labels = withVO2.map(a => new Date(a.date).toLocaleDateString());
+    const data   = withVO2.map(a => a.vo2max);
+
+    const ctx = document.getElementById('vo2maxChart').getContext('2d');
+    AnalyticsChartRegistry['vo2maxChart'] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'VO₂max (ml/kg/min)',
+          data,
+          borderColor: 'rgba(0,158,115,0.9)',
+          backgroundColor: 'rgba(0,158,115,0.1)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3,
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: { title: { display: true, text: 'ml/kg/min' } }
+        }
+      }
     });
-  },
-  _vo2calc(paceMinKm,distKm){
-    if(paceMinKm<=0||distKm<=0)return 0;
-    var vm=1000/paceMinKm;var tMin=paceMinKm*distKm;
-    var oc=-4.60+0.182258*vm+0.000104*vm*vm;
-    var frac=0.8+0.1894393*Math.exp(-0.012778*tMin)+0.2989558*Math.exp(-0.1932605*tMin);
-    if(frac<=0)return 0;return oc/frac;
-  },
-  getVO2(){
-    var self=this;
-    var logs=this._logs().filter(function(l){return l.pace&&parseFloat(l.distance)>=3});
-    var trend=[];
-    logs.forEach(function(l){
-      var pMin=self._pp(l.pace);if(pMin<=0)return;
-      var km=parseFloat(l.distance);var bestVO2=self._vo2calc(pMin,km);
-      if(l.strava_id){
-        var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
-        if(det&&det.splits&&det.splits.length>=3){
-          var sp=det.splits;
-          for(var len=3;len<=Math.min(sp.length,10);len++){
-            for(var start=0;start<=sp.length-len;start++){
-              var d=0,t=0;
-              for(var i=start;i<start+len;i++){d+=(sp[i].distance||0);t+=(sp[i].moving_time||0)}
-              if(d>0&&t>0){var v=self._vo2calc(t/d*1000/60,d/1000);if(v>bestVO2)bestVO2=v}
+  }
+
+  // ======================== 2. Training Distribution ========================
+  {
+    const section = document.createElement('div');
+    section.className = 'chart-section';
+    section.innerHTML = '<h3>Training Type Distribution</h3><canvas id="trainingDistChart"></canvas>';
+    containerEl.appendChild(section);
+
+    const typeCounts = { Easy: 0, Tempo: 0, Interval: 0, 'Long Run': 0 };
+    perActivity.forEach(a => { if (typeCounts.hasOwnProperty(a.type)) typeCounts[a.type]++; });
+
+    const typeColors = {
+      Easy:       'rgba(86,180,233,0.7)',
+      Tempo:      'rgba(230,159,0,0.7)',
+      Interval:   'rgba(213,94,0,0.7)',
+      'Long Run': 'rgba(0,158,115,0.7)',
+    };
+
+    const ctx = document.getElementById('trainingDistChart').getContext('2d');
+    AnalyticsChartRegistry['trainingDistChart'] = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(typeCounts),
+        datasets: [{
+          data: Object.values(typeCounts),
+          backgroundColor: Object.keys(typeCounts).map(k => typeColors[k]),
+        }]
+      },
+      options: { responsive: true, plugins: { legend: { position: 'right' } } }
+    });
+  }
+
+  // ======================== 3. Cumulative Distance ========================
+  {
+    const section = document.createElement('div');
+    section.className = 'chart-section';
+    section.innerHTML = '<h3>Cumulative Distance</h3><canvas id="cumDistChart"></canvas>';
+    containerEl.appendChild(section);
+
+    let cum = 0;
+    const labels = perActivity.map(a => new Date(a.date).toLocaleDateString());
+    const data   = perActivity.map(a => { cum += a.distKm; return Math.round(cum * 10) / 10; });
+
+    const ctx = document.getElementById('cumDistChart').getContext('2d');
+    AnalyticsChartRegistry['cumDistChart'] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Cumulative Distance (km)',
+          data,
+          borderColor: 'rgba(86,180,233,0.9)',
+          backgroundColor: 'rgba(86,180,233,0.1)',
+          fill: true,
+          tension: 0.3,
+        }]
+      },
+      options: { responsive: true, scales: { y: { title: { display: true, text: 'km' } } } }
+    });
+  }
+
+  // ======================== 4. Time below HR 150 ========================
+  {
+    const section = document.createElement('div');
+    section.className = 'chart-section';
+    section.innerHTML = '<h3>Time with HR < 150 bpm (per activity)</h3><canvas id="hrBelow150Chart"></canvas>';
+    containerEl.appendChild(section);
+
+    const items = perActivity.map(a => {
+      if (!a.hrData || !a.timeData || a.hrData.length < 2) return { label: '', mins: 0 };
+      let totalBelow = 0;
+      for (let i = 1; i < a.hrData.length; i++) {
+        if (a.hrData[i] < 150) {
+          totalBelow += (a.timeData[i] - a.timeData[i-1]);
+        }
+      }
+      return {
+        label: new Date(a.date).toLocaleDateString(),
+        mins: Math.round(totalBelow / 60 * 10) / 10
+      };
+    }).filter(x => x.label);
+
+    const ctx = document.getElementById('hrBelow150Chart').getContext('2d');
+    AnalyticsChartRegistry['hrBelow150Chart'] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: items.map(i => i.label),
+        datasets: [{
+          label: 'Minutes below 150 bpm',
+          data: items.map(i => i.mins),
+          backgroundColor: 'rgba(0,158,115,0.6)',
+        }]
+      },
+      options: { responsive: true, scales: { y: { title: { display: true, text: 'min' }, beginAtZero: true } } }
+    });
+  }
+
+  // ======================== 5. Power Trend ========================
+  {
+    const section = document.createElement('div');
+    section.className = 'chart-section';
+    section.innerHTML = '<h3>Average Power Trend</h3><canvas id="powerTrendChart"></canvas>';
+    containerEl.appendChild(section);
+
+    const withPwr = perActivity.filter(a => a.avgPower !== null);
+    const labels = withPwr.map(a => new Date(a.date).toLocaleDateString());
+
+    const ctx = document.getElementById('powerTrendChart').getContext('2d');
+    AnalyticsChartRegistry['powerTrendChart'] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Avg Power (W)',
+            data: withPwr.map(a => a.avgPower),
+            borderColor: 'rgba(120,60,200,0.9)',
+            backgroundColor: 'rgba(120,60,200,0.1)',
+            fill: true, tension: 0.3, pointRadius: 3,
+          },
+          {
+            label: 'P:W Ratio (W/kg)',
+            data: withPwr.map(a => parseFloat(a.pwRatio)),
+            borderColor: 'rgba(200,60,120,0.9)',
+            backgroundColor: 'rgba(200,60,120,0.1)',
+            fill: false, tension: 0.3, pointRadius: 3,
+            yAxisID: 'y1',
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y:  { title: { display: true, text: 'Watts' }, position: 'left' },
+          y1: { title: { display: true, text: 'W/kg' }, position: 'right', grid: { drawOnChartArea: false } },
+        }
+      }
+    });
+  }
+
+  // ======================== 6. Power Zone Distribution (all activities) ========================
+  {
+    const section = document.createElement('div');
+    section.className = 'chart-section';
+    section.innerHTML = '<h3>Power Zone Distribution (all activities)</h3><canvas id="powerZonesChart"></canvas>';
+    containerEl.appendChild(section);
+
+    // Estimate FTP as 95% of best 20-min normalized power (simplified: use highest avgPower * 0.95)
+    const allPowers = perActivity.filter(a => a.avgPower).map(a => a.avgPower);
+    const estFTP = allPowers.length > 0 ? Math.max(...allPowers) * 0.95 : 250;
+
+    const zoneCounts = POWER_ZONES.map(() => 0);
+    perActivity.forEach(a => {
+      if (!a.powerStream) return;
+      a.powerStream.forEach(p => {
+        const ratio = p / estFTP;
+        for (let z = 0; z < POWER_ZONES.length; z++) {
+          if (ratio <= POWER_ZONES[z].max) { zoneCounts[z]++; break; }
+        }
+      });
+    });
+
+    const total = zoneCounts.reduce((a,b) => a+b, 0) || 1;
+
+    const ctx = document.getElementById('powerZonesChart').getContext('2d');
+    AnalyticsChartRegistry['powerZonesChart'] = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: POWER_ZONES.map((z, i) => `${z.name} (${((zoneCounts[i]/total)*100).toFixed(1)}%)`),
+        datasets: [{
+          data: zoneCounts,
+          backgroundColor: POWER_ZONES.map(z => z.color),
+        }]
+      },
+      options: { responsive: true, plugins: { legend: { position: 'right' } } }
+    });
+  }
+
+  // ======================== 7. GAP Trend ========================
+  {
+    const section = document.createElement('div');
+    section.className = 'chart-section';
+    section.innerHTML = '<h3>GAP vs Actual Pace Trend</h3><canvas id="gapTrendChart"></canvas>';
+    containerEl.appendChild(section);
+
+    const withGap = perActivity.filter(a => a.avgGapSpeed && a.avgSpeed);
+    const labels = withGap.map(a => new Date(a.date).toLocaleDateString());
+
+    const ctx = document.getElementById('gapTrendChart').getContext('2d');
+    AnalyticsChartRegistry['gapTrendChart'] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Actual Pace (sec/km)',
+            data: withGap.map(a => Math.round(1000 / a.avgSpeed)),
+            borderColor: 'rgba(86,180,233,0.9)',
+            tension: 0.3, pointRadius: 3,
+          },
+          {
+            label: 'GAP (sec/km)',
+            data: withGap.map(a => Math.round(1000 / a.avgGapSpeed)),
+            borderColor: 'rgba(230,159,0,0.9)',
+            tension: 0.3, pointRadius: 3,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: {
+            title: { display: true, text: 'sec / km' },
+            reverse: true,
+            ticks: {
+              callback: (v) => {
+                const m = Math.floor(v / 60);
+                const s = Math.round(v % 60);
+                return `${m}:${s.toString().padStart(2,'0')}`;
+              }
+            }
+          }
+        },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const v = ctx.raw;
+                const m = Math.floor(v / 60);
+                const s = Math.round(v % 60);
+                return `${ctx.dataset.label}: ${m}:${s.toString().padStart(2,'0')} /km`;
+              }
             }
           }
         }
       }
-      if(bestVO2>20&&bestVO2<90)trend.push({date:l.date,vo2:Math.round(bestVO2*10)/10});
     });
-    if(trend.length===0){
-      var rhr=S.getSettings().rhr||0;
-      if(rhr>0){
-        var maxHR=0;
-        logs.forEach(function(l){if(!l.strava_id)return;var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');if(det&&det.max_hr&&det.max_hr>maxHR)maxHR=det.max_hr});
-        if(maxHR>0){var uthVO2=Math.round(15.3*(maxHR/rhr)*10)/10;trend.push({date:logs[logs.length-1].date,vo2:uthVO2})}
-      }
-    }
-    var cur=trend.length?trend[trend.length-1].vo2:0;
-    var lvl=cur>=60?'Elitarny':cur>=55?'Swietny':cur>=50?'Bardzo dobry':cur>=45?'Dobry':cur>=40?'Sredni':'Poczatkujacy';
-    return{current:cur,trend:trend,level:lvl};
-  },
-  getDist(){
-    var self=this;
-    var z={easy:{km:0,label:'Easy (>5:30)'},tempo:{km:0,label:'Tempo (5:00-5:30)'},threshold:{km:0,label:'Threshold (4:30-5:00)'},interval:{km:0,label:'Interval (<4:30)'}};
-    var total=0;
-    this._logs().forEach(function(l){
-      var km=parseFloat(l.distance);if(km<=0)return;
-      if(l.strava_id){
-        var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
-        if(det&&det.splits&&det.splits.length>0){
-          det.splits.forEach(function(sp){
-            if(!sp.distance||sp.distance<100||!sp.moving_time)return;
-            var spKm=sp.distance/1000;var spPace=sp.moving_time/sp.distance*1000/60;
-            total+=spKm;
-            if(spPace>5.5)z.easy.km+=spKm;else if(spPace>5)z.tempo.km+=spKm;else if(spPace>4.5)z.threshold.km+=spKm;else z.interval.km+=spKm;
-          });return;
-        }
-      }
-      if(!l.pace)return;var p=self._pp(l.pace);if(p<=0)return;total+=km;
-      if(p>5.5)z.easy.km+=km;else if(p>5)z.tempo.km+=km;else if(p>4.5)z.threshold.km+=km;else z.interval.km+=km;
-    });
-    Object.values(z).forEach(function(v){v.km=Math.round(v.km*10)/10;v.pct=total>0?Math.round(v.km/total*100):0});
-    return{zones:z,total:Math.round(total*10)/10};
-  },
-  getCumDist(){
-    var labels=[],actual=[],planned=[];var ca=0,cp=0;
-    PLAN.forEach(function(w){
-      var wkA=0;for(var d=0;d<7;d++){var dt=getDayDate(w.start,d);var log=S.getLog(dt);if(log&&log.distance)wkA+=parseFloat(log.distance)}
-      ca+=wkA;cp+=w.km;labels.push('T'+w.weekNum);actual.push(Math.round(ca*10)/10);planned.push(Math.round(cp*10)/10);
-    });
-    return{labels:labels,actual:actual,planned:planned};
-  },
-  getRR(){
-    var fit=typeof TL!=='undefined'?TL.get():{ctl:0,atl:0,tsb:0};
-    var con=this.getConsistency();var cd=this.getCumDist();
-    var lastPlan=cd.planned[cd.planned.length-1]||1;var lastActual=cd.actual[cd.actual.length-1]||0;
-    var fitScore=Math.min(100,Math.round(fit.ctl*2));var volScore=Math.min(100,Math.round(lastActual/lastPlan*100));
-    var conScore=con.score;var freshScore=Math.min(100,Math.max(0,50+fit.tsb*2));
-    var score=Math.round(fitScore*0.3+volScore*0.25+conScore*0.25+freshScore*0.2);
-    var lbl=score>=80?'Gotowy na wyscig!':score>=60?'Dobra forma':score>=40?'W budowie':'Poczatek drogi';
-    return{score:score,components:{fitness:fitScore,volume:volScore,consistency:conScore,freshness:freshScore},label:lbl};
-  },
-  getPaceHR150(){
-    var self=this;
-    return this._logs().filter(function(l){return l.hr&&l.pace&&self._pp(l.pace)>0&&parseFloat(l.hr)>100}).map(function(l){
-      var p=self._pp(l.pace);var hr=parseFloat(l.hr);return{date:l.date,pace:Math.round(p*(hr/150)*100)/100};
-    });
-  },
-  getWoW(){
-    return PLAN.map(function(w){
-      var km=0,ttime=0,thr=0,hrc=0,cnt=0;
-      for(var d=0;d<7;d++){var dt=getDayDate(w.start,d);var log=S.getLog(dt);
-        if(log&&log.distance){cnt++;km+=parseFloat(log.distance);
-          if(log.pace){var p=Analytics._pp(log.pace);if(p>0)ttime+=p*parseFloat(log.distance)}
-          if(log.hr){thr+=parseFloat(log.hr);hrc++}
-        }
-      }
-      var ap=km>0&&ttime>0?ttime/km:0;
-      return{week:w.weekNum,km:Math.round(km*10)/10,avgPace:ap>0?Math.round(ap*100)/100:0,avgHR:hrc>0?Math.round(thr/hrc):0,workouts:cnt};
-    });
-  },
-  getHRRec(){
-    var arr=[];this._logs().forEach(function(l){
-      if(!l.strava_id)return;var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
-      if(!det||!det.max_hr||!l.hr)return;arr.push({date:l.date,spread:det.max_hr-parseFloat(l.hr)});
-    });return arr;
-  },
-
-  getCadPace(){
-    var arr=[];this._logs().forEach(function(l){
-      if(!l.strava_id||!l.pace)return;
-      var cad=0;
-      var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
-      if(det&&det.cadence){cad=Math.round(det.cadence*2)}
-      else{
-        var str=JSON.parse(localStorage.getItem('strava_streams_'+l.strava_id)||'null');
-        if(str){
-          var cd=null;
-          if(Array.isArray(str)){var f=str.find(function(s){return s.type==='cadence'});if(f)cd=f.data}
-          else if(str.cadence&&str.cadence.data){cd=str.cadence.data}
-          if(cd&&cd.length>0){var sum=0,cnt=0;cd.forEach(function(v){if(v>0){sum+=v;cnt++}});if(cnt>0)cad=Math.round(sum/cnt*2)}
-        }
-      }
-      if(cad>0)arr.push({pace:Analytics._pp(l.pace),cadence:cad,date:l.date});
-    });return arr;
-  },
-
-  getPaceDrift(){
-    var self=this;var arr=[];
-    this._logs().forEach(function(l){
-      if(!l.strava_id||parseFloat(l.distance)<8)return;
-      var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
-      if(!det||!det.splits)return;var working=self._trimSplits(det.splits);if(!working)return;
-      var mid=Math.floor(working.length/2);var firstPace=0,secondPace=0;
-      for(var i=0;i<mid;i++){if(working[i].distance>0)firstPace+=working[i].moving_time/working[i].distance*1000}
-      for(var i=mid;i<working.length;i++){if(working[i].distance>0)secondPace+=working[i].moving_time/working[i].distance*1000}
-      firstPace/=mid;secondPace/=(working.length-mid);if(firstPace<=0)return;
-      var drift=Math.round((secondPace-firstPace)/firstPace*100);
-      arr.push({date:l.date,drift:drift});
-    });return arr;
-  },
-  getCardiacDrift(){
-    var self=this;var arr=[];
-    this._logs().forEach(function(l){
-      if(!l.strava_id||parseFloat(l.distance)<8)return;
-      var det=JSON.parse(localStorage.getItem('strava_detail_'+l.strava_id)||'null');
-      if(!det||!det.splits)return;var working=self._trimSplits(det.splits);if(!working)return;
-      var hasHR=working.every(function(sp){return sp.average_heartrate>0});if(!hasHR)return;
-      var mid=Math.floor(working.length/2);var firstHR=0,secondHR=0;
-      for(var i=0;i<mid;i++)firstHR+=working[i].average_heartrate;
-      for(var i=mid;i<working.length;i++)secondHR+=working[i].average_heartrate;
-      firstHR/=mid;secondHR/=(working.length-mid);if(firstHR<=0)return;
-      var drift=Math.round((secondHR-firstHR)/firstHR*100*10)/10;
-      arr.push({date:l.date,drift:drift,firstHR:Math.round(firstHR),secondHR:Math.round(secondHR)});
-    });return arr;
-  },
-  getStreak(){
-    var cur=0,best=0;var t=today();
-    for(var i=0;i<PLAN.length;i++){
-      var w=PLAN[i];var we=getDayDate(w.start,6);if(w.start>t)break;var km=0;
-      for(var d=0;d<7;d++){var dt=getDayDate(w.start,d);var log=S.getLog(dt);if(log&&log.distance)km+=parseFloat(log.distance)}
-      if(w.km>0&&km/w.km>=0.8){cur++;if(cur>best)best=cur}else{if(we<t)cur=0}
-    }
-    return{current:cur,best:best};
-  },
-  getConsistency(){
-    var done=0,total=0;var t=today();
-    PLAN.forEach(function(w){w.days.forEach(function(d){
-      if(d.rest)return;var dt=getDayDate(w.start,d.dow);if(dt>t)return;
-      total++;var log=S.getLog(dt);if(log&&(log.distance||log.status==='done'))done++;
-    })});
-    return{score:total>0?Math.round(done/total*100):0,done:done,total:total};
-  },
-  getMonthly(){
-    var months={};this._logs().forEach(function(l){
-      var m=l.date.substring(0,7);if(!months[m])months[m]={km:0,workouts:0,ttime:0,thr:0,hrc:0};
-      var mo=months[m];mo.km+=parseFloat(l.distance);mo.workouts++;
-      if(l.pace){var p=Analytics._pp(l.pace);if(p>0)mo.ttime+=p*parseFloat(l.distance)}
-      if(l.hr){mo.thr+=parseFloat(l.hr);mo.hrc++}
-    });
-    return Object.entries(months).sort().map(function(e){
-      var m=e[0],d=e[1];return{month:m,km:Math.round(d.km*10)/10,workouts:d.workouts,
-        avgPace:d.km>0&&d.ttime>0?Math.round(d.ttime/d.km*100)/100:0,avgHR:d.hrc>0?Math.round(d.thr/d.hrc):0};
-    });
-  },
-  getCumElev(){
-    var total=0;var byWeek=[];
-    PLAN.forEach(function(w){var wElev=0;
-      for(var d=0;d<7;d++){var dt=getDayDate(w.start,d);var log=S.getLog(dt);
-        if(log&&log.strava_id){var det=JSON.parse(localStorage.getItem('strava_detail_'+log.strava_id)||'null');
-          if(det&&det.total_elevation_gain)wElev+=det.total_elevation_gain}
-      }
-      total+=wElev;byWeek.push({week:w.weekNum,elev:Math.round(wElev),cum:Math.round(total)});
-    });
-    return{total:Math.round(total),byWeek:byWeek};
-  },
-  render(){
-    try{
-    var rr=this.getRR();var str=this.getStreak();var con=this.getConsistency();var vo2=this.getVO2();
-    var h='';
-    h+='<div class="an-section"><div class="an-title">\uD83C\uDFC1 Race Readiness</div>';
-    h+='<div class="an-gauge-wrap"><div class="an-gauge" style="--pct:'+rr.score+'"><div class="an-gauge-val">'+rr.score+'</div></div><div class="an-gauge-label">'+rr.label+'</div></div>';
-    h+='<div class="an-rr-row"><div class="an-rr-item"><div class="an-rr-v">'+rr.components.fitness+'</div><div class="an-rr-l">Fitness</div></div><div class="an-rr-item"><div class="an-rr-v">'+rr.components.volume+'</div><div class="an-rr-l">Objetosc</div></div><div class="an-rr-item"><div class="an-rr-v">'+rr.components.consistency+'</div><div class="an-rr-l">Stalosc</div></div><div class="an-rr-item"><div class="an-rr-v">'+rr.components.freshness+'</div><div class="an-rr-l">Swiezosc</div></div></div></div>';
-    h+='<div class="an-badges"><div class="an-badge fire"><span class="an-badge-icon">\uD83D\uDD25</span><span class="an-badge-val">'+str.current+'</span><span class="an-badge-l">Streak (tyg.)</span></div>';
-    h+='<div class="an-badge check"><span class="an-badge-icon">\u2705</span><span class="an-badge-val">'+con.score+'%</span><span class="an-badge-l">Stalosc ('+con.done+'/'+con.total+')</span></div>';
-    if(str.best>str.current)h+='<div class="an-badge trophy"><span class="an-badge-icon">\uD83C\uDFC6</span><span class="an-badge-val">'+str.best+'</span><span class="an-badge-l">Najlepszy streak</span></div>';
-    h+='</div>';
-    if(vo2.current>0){
-      h+='<div class="an-section"><div class="an-title">\uD83E\uDEC0 VO2max</div><div class="an-vo2-row"><div class="an-vo2-val">'+vo2.current+'</div><div class="an-vo2-info"><div class="an-vo2-level">'+vo2.level+'</div><div class="an-vo2-sub">ml/kg/min</div></div></div>';
-      if(vo2.trend.length>1)h+='<canvas id="an-vo2"></canvas>';
-      h+='</div>';
-    }
-    h+='<div class="an-section"><div class="an-title">\u2764\uFE0F Aerobic Efficiency (nizszy = lepiej)</div><canvas id="an-ae"></canvas></div>';
-    h+='<div class="an-section"><div class="an-title">\uD83C\uDFAF Training Distribution (80/20)</div><canvas id="an-dist"></canvas></div>';
-    h+='<div class="an-section"><div class="an-title">\uD83D\uDCC8 Dystans narastajacy (plan vs realizacja)</div><canvas id="an-cum"></canvas></div>';
-    h+='<div class="an-section"><div class="an-title">\u26A1 Tempo @ HR 150 (nizszy = lepiej)</div><canvas id="an-hr150"></canvas></div>';
-    h+='<div class="an-section"><div class="an-title">\uD83D\uDCCA Tydzien po tygodniu</div><canvas id="an-wow"></canvas></div>';
-    h+='<div class="an-section"><div class="an-title">\uD83D\uDCC9 Pace Drift (bez rozgrzewki/schlodzenia)</div><canvas id="an-pdrift"></canvas></div>';
-    h+='<div class="an-section"><div class="an-title">\uD83D\uDC93 Cardiac Drift (wzrost HR w 2. polowie)</div><canvas id="an-cdrift"></canvas></div>';
-    h+='<div class="an-section"><div class="an-title">\uD83D\uDC63 Kadencja vs Tempo</div><canvas id="an-cad"></canvas></div>';
-    h+='<div class="an-section"><div class="an-title">\u26F0\uFE0F Narastajace przewyzszenie</div><canvas id="an-elev"></canvas></div>';
-    var mo=this.getMonthly();
-    if(mo.length){
-      h+='<div class="an-section"><div class="an-title">\uD83D\uDCC5 Porownanie miesieczne</div><div class="an-months">';
-      var MN=['','Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paz','Lis','Gru'];
-      mo.forEach(function(m){
-        var mi=parseInt(m.month.split('-')[1]);
-        var ap=m.avgPace>0?Math.floor(m.avgPace)+':'+String(Math.round((m.avgPace%1)*60)).padStart(2,'0'):'-';
-        h+='<div class="an-month"><div class="an-month-name">'+MN[mi]+' '+m.month.split('-')[0]+'</div><div class="an-month-km">'+m.km+' km</div><div class="an-month-det">'+m.workouts+' treningow \u2022 '+ap+'/km'+(m.avgHR?' \u2022 \u2764 '+m.avgHR:'')+'</div></div>';
-      });
-      h+='</div></div>';
-    }
-    return h;
-    }catch(e){console.error('Analytics render error:',e);return '<div class="empty">Blad: '+e.message+'</div>'}
-  },
-  drawCharts(){
-    try{
-    console.log('Analytics drawCharts START');
-    var ae=this.getAE();console.log('AE:',ae.length);
-    if(ae.length>0){try{this._ch('an-ae',{type:'line',data:{labels:ae.map(function(a){return a.date.substring(5)}),datasets:[{data:ae.map(function(a){return a.ae}),borderColor:'#FF9F0A',borderWidth:2,pointRadius:3,pointBackgroundColor:'#FF9F0A',fill:false,tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:10}},y:{reverse:true,ticks:{color:'#999'}}}}})}catch(e){console.warn('AE err',e)}}
-    var vo2=this.getVO2();console.log('VO2:',vo2.trend.length,'cur:',vo2.current);
-    if(vo2.trend.length>1){try{this._ch('an-vo2',{type:'line',data:{labels:vo2.trend.map(function(v){return v.date.substring(5)}),datasets:[{data:vo2.trend.map(function(v){return v.vo2}),borderColor:'#30D158',borderWidth:2,pointRadius:3,pointBackgroundColor:'#30D158',fill:true,backgroundColor:'rgba(48,209,88,.1)',tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:8}},y:{ticks:{color:'#999'}}}}})}catch(e){console.warn('VO2 err',e)}}
-    var dist=this.getDist();var dz=dist.zones;console.log('Dist:',dz.easy.km,'e',dz.tempo.km,'t',dz.threshold.km,'th',dz.interval.km,'i');
-    try{this._ch('an-dist',{type:'doughnut',data:{labels:[dz.easy.label+' '+dz.easy.pct+'%',dz.tempo.label+' '+dz.tempo.pct+'%',dz.threshold.label+' '+dz.threshold.pct+'%',dz.interval.label+' '+dz.interval.pct+'%'],datasets:[{data:[dz.easy.km,dz.tempo.km,dz.threshold.km,dz.interval.km],backgroundColor:['#30D158','#0A84FF','#FF9F0A','#FF453A'],borderWidth:0}]},options:{responsive:true,plugins:{legend:{display:true,position:'bottom',labels:{color:'#ccc',font:{size:11}}}}}})}catch(e){console.warn('Dist err',e)}
-    var cd=this.getCumDist();console.log('CumDist:',cd.actual.length);
-    try{this._ch('an-cum',{type:'line',data:{labels:cd.labels,datasets:[{label:'Plan',data:cd.planned,borderColor:'#555',borderWidth:2,borderDash:[5,5],pointRadius:0,fill:false},{label:'Realizacja',data:cd.actual,borderColor:'#0A84FF',borderWidth:2,pointRadius:3,pointBackgroundColor:'#0A84FF',fill:true,backgroundColor:'rgba(10,132,255,.1)'}]},options:{responsive:true,plugins:{legend:{display:true,labels:{color:'#ccc'}}},scales:{x:{ticks:{color:'#999'}},y:{ticks:{color:'#999'}}}}})}catch(e){console.warn('CumDist err',e)}
-    var hr150=this.getPaceHR150();console.log('HR150:',hr150.length);
-    if(hr150.length>0){try{this._ch('an-hr150',{type:'line',data:{labels:hr150.map(function(h){return h.date.substring(5)}),datasets:[{data:hr150.map(function(h){return h.pace}),borderColor:'#BF5AF2',borderWidth:2,pointRadius:3,pointBackgroundColor:'#BF5AF2',fill:false,tension:.3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999',maxTicksLimit:10}},y:{reverse:true,ticks:{color:'#999',callback:function(v){var m=Math.floor(v);var s=Math.round((v-m)*60);return m+':'+String(s).padStart(2,'0')}}}}}})}catch(e){console.warn('HR150 err',e)}}
-    var wow=this.getWoW();console.log('WoW:',wow.length);
-    try{this._ch('an-wow',{type:'bar',data:{labels:wow.map(function(w){return 'T'+w.week}),datasets:[{label:'km',data:wow.map(function(w){return w.km}),backgroundColor:'rgba(10,132,255,.6)',borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#999'}},y:{ticks:{color:'#999'}}}}})}catch(e){console.warn('WoW err',e)}
-    var pd=this.getPaceDrift();console.log('PaceDrift:',pd.length);
-    if(pd.length>0){try{this._ch('an-pdrift',{type:'bar',data:{labels:pd.map(function(p){return p.date.substring(5)}),datasets:[{data:pd.map(function(p){return p.drift}),backgroundColor:pd.map(function(p){return p.drift<=0?'#30D158':p.drift<=3?'#0A84FF':p.drift<=6?'#FF9F0A':'#FF453A'}),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){var v=ctx.raw;return(v<=0?'':'+')+v+'% '+(v<=0?'Negative split!':v<=3?'Stabilne':v<=6?'Lekki drift':'Duzy drift')}}}},scales:{x:{ticks:{color:'#999',maxTicksLimit:10}},y:{ticks:{color:'#999',callback:function(v){return(v>0?'+':'')+v+'%'}}}}}})}catch(e){console.warn('PaceDrift err',e)}}
-    var cdr=this.getCardiacDrift();console.log('CardiacDrift:',cdr.length);
-    if(cdr.length>0){try{this._ch('an-cdrift',{type:'bar',data:{labels:cdr.map(function(c){return c.date.substring(5)}),datasets:[{data:cdr.map(function(c){return c.drift}),backgroundColor:cdr.map(function(c){return c.drift<=2?'#30D158':c.drift<=5?'#FF9F0A':'#FF453A'}),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){var i=ctx.dataIndex;var c=cdr[i];return c.firstHR+' -> '+c.secondHR+' bpm ('+(c.drift>0?'+':'')+c.drift+'%)'}}}},scales:{x:{ticks:{color:'#999',maxTicksLimit:10}},y:{ticks:{color:'#999',callback:function(v){return(v>0?'+':'')+v+'%'}}}}}})}catch(e){console.warn('CardiacDrift err',e)}}
-    var cp=this.getCadPace();console.log('CadPace:',cp.length);
-    if(cp.length>0){try{this._ch('an-cad',{type:'scatter',data:{datasets:[{data:cp.map(function(c){return{x:c.pace,y:c.cadence}}),backgroundColor:'#64D2FF',pointRadius:5}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{reverse:true,title:{display:true,text:'Tempo (min/km)',color:'#999'},ticks:{color:'#999',callback:function(v){var m=Math.floor(v);var s=Math.round((v-m)*60);return m+':'+String(s).padStart(2,'0')}}},y:{title:{display:true,text:'Kadencja (kroki/min)',color:'#999'},ticks:{color:'#999'}}}}})}catch(e){console.warn('Cad err',e)}}
-    var elev=this.getCumElev();console.log('Elev:',elev.total);
-    if(elev.byWeek.length>0&&elev.total>0){try{this._ch('an-elev',{type:'bar',data:{labels:elev.byWeek.map(function(e){return 'T'+e.week}),datasets:[{label:'Tygodniowe (m)',data:elev.byWeek.map(function(e){return e.elev}),backgroundColor:'rgba(100,210,255,.5)',borderRadius:4},{label:'Narastajace (m)',data:elev.byWeek.map(function(e){return e.cum}),type:'line',borderColor:'#FF9F0A',borderWidth:2,pointRadius:2,fill:false,yAxisID:'y2'}]},options:{responsive:true,plugins:{legend:{display:true,labels:{color:'#ccc'}}},scales:{x:{ticks:{color:'#999'}},y:{position:'left',ticks:{color:'#999'}},y2:{position:'right',grid:{display:false},ticks:{color:'#999'}}}}})}catch(e){console.warn('Elev err',e)}}
-    console.log('Analytics drawCharts DONE');
-    }catch(e){console.error('drawCharts global error:',e)}
   }
-};
+
+  // ======================== 8. Best Km Pace Trend ========================
+  {
+    const section = document.createElement('div');
+    section.className = 'chart-section';
+    section.innerHTML = '<h3>Best Km Pace Trend</h3><canvas id="bestKmChart"></canvas>';
+    containerEl.appendChild(section);
+
+    const withBest = perActivity.filter(a => a.bestKmPace !== null);
+    const labels = withBest.map(a => new Date(a.date).toLocaleDateString());
+
+    const ctx = document.getElementById('bestKmChart').getContext('2d');
+    AnalyticsChartRegistry['bestKmChart'] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Best Km (sec/km)',
+          data: withBest.map(a => Math.round(a.bestKmPace)),
+          borderColor: 'rgba(213,94,0,0.9)',
+          backgroundColor: 'rgba(213,94,0,0.1)',
+          fill: true, tension: 0.3, pointRadius: 3,
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: {
+            title: { display: true, text: 'sec / km' },
+            reverse: true,
+            ticks: {
+              callback: (v) => {
+                const m = Math.floor(v / 60);
+                const s = Math.round(v % 60);
+                return `${m}:${s.toString().padStart(2,'0')}`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // ======================== 9. Split Consistency & Negative Split Ratio ========================
+  {
+    const section = document.createElement('div');
+    section.className = 'chart-section';
+    section.innerHTML = '<h3>Pacing Consistency & Split Ratio</h3><canvas id="consistencyChart"></canvas>';
+    containerEl.appendChild(section);
+
+    const withData = perActivity.filter(a => a.consistency !== null && a.splitRatio !== null);
+    const labels = withData.map(a => new Date(a.date).toLocaleDateString());
+
+    const ctx = document.getElementById('consistencyChart').getContext('2d');
+    AnalyticsChartRegistry['consistencyChart'] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Consistency Score (%)',
+            data: withData.map(a => a.consistency),
+            backgroundColor: 'rgba(0,158,115,0.6)',
+            yAxisID: 'y',
+          },
+          {
+            label: 'Split Ratio (>1 = negative split)',
+            data: withData.map(a => Math.round(a.splitRatio * 100) / 100),
+            type: 'line',
+            borderColor: 'rgba(230,159,0,0.9)',
+            pointRadius: 4,
+            tension: 0.3,
+            yAxisID: 'y1',
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y:  { title: { display: true, text: 'Consistency %' }, position: 'left', min: 0, max: 100 },
+          y1: { title: { display: true, text: 'Split Ratio' }, position: 'right',
+                grid: { drawOnChartArea: false } },
+        }
+      }
+    });
+  }
+
+  // ======================== 10. Weekly Summary Table ========================
+  {
+    const section = document.createElement('div');
+    section.className = 'table-section';
+
+    // Group by week
+    const weekMap = {};
+    perActivity.forEach(a => {
+      if (!weekMap[a.week]) weekMap[a.week] = { dist: 0, runs: 0, vo2: [], power: [] };
+      weekMap[a.week].dist += a.distKm;
+      weekMap[a.week].runs++;
+      if (a.vo2max) weekMap[a.week].vo2.push(a.vo2max);
+      if (a.avgPower) weekMap[a.week].power.push(a.avgPower);
+    });
+
+    let html = '<h3>Weekly Summary</h3><table class="analytics-table"><thead><tr>' +
+      '<th>Week</th><th>Runs</th><th>Distance</th><th>Avg VO₂max</th><th>Avg Power</th>' +
+      '</tr></thead><tbody>';
+
+    Object.keys(weekMap).sort().forEach(w => {
+      const d = weekMap[w];
+      const avgVO2 = d.vo2.length > 0 ? (d.vo2.reduce((a,b)=>a+b,0)/d.vo2.length).toFixed(1) : '--';
+      const avgPwr = d.power.length > 0 ? Math.round(d.power.reduce((a,b)=>a+b,0)/d.power.length) : '--';
+      html += `<tr>
+        <td>${w}</td>
+        <td>${d.runs}</td>
+        <td>${d.dist.toFixed(1)} km</td>
+        <td>${avgVO2}</td>
+        <td>${avgPwr !== '--' ? avgPwr + ' W' : '--'}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    section.innerHTML = html;
+    containerEl.appendChild(section);
+  }
+}
+
+// Expose to global scope
+window.renderAnalytics  = renderAnalytics;
+window.estimateVO2max   = estimateVO2max;
+window.classifyTraining = classifyTraining;
