@@ -252,15 +252,15 @@ const Briefing = (() => {
    *  PRE-RUN BRIEFING — dane
    * ------------------------------------------------------- */
 
-  /** Dzisiejszy plan treningowy z window.PLAN */
+  /** Dzisiejszy plan treningowy z window.PLAN_FLAT */
   function getTodayPlan() {
     try {
-      const plan = window.PLAN || [];
+      const plan = window.PLAN_FLAT || [];
       const today = todayISO();
       const entry = plan.find((p) => p.date === today);
       return entry || null;
     } catch (e) {
-      console.warn(TAG, "Brak window.PLAN", e);
+      console.warn(TAG, "Brak window.PLAN_FLAT", e);
       return null;
     }
   }
