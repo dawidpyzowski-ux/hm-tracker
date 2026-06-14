@@ -509,31 +509,7 @@ function getTodayPlan() {
         );
       } else {
         const planGrid = el("div", "briefing-plan-grid");
-        const fields = [
-          ["Typ", plan.type || "--"],
-          ["Dystans", plan.km ? `${plan.km} km` : "--"],
-          ["Tempo", plan.pace || "--"],
-          ["Strefa HR", plan.hr_zone || "--"],
-        ];
-        fields.forEach(([k, v]) => {
-          const item = el("div", "briefing-plan-item");
-          item.appendChild(el("span", "briefing-plan-key", k));
-          item.appendChild(el("span", "briefing-plan-val", v));
-          planGrid.appendChild(item);
-        });
-        planCard.appendChild(planGrid);
-        if (plan.notes) {
-          planCard.appendChild(el("p", "briefing-plan-notes", `📝 ${plan.notes}`));
-        }
-        planCard.appendChild(
-          el("p", "briefing-warning", "⏳ Trening jeszcze nie wykonany")
-        );
-      }
-    } else {
-      planCard.appendChild(
-        el("p", "briefing-rest", "😴 Brak planu — dzień odpoczynku")
-      );
-    }
+   
 
 
       const fields = [
