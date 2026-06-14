@@ -155,3 +155,29 @@
   .stat-value { font-size: .8rem; }
   .laps-table, .analytics-table { font-size: .68rem; }
 }
+
+
+/* Weather Advisor */
+.weather-advisor{background:#16213e;border-radius:12px;padding:16px;margin-bottom:16px}
+.wa-conditions{margin-bottom:12px}
+.wa-main{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.wa-icon{font-size:32px}
+.wa-temp{font-size:28px;font-weight:700;color:#fff}
+.wa-feels{font-size:13px;color:#8E8E93}
+.wa-details{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;color:#aaa}
+.wa-score{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid #333;border-bottom:1px solid #333;margin:12px 0}
+.wa-score-circle{width:56px;height:56px;border-radius:50%;border:3px solid;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;font-weight:700}
+.wa-score-circle small{font-size:11px;color:#8E8E93;font-weight:400}
+.wa-score-label{font-size:14px;color:#aaa}
+.wa-pace-adj{font-size:13px;color:#FF9F0A;margin-top:4px}
+.wa-section{margin-top:14px}
+.wa-section-title{font-size:14px;font-weight:600;color:#fff;margin-bottom:8px}
+.wa-item{font-size:13px;color:#ddd;padding:4px 0;border-bottom:1px solid #1a1a2e}
+.wa-item-label{color:#0A84FF;font-weight:600}
+.wa-warning{font-size:13px;color:#FF453A;padding:6px 0}
+.wa-effect{font-size:13px;color:#ddd;padding:4px 0}
+.wa-tip{font-size:13px;color:#ddd;padding:4px 0}
+.wa-toggle{display:flex;gap:8px;margin:8px 0}
+.wa-btn{padding:6px 16px;border-radius:8px;border:1px solid #333;background:#1a1a2e;color:#8E8E93;font-size:13px;cursor:pointer}
+.wa-btn.act{background:#0A84FF;color:#fff;border-color:#0A84FF}
+
