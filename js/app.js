@@ -88,15 +88,15 @@ async function rDash(){
   loadWeather();
 }
 
+
 async function loadWeather(){
   const slot=document.getElementById('weather-slot');if(!slot)return;
   slot.innerHTML='<div class="wcard"><div class="wcard-icon">\u23F3</div><div class="wcard-info"><div class="wcard-temp">Laduje pogode...</div></div></div>';
-  const w=await Weather.get();if(!w||!w.current){slot.innerHTML='';return}
-  const temp=Math.round(w.current.temperature_2m),code=w.current.weathercode,wind=Math.round(w.current.windspeed_10m);
-  const rain=w.daily?Math.round(w.daily.precipitation_sum[0]*10)/10:0;
-  const adj=Weather.paceAdj(temp),acls=adj.adj===0?'ok':adj.adj<=15?'warn':'hot';
-  slot.innerHTML=`<div class="wcard"><div class="wcard-icon">${Weather.wmo(code)}</div><div class="wcard-info"><div class="wcard-temp">${temp}\u00B0C</div><div class="wcard-det">\uD83C\uDF2C\uFE0F ${wind} km/h${rain>0?' \u00B7 \uD83C\uDF27\uFE0F '+rain+' mm':''}</div><div class="wcard-adj ${acls}">${adj.icon} ${adj.msg}</div></div></div>`;
+  const w=await Weather.get();
+  if(!w||!w.current){slot.innerHTML='';return}
+  slot.innerHTML=Weather.renderAdvisor(w,Weather._fasting);
 }
+
 
 function rSel(btn){btn.parentElement.querySelectorAll('.rform-btn').forEach(b=>b.classList.remove('act'));btn.classList.add('act')}
 function saveRecovery(){
@@ -148,9 +148,13 @@ function rPlan(){
     h+=`</div></div>`;
   });
   // Extra workouts
-  const wPlannedDates={};w.days.forEach(d=>{wPlannedDates[getDayDate(wStart,d.dow)]=d});
-  const allLogs=S.getAllLogs();const extraLogs=[];
-  Object.entries(allLogs).forEach(([date,l])=>{if(date>=wStart&&date<=wEnd&&l.distance){const planned=wPlannedDates[date];if(!planned||planned.rest)extraLogs.push({date,log:l})}});
+
+const wPlannedDates={};w.days.forEach(d=>{wPlannedDates[getDayDate(wStart,d.dow)]=d});
+const shiftedDates=new Set();
+w.days.forEach(d=>{if(!d.rest&&d.km>0){const dt=getDayDate(w.start,d.dow);const log=S.getLog(dt);if(!log||!log.distance){const sh=findShiftedLog(wStart,wEnd,dt,d.km);if(sh)shiftedDates.add(sh.date);}}});
+const allLogs=S.getAllLogs();const extraLogs=[];
+Object.entries(allLogs).forEach(([date,l])=>{if(date>=wStart&&date<=wEnd&&l.distance&&!shiftedDates.has(date)){const planned=wPlannedDates[date];if(!planned||planned.rest)extraLogs.push({date,log:l})}});
+
   if(extraLogs.length){
     h+=`<div class="extra-section"><div class="extra-title">\u2728 Dodatkowe treningi w tym tygodniu (${extraLogs.length})</div>`;
     extraLogs.forEach(e=>{const dd=new Date(e.date+'T12:00:00');const DOW=['Nd','Pn','Wt','Sr','Cz','Pt','Sb'];h+=`<div class="extra-card"><span class="extra-dt">${DOW[dd.getDay()]} ${fmtD(e.date)}</span><span class="extra-km">${e.log.distance} km</span>${e.log.pace?`<span class="extra-pace">\u23F1 ${e.log.pace}</span>`:''}${e.log.hr?`<span class="extra-hr">\u2764 ${e.log.hr}</span>`:''}</div>`});
