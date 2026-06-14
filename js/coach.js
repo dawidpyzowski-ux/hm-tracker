@@ -307,11 +307,13 @@ const Coach = (() => {
       var km = parseFloat(a.distance_km||a.km||0);
       var pace = parsePace(a.pace||a.avg_pace);
      
+
     var type = (a.type||a.workout_type||"").toLowerCase();
     var isHard = type.indexOf("interval")>=0 || type.indexOf("tempo")>=0 || type.indexOf("fartlek")>=0 || type.indexOf("race")>=0;
     if (km >= 3 && pace && pace > 0 && (isHard || pace < 360)) {
       efforts.push({ km: km, pace: pace, date: a.date, type: type });
     }
+
 
     });
 
