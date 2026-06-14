@@ -230,8 +230,7 @@ if(typeof Analytics!=='undefined'){h+=Analytics.render()}
   const sortedDates=Object.keys(logs).filter(d=>logs[d].distance).sort((a,b)=>b.localeCompare(a));
   let totalKm=0;sortedDates.forEach(d=>{if(logs[d].distance)totalKm+=parseFloat(logs[d].distance)});
   const plannedDates={};
-  PLAN.forEach(w=>{w.days.forEach(d=>{const dt=getDayDate(w.start,d.dow);if(!d.rest)plannedDates[dt]={type:d.type,km:d.km,week:w.weekNum}})});
-
+  try{if(window.PLAN_FLAT){window.PLAN_FLAT.forEach(function(pf){if(!plannedDates[pf.date])plannedDates[pf.date]={type:pf.type,km:pf.km,week:'—'}})}}catch(e){}
   h+=`<div class="stit">🏃 Historia treningow</div>`;
   h+=`<div class="hist-head"><span class="hist-count">${sortedDates.length} treningow</span><span class="hist-total">${Math.round(totalKm*10)/10} km lacznie</span></div>`;
 
