@@ -529,7 +529,7 @@ function getTodayPlan() {
         const notes = el("p", "briefing-plan-notes", `📝 ${plan.notes}`);
         planCard.appendChild(notes);
       }
- /   } else {/
+
       planCard.appendChild(
         el("p", "briefing-rest", "😴 Brak planu — dzień odpoczynku lub plan nie ustawiony")
       );
