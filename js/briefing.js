@@ -528,8 +528,7 @@ function getTodayPlan() {
         planCard.appendChild(el("p", "briefing-warning", "⏳ Trening jeszcze nie wykonany"));
       }
     } else {
-      planCard.appendChild(el("p", "briefing-rest", "😴 Brak planu — dzień odpoczynku"));
-    }
+      planCard.appendChild(el("p", "briefing-rest", "😴 Brak planu"));
     }
     container.appendChild(planCard);
 
