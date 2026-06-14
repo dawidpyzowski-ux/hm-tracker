@@ -1,0 +1,32 @@
+/* sprint12-update.css */
+.briefing-coach{border-left:4px solid #8b5cf6}
+.coach-headline{font-size:1.1em;font-weight:700;padding:8px 12px;border-radius:6px;margin:8px 0}
+.coach-rest{background:#dbeafe;color:#1e40af;border-left:4px solid #3b82f6}
+.coach-easy{background:#d1fae5;color:#065f46;border-left:4px solid #22c55e}
+.coach-go{background:#ede9fe;color:#5b21b6;border-left:4px solid #8b5cf6}
+.coach-suggestion{font-weight:600;color:#374151;margin:4px 0}
+.coach-reason{color:#6b7280;font-size:.9em;margin:2px 0 8px}
+.coach-fitness{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.coach-fitness span{background:#f3f4f6;padding:4px 10px;border-radius:12px;font-size:.85em;font-weight:500}
+.coach-ctl{color:#3b82f6!important}
+.coach-atl{color:#ef4444!important}
+.coach-tsb{color:#f59e0b!important}
+.coach-trend{color:#6b7280!important}
+.coach-race{background:#f9fafb;border-radius:8px;padding:10px;margin:8px 0}
+.coach-race-name{font-weight:700;margin-bottom:4px}
+.coach-status-ahead,.coach-status-on_track{color:#22c55e;font-weight:700}
+.coach-status-behind{color:#f59e0b;font-weight:700}
+.coach-status-at_risk{color:#ef4444;font-weight:700}
+.coach-warning{background:#fef2f2;color:#dc2626;padding:6px 10px;border-radius:6px;font-weight:600;margin:4px 0}
+.coach-insights{margin:8px 0}
+.coach-insights h4{font-size:.9em;color:#374151;margin:4px 0}
+.coach-insight{color:#6b7280;font-size:.85em;margin:2px 0;padding-left:8px;border-left:2px solid #8b5cf6}
+.coach-tips{margin:8px 0}
+.coach-tips h4{font-size:.9em;color:#374151;margin:4px 0}
+.coach-tip{color:#6b7280;font-size:.85em;margin:2px 0;padding-left:8px;border-left:2px solid #22c55e}
+.briefing-forecast{border-left:4px solid #60a5fa}
+.briefing-weather-info{display:flex;flex-wrap:wrap;gap:12px;padding:6px 0}
+.weather-badge{display:inline-block;background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:10px;font-size:.8em;margin-top:4px}
+.trends-title{text-align:center;color:#1f2937;margin:12px 0}
+.trends-chart{margin:12px 0;background:#fff;border-radius:10px;padding:10px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.trends-chart h4{font-size:.9em;color:#374151;margin:0 0 6px}
