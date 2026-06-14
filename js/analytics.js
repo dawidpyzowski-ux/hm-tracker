@@ -30,15 +30,11 @@ var Analytics = (function() {
     return null;
   }
 
-  function _getStrava(sid) {
-    var det = null, str = null, sidStr = String(sid);
-    var dP = ['strava_detail_','hm_strava_detail_','hm_detail_','detail_'];
-    var sP = ['strava_streams_','hm_strava_streams_','hm_streams_','streams_'];
-    var i, raw;
-    for (i = 0; i < dP.length; i++) { raw = localStorage.getItem(dP[i]+sidStr); if (raw) { try{det=JSON.parse(raw);}catch(e){} break; } }
-    for (i = 0; i < sP.length; i++) { raw = localStorage.getItem(sP[i]+sidStr); if (raw) { try{str=JSON.parse(raw);}catch(e){} break; } }
-    return { det: det, str: str };
-  }
+
+function _getStrava(sid) {
+  return { det: DB.getDetail(sid), str: DB.getStreams(sid) };
+}
+
 
   function _paceToSec(p) {
     if (!p) return 360;
