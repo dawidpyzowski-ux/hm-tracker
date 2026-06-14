@@ -25,11 +25,16 @@ var TrainScore = (function() {
   function _clamp(v, mn, mx) { return Math.max(mn, Math.min(mx, v)); }
 
   // === PLAN PARSER ===
+  
   function _parseDesc(desc, type, km) {
     var result = { category: 'steady', warmup: 0, cooldown: 0, reps: 0, repDist: 0,
       repPace: 0, repPaceMax: 0, restTime: 0, steadyPace: 0, steadyPaceMax: 0,
-      segments: [], totalKm: km, rawDesc: desc };
+      segments: [], totalKm: km, rawDesc: desc, hasStrides: false, steadyKm: 0 };
     var d = desc.toLowerCase();
+
+    // Detect strides/rytmy
+    var strideMatch = d.match(/(\d+)\s*x\s*(\d+)\s*m\s*(rytm|stride)/);
+    if (strideMatch) result.hasStrides = true;
 
     // Extract WU
     var wuMatch = d.match(/(\d+\.?\d*)\s*km\s*wu/);
@@ -104,16 +109,17 @@ var TrainScore = (function() {
       result.category = 'progressive';
       result.segments.push({ km: parseFloat(progMatch[1]), pace: _p(progMatch[2]) });
       result.segments.push({ km: parseFloat(progMatch[3]), pace: _p(progMatch[4]), paceMax: progMatch[5] ? _p(progMatch[5]) : 0 });
-      // Check for third segment: "-> 3km easy"
       var thirdSeg = d.match(/->\s*(\d+\.?\d*)\s*km\s*easy/);
       if (thirdSeg) result.segments.push({ km: parseFloat(thirdSeg[1]), pace: 0 });
       return result;
     }
 
-    // STEADY: "17 km @ 6:20-6:30"
+    // STEADY: "8 km @ 6:30-6:40 + 6x100m rytmy + 1.5 km CD"
+    // Extract the main steady portion distance separately
     var steadyMatch = d.match(/(\d+\.?\d*)\s*km\s*@\s*(\d+:\d+)(?:\s*-\s*(\d+:\d+))?/);
     if (steadyMatch) {
       result.category = 'steady';
+      result.steadyKm = parseFloat(steadyMatch[1]);
       result.steadyPace = _p(steadyMatch[2]);
       result.steadyPaceMax = steadyMatch[3] ? _p(steadyMatch[3]) : result.steadyPace;
       return result;
@@ -122,57 +128,60 @@ var TrainScore = (function() {
     return result;
   }
 
+
   // === LAP CLASSIFIER ===
+  
   function _classifyLaps(laps, plan) {
     if (!laps || laps.length === 0) return [];
     var classified = [];
-    var medPace = 0;
-    var paces = [];
-    for (var i = 0; i < laps.length; i++) paces.push(_lapPace(laps[i]));
-    paces.sort(function(a, b) { return a - b; });
-    medPace = paces[Math.floor(paces.length / 2)];
+    var i;
 
-    for (i = 0; i < laps.length; i++) {
-      var lap = laps[i];
-      var pace = _lapPace(lap);
-      var distKm = lap.distance / 1000;
-      var role = 'work';
+    // For interval/fartlek/tempo: use plan structure to identify roles
+    if (plan.category === 'intervals' || plan.category === 'fartlek' || plan.category === 'tempo') {
+      for (i = 0; i < laps.length; i++) {
+        var lap = laps[i];
+        var pace = _lapPace(lap);
+        var distKm = lap.distance / 1000;
+        var role = 'work';
 
-      if (plan.category === 'intervals' || plan.category === 'fartlek') {
-        // First lap, slow, ~warmup distance
-        if (i === 0 && pace > medPace + 30 && plan.warmup > 0 && distKm >= plan.warmup * 0.7) {
+        // First lap: warmup if plan has WU and lap matches ~WU distance and is slow
+        if (i === 0 && plan.warmup > 0 && distKm >= plan.warmup * 0.6 && distKm <= plan.warmup * 1.5) {
           role = 'warmup';
         }
-        // Last lap(s), slow
-        else if (i >= laps.length - 2 && pace > medPace + 30 && distKm > 0.5) {
-          role = 'cooldown';
-        }
-        // Short + very slow = rest/trucht
-        else if (distKm < 0.8 && pace > medPace + 60) {
+        // Very short laps (< 0.8km) = rest/trucht between intervals
+        else if (distKm < 0.8) {
           role = 'rest';
         }
-        // Short but not that slow (could be end fragment)
-        else if (distKm < 0.1) {
-          role = 'rest';
+        // Last 1-2 laps: cooldown if plan has CD and pace is slow
+        else if (plan.cooldown > 0 && i >= laps.length - 2) {
+          // Check if this lap is significantly slower than the work pace target
+          var targetPace = plan.repPace || 300;
+          if (pace > targetPace + 60) {
+            role = 'cooldown';
+          }
         }
-      } else if (plan.category === 'tempo') {
-        if (i === 0 && pace > medPace + 20) role = 'warmup';
-        else if (i === laps.length - 1 && pace > medPace + 20) role = 'cooldown';
-      }
 
+        classified.push({
+          index: i, role: role, distKm: distKm, pace: pace,
+          hr: lap.average_heartrate || 0, maxHR: lap.max_heartrate || 0,
+          name: lap.name || '', time: lap.moving_time || lap.elapsed_time || 0
+        });
+      }
+      return classified;
+    }
+
+    // For steady runs: all splits are "work" (handled elsewhere)
+    for (i = 0; i < laps.length; i++) {
       classified.push({
-        index: i,
-        role: role,
-        distKm: distKm,
-        pace: pace,
-        hr: lap.average_heartrate || 0,
-        maxHR: lap.max_heartrate || 0,
-        name: lap.name || '',
-        time: lap.moving_time || lap.elapsed_time || 0
+        index: i, role: 'work', distKm: laps[i].distance / 1000,
+        pace: _lapPace(laps[i]), hr: laps[i].average_heartrate || 0,
+        maxHR: laps[i].max_heartrate || 0, name: laps[i].name || '',
+        time: laps[i].moving_time || laps[i].elapsed_time || 0
       });
     }
     return classified;
   }
+
 
   // === SCORING FUNCTIONS ===
 
@@ -198,35 +207,57 @@ var TrainScore = (function() {
     var restLaps = classified.filter(function(l) { return l.role === 'rest'; });
 
     // STEADY (easy, recovery, long)
+   
     if (plan.category === 'steady' && plan.steadyPace > 0) {
       var targetMin = plan.steadyPace;
       var targetMax = plan.steadyPaceMax || plan.steadyPace;
-      var avgPace = 0;
-      if (workLaps.length > 0) {
-        var sum = 0;
-        for (var i = 0; i < workLaps.length; i++) sum += workLaps[i].pace;
-        avgPace = sum / workLaps.length;
+      
+      // If has strides or CD: only evaluate the main steady portion (steadyKm)
+      var evalLaps = workLaps;
+      if (plan.hasStrides || plan.cooldown > 0) {
+        var mainKm = plan.steadyKm || plan.totalKm;
+        evalLaps = [];
+        var cumDist = 0;
+        for (var ei = 0; ei < workLaps.length; ei++) {
+          cumDist += workLaps[ei].distKm;
+          if (cumDist <= mainKm + 0.5) {
+            evalLaps.push(workLaps[ei]);
+          }
+        }
+        if (evalLaps.length === 0) evalLaps = workLaps;
       }
-      // For easy/recovery: penalty for too fast!
+      
+      var avgPace = 0;
+      if (evalLaps.length > 0) {
+        var sum = 0;
+        for (var i = 0; i < evalLaps.length; i++) sum += evalLaps[i].pace;
+        avgPace = sum / evalLaps.length;
+      }
+      
       var isEasy = type.toLowerCase().indexOf('easy') !== -1 || type.toLowerCase().indexOf('recovery') !== -1 || type.toLowerCase().indexOf('regen') !== -1;
       var diff = 0;
       var msgs = [];
+      
       if (avgPace >= targetMin - 15 && avgPace <= targetMax + 15) {
         diff = 100;
         msgs.push('Tempo w zakresie: ' + _pStr(avgPace) + ' (plan: ' + _pStr(targetMin) + '-' + _pStr(targetMax) + ')');
       } else if (avgPace < targetMin - 15) {
-        // Too fast
         var overSec = targetMin - avgPace;
         diff = isEasy ? Math.max(30, 100 - overSec * 3) : Math.max(50, 100 - overSec * 2);
         msgs.push('Za szybko! ' + _pStr(avgPace) + ' vs plan ' + _pStr(targetMin) + (isEasy ? ' - easy run = pilnuj tempa!' : ''));
       } else {
-        // Too slow
         var underSec = avgPace - targetMax;
         diff = Math.max(50, 100 - underSec * 2);
         msgs.push('Za wolno: ' + _pStr(avgPace) + ' vs plan ' + _pStr(targetMax));
       }
+      
+      if (plan.hasStrides) {
+        msgs.push('Rytmy wykryte - ocena tempa tylko z glownej czesci (' + (plan.steadyKm || '?') + ' km)');
+      }
+      
       return { score: _clamp(Math.round(diff), 0, 100), msgs: msgs };
     }
+
 
     // INTERVALS
     if (plan.category === 'intervals' && workLaps.length > 0) {
