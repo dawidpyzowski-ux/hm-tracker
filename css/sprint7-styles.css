@@ -192,3 +192,18 @@
 .wa-training-label{font-size:13px;color:#8E8E93}
 .wa-training-type{font-size:15px;font-weight:600;color:#fff;margin:4px 0}
 .wa-fasting-verdict{font-size:14px;font-weight:700}
+
+
+/* Training Score */
+.ts-card{background:#16213e;border-radius:12px;padding:14px;margin:12px 0}
+.ts-header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.ts-score-circle{width:52px;height:52px;border-radius:50%;border:3px solid;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700}
+.ts-info{flex:1}
+.ts-title{font-size:15px;font-weight:600;color:#fff}
+.ts-plan{font-size:13px;color:#8E8E93}
+.ts-dim{margin:6px 0}
+.ts-dim-head{display:flex;justify-content:space-between;font-size:13px;color:#ddd;margin-bottom:3px}
+.ts-bar{height:6px;background:#1a1a2e;border-radius:3px}
+.ts-fill{height:100%;border-radius:3px;transition:width 0.3s}
+.ts-detail{font-size:12px;color:#aaa;padding:3px 0;border-bottom:1px solid #1a1a2e}
+.ts-coach{font-size:13px;color:#0A84FF;margin-top:10px;padding:8px;background:#0a1628;border-radius:8px}
