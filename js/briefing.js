@@ -497,27 +497,44 @@ function getTodayPlan() {
     const planTitle = el("h3", "briefing-card-title", "📋 Dzisiejszy Plan");
     planCard.appendChild(planTitle);
 
+
     const plan = getTodayPlan();
     if (plan) {
-      const planGrid = el("div", "briefing-plan-grid");
-      
-if (plan._status === "done") {
-  planCard.appendChild(
-    el("p", "briefing-ok", "✅ Trening wykonany dziś")
-  );
-}
+      if (plan._status === "moved" || plan._status === "done") {
+        planCard.appendChild(
+          el("p", "briefing-ok", `✅ Trening wykonany (${plan._logDate})`)
+        );
+        planCard.appendChild(
+          el("p", "briefing-reco", "➡️ Rekomendacja na dziś: recovery / easy run")
+        );
+      } else {
+        const planGrid = el("div", "briefing-plan-grid");
+        const fields = [
+          ["Typ", plan.type || "--"],
+          ["Dystans", plan.km ? `${plan.km} km` : "--"],
+          ["Tempo", plan.pace || "--"],
+          ["Strefa HR", plan.hr_zone || "--"],
+        ];
+        fields.forEach(([k, v]) => {
+          const item = el("div", "briefing-plan-item");
+          item.appendChild(el("span", "briefing-plan-key", k));
+          item.appendChild(el("span", "briefing-plan-val", v));
+          planGrid.appendChild(item);
+        });
+        planCard.appendChild(planGrid);
+        if (plan.notes) {
+          planCard.appendChild(el("p", "briefing-plan-notes", `📝 ${plan.notes}`));
+        }
+        planCard.appendChild(
+          el("p", "briefing-warning", "⏳ Trening jeszcze nie wykonany")
+        );
+      }
+    } else {
+      planCard.appendChild(
+        el("p", "briefing-rest", "😴 Brak planu — dzień odpoczynku")
+      );
+    }
 
-if (plan._status === "moved") {
-  planCard.appendChild(
-    el("p", "briefing-ok", `✅ Wykonany wcześniej (${plan._logDate})`)
-  );
-}
-
-if (plan._status === "pending") {
-  planCard.appendChild(
-    el("p", "briefing-warning", "⚠️ Trening jeszcze nie wykonany")
-  );
-}
 
       const fields = [
         ["Typ", plan.type || "--"],
