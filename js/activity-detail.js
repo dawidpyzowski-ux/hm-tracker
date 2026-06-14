@@ -90,6 +90,13 @@ function _getData(sid) {
     if(gear)h+='<div class="stat" style="grid-column:1/-1"><span class="stat-label">Buty</span><span class="stat-value">&#x1f45f; '+gear+'</span></div>';
     h+='</div></div>';
 
+
+    // Training Score
+    if(typeof TrainScore!=='undefined'&&data.date){
+      h+=TrainScore.render(data.date);
+    }
+
+    
     // Laps table (expanded: +Max Tempo, +Max HR)
     if(laps.length>0){var lpA=[];for(var li=0;li<laps.length;li++)lpA.push(laps[li].pSec);var lmn=Math.min.apply(null,lpA),lmx=Math.max.apply(null,lpA);
       h+='<div class="table-section"><h3>Okrazenia (segmenty treningu)</h3>';
