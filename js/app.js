@@ -321,5 +321,9 @@ function toggleNotify(){if(Notify.isEnabled()){Notify.disable()}else{Notify.requ
 function showPacer(){document.querySelectorAll('.scr').forEach(el=>el.classList.remove('act'));document.getElementById('pacer-view').classList.add('act');Pacer.renderPacer()}
 
 // --- INIT ---
+
 document.querySelector('.tabs').addEventListener('click',e=>{const tab=e.target.closest('.tab');if(tab)nav(tab.dataset.s)});
-(async()=>{if(window.location.search.includes('code=')){const ok=await Strava.handleCallback();if(ok){toast('Strava polaczona!');await Strava.syncWorkouts()}}nav('dash')})();
+DB.init().then(function(){
+  (async()=>{if(window.location.search.includes('code=')){const ok=await Strava.handleCallback();if(ok){toast('Strava polaczona!');await Strava.syncWorkouts()}}nav('dash')})();
+});
+
