@@ -475,6 +475,14 @@ var TrainScore = (function() {
       if (planDay) break;
     }
 
+    // Sprint 11: fallback do PLAN_FLAT
+    if (!planDay && window.PLAN_FLAT) {
+      var pf = window.PLAN_FLAT.find(function(p){ return p.date === date; });
+      if (pf) {
+        planDay = { type: pf.type, km: pf.km, pace: pf.pace, desc: pf.notes, rest: false };
+      }
+    }
+
     // Check shift matching
     if (!planDay) {
       for (wi = 0; wi < PLAN.length; wi++) {
