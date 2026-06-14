@@ -213,18 +213,7 @@ var TrainScore = (function() {
   }
 
 
-    // For steady runs: all splits are "work" (handled elsewhere)
-    for (i = 0; i < laps.length; i++) {
-      classified.push({
-        index: i, role: 'work', distKm: laps[i].distance / 1000,
-        pace: _lapPace(laps[i]), hr: laps[i].average_heartrate || 0,
-        maxHR: laps[i].max_heartrate || 0, name: laps[i].name || '',
-        time: laps[i].moving_time || laps[i].elapsed_time || 0
-      });
-    }
-    return classified;
-  }
-
+    
 
   // === SCORING FUNCTIONS ===
 
