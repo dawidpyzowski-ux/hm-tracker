@@ -300,38 +300,77 @@ const Coach = (() => {
 
   // === LAYER 4: RACE PREDICTOR ===
 
+  
   function predictRace(activities) {
-    // Find best recent race-like effort (tempo/race/fast run)
     var efforts = [];
+
     activities.forEach(function(a) {
+      var type = (a.type||a.workout_type||"").toLowerCase();
+      var isHard = type.indexOf("interval")>=0 || type.indexOf("tempo")>=0
+        || type.indexOf("fartlek")>=0 || type.indexOf("race")>=0;
+      if (!isHard) return;
+
       var km = parseFloat(a.distance_km||a.km||0);
-      var pace = parsePace(a.pace||a.avg_pace);
-     
+      if (km < 3) return;
 
-    var type = (a.type||a.workout_type||"").toLowerCase();
-    var isHard = type.indexOf("interval")>=0 || type.indexOf("tempo")>=0 || type.indexOf("fartlek")>=0 || type.indexOf("race")>=0;
-    if (km >= 3 && pace && pace > 0 && (isHard || pace < 360)) {
-      efforts.push({ km: km, pace: pace, date: a.date, type: type });
-    }
+      // Try TrainScore for WORK pace
+      var workPace = null, workKm = 0;
+      try {
+        if (typeof TrainScore !== "undefined") {
+          var ev = TrainScore.evaluate(a.date);
+          if (ev && ev.classified) {
+            var workLaps = ev.classified.filter(function(l){ return l.role === "work"; });
+            if (workLaps.length > 0) {
+              var totalPace = 0, totalDist = 0;
+              workLaps.forEach(function(l){
+                if (l.pace > 0 && l.pace < 9000) {
+                  totalPace += l.pace * l.distKm;
+                  totalDist += l.distKm;
+                }
+              });
+              if (totalDist > 0) {
+                workPace = totalPace / totalDist;
+                workKm = totalDist;
+              }
+            }
+          }
+        }
+      } catch(e){}
 
+      // Fallback: use activity pace if fast enough
+      if (!workPace) {
+        var p = parsePace(a.pace||a.avg_pace);
+        if (p && p < 390) { workPace = p; workKm = km; }
+      }
 
+      if (workPace && workKm > 1) {
+        efforts.push({ km: workKm, pace: workPace, date: a.date, type: type });
+      }
     });
 
-    if (efforts.length < 3) return null;
+    if (efforts.length < 2) return null;
 
     // Sort by date, take recent
-    efforts.sort(function(a,b){return (b.date||"").localeCompare(a.date||"");});
-    var recent = efforts.slice(0, 10);
+    efforts.sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
+    var recent = efforts.slice(0, 8);
 
-    // Riegel formula: T2 = T1 * (D2/D1)^1.06
+    // Riegel: T2 = T1 * (D2/D1)^1.06
     var predictions = [];
     recent.forEach(function(e) {
-      var timeSeconds = e.km * e.pace;
-      var predicted = timeSeconds * Math.pow(RACE.distance / e.km, 1.06);
+      var timeSec = e.km * e.pace;
+      var predicted = timeSec * Math.pow(RACE.distance / e.km, 1.06);
       predictions.push(predicted);
     });
 
-    var avgPrediction = predictions.reduce(function(s,v){return s+v;},0) / predictions.length;
+    // Weighted average (newer = more weight)
+    var totalWeight = 0, weightedSum = 0;
+    predictions.forEach(function(p, i) {
+      var w = predictions.length - i; // newer = higher weight
+      weightedSum += p * w;
+      totalWeight += w;
+    });
+    var avgPrediction = weightedSum / totalWeight;
+
     var hours = Math.floor(avgPrediction / 3600);
     var mins = Math.floor((avgPrediction % 3600) / 60);
     var secs = Math.round(avgPrediction % 60);
@@ -351,7 +390,7 @@ const Coach = (() => {
       targetTime: "1:45:10",
       targetPace: RACE.targetPace,
       status: status,
-      basedOn: recent.length + " recent efforts"
+      basedOn: recent.length + " hard efforts (work pace)"
     };
   }
 
