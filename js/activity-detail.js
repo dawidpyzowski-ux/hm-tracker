@@ -15,7 +15,14 @@ var ActDetail = (function() {
   function _maxHR(){var m=parseInt(localStorage.getItem('hm_user_max_hr'),10);return(m&&m>100)?m:190;}
   function _sa(str,key){if(!str||!str[key])return null;if(Array.isArray(str[key]))return str[key];if(str[key].data&&Array.isArray(str[key].data))return str[key].data;return null;}
   function _findLog(sid){var ss=String(sid);try{var logs=S.getAllLogs();var d=Object.keys(logs);for(var i=0;i<d.length;i++){var l=logs[d[i]];if(l.strava_id&&String(l.strava_id)==ss)return{log:l,date:d[i]};}}catch(e){}return null;}
-  function _getData(sid){var det=null,str=null,ss=String(sid);var dp=['strava_detail_','hm_strava_detail_','hm_detail_','detail_'];var sp=['strava_streams_','hm_strava_streams_','hm_streams_','streams_'];var i,r;for(i=0;i<dp.length;i++){r=localStorage.getItem(dp[i]+ss);if(r){try{det=JSON.parse(r);}catch(e){}break;}}for(i=0;i<sp.length;i++){r=localStorage.getItem(sp[i]+ss);if(r){try{str=JSON.parse(r);}catch(e){}break;}}var fo=_findLog(sid);return{detail:det,streams:str,log:fo?fo.log:null,date:fo?fo.date:null};}
+  
+function _getData(sid) {
+  var detail = DB.getDetail(sid);
+  var streams = DB.getStreams(sid);
+  var found = _findLog(sid);
+  return { detail: detail, streams: streams, log: found ? found.log : null, date: found ? found.date : null };
+}
+
   function _fmtPace(ms){if(!ms||ms<=0)return'--:--';var s=1000/ms,m=Math.floor(s/60),sc=Math.round(s%60);return m+':'+(sc<10?'0':'')+sc;}
   function _fmtTime(sec){if(!sec||sec<=0)return'0:00';var h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=Math.round(sec%60);if(h>0)return h+':'+(m<10?'0':'')+m+':'+(s<10?'0':'')+s;return m+':'+(s<10?'0':'')+s;}
   function _paceToSec(p){if(!p)return 0;var pp=p.split(':');return(+pp[0])*60+(+pp[1]||0);}
