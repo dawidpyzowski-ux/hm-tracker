@@ -253,17 +253,54 @@ const Briefing = (() => {
    * ------------------------------------------------------- */
 
   /** Dzisiejszy plan treningowy z window.PLAN_FLAT */
-  function getTodayPlan() {
-    try {
-      const plan = window.PLAN_FLAT || [];
-      const today = todayISO();
-      const entry = plan.find((p) => p.date === today);
-      return entry || null;
-    } catch (e) {
-      console.warn(TAG, "Brak window.PLAN_FLAT", e);
-      return null;
+  
+function getTodayPlan() {
+  try {
+    const plan = window.PLAN_FLAT || [];
+    const today = todayISO();
+
+    // 1. Plan na dziś
+    let entry = plan.find(p => p.date === today);
+
+    if (!entry) return null;
+
+    // 2. Sprawdź log dziś
+    const logToday = S.getLog(today);
+    if (logToday && logToday.distance) {
+      entry._status = "done";
+      entry._logDate = today;
+      return entry;
     }
+
+    // 3. SHIFT CHECK (wczoraj / -2 dni)
+    for (let i = 1; i <= 2; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const prevDate = d.toISOString().slice(0, 10);
+
+      const log = S.getLog(prevDate);
+      if (log && log.distance) {
+        const ratio = parseFloat(log.distance) / entry.km;
+
+        // sensowny match
+        if (ratio > 0.7 && ratio < 1.4) {
+          entry._status = "moved";
+          entry._logDate = prevDate;
+          return entry;
+        }
+      }
+    }
+
+    // 4. Nie zrobiony
+    entry._status = "pending";
+    return entry;
+
+  } catch (e) {
+    console.warn(TAG, "PLAN_FLAT error", e);
+    return null;
   }
+}
+
 
   /**
    * getRecentForm — statystyki z ostatnich N dni + porównanie z poprzednim okresem
@@ -463,6 +500,25 @@ const Briefing = (() => {
     const plan = getTodayPlan();
     if (plan) {
       const planGrid = el("div", "briefing-plan-grid");
+      
+if (plan._status === "done") {
+  planCard.appendChild(
+    el("p", "briefing-ok", "✅ Trening wykonany dziś")
+  );
+}
+
+if (plan._status === "moved") {
+  planCard.appendChild(
+    el("p", "briefing-ok", `✅ Wykonany wcześniej (${plan._logDate})`)
+  );
+}
+
+if (plan._status === "pending") {
+  planCard.appendChild(
+    el("p", "briefing-warning", "⚠️ Trening jeszcze nie wykonany")
+  );
+}
+
       const fields = [
         ["Typ", plan.type || "--"],
         ["Dystans", plan.km ? `${plan.km} km` : "--"],
