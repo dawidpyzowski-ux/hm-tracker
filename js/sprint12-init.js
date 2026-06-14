@@ -1,5 +1,8 @@
+
 /* sprint12-init.js - Patches Briefing with Coach + Weather + Trends */
 (function(){"use strict";var TAG="[S12]";
+
+// === PATCH BRIEFING: add Coach + Forecast ===
 if(typeof Briefing!=="undefined"&&Briefing.render){
   var origRender=Briefing.render.bind(Briefing);
   Briefing.render=async function(id){
@@ -30,6 +33,54 @@ if(typeof Briefing!=="undefined"&&Briefing.render){
         fCard.innerHTML="<h3 class='briefing-card-title'>Pogoda jutro</h3><div class='briefing-weather-info'><span>"+tom.description+"</span><span>"+tom.tempMin+"--"+tom.tempMax+" C</span>"+(tom.rain>0?"<span>Deszcz: "+tom.rain+" mm</span>":"")+"<span>Wiatr: "+tom.windMax+" km/h</span></div>";
         c.appendChild(fCard);}
     }catch(e){}}
-  };console.log(TAG,"Briefing patched");}
+  };console.log(TAG,"Briefing patched");
+}
+
+// === WEATHER BADGES ON STAT CARDS ===
+function addWeatherBadges(){
+  if(typeof WeatherHistory==="undefined"||typeof DB==="undefined") return;
+  DB.getAll().then(function(acts){
+    WeatherHistory.enrichAll(acts).then(function(enriched){
+      document.querySelectorAll('.weather-badge').forEach(function(b){b.remove();});
+      var wlogs=document.querySelectorAll('.wlog');
+      wlogs.forEach(function(wlog){
+        var dateEl=wlog.querySelector('.wlog-d');
+        if(!dateEl) return;
+        var dateTxt=dateEl.textContent.trim();
+        var parts=dateTxt.split('.');
+        if(parts.length!==2) return;
+        var day=parts[0],month=parts[1];
+        var act=enriched.find(function(a){
+          var d=(a.date||'').slice(0,10);
+          return d.endsWith('-'+month+'-'+day);
+        });
+        if(act&&act._weather){
+          var w=act._weather;
+          var top=wlog.querySelector('.wlog-top');
+          if(top&&!top.querySelector('.weather-badge')){
+            var badge=document.createElement('div');
+            badge.className='weather-badge';
+            badge.textContent=w.temp+'C | '+w.description+' | wilg. '+w.humidity+'% | wiatr '+w.wind+' km/h';
+            badge.style.marginTop='6px';
+            top.appendChild(badge);
+          }
+        }
+      });
+      console.log(TAG,"Weather badges: done");
+    });
+  });
+}
+
+// Auto-add badges when stats tab is shown
+var origNav=window.nav;
+if(typeof origNav==="function"){
+  window.nav=function(){
+    origNav.apply(this,arguments);
+    setTimeout(addWeatherBadges, 500);
+  };
+}
+// Also run on load with delay
+setTimeout(addWeatherBadges, 2000);
+
 console.log(TAG,"Init OK");
 })();
