@@ -97,14 +97,14 @@ const WeeklyReport = (() => {
 
   function getWeekPlan(weekOffset = 0) {
     try {
-      const plan = window.PLAN || [];
+      const plan = window.PLAN_FLAT || [];
       const range = getWeekRange(weekOffset);
       return plan.filter((p) => {
         const d = dayStart(new Date(p.date));
         return d >= range.start && d <= range.end;
       });
     } catch (e) {
-      console.warn(TAG, "Brak window.PLAN", e);
+      console.warn(TAG, "Brak window.PLAN_FLAT", e);
       return [];
     }
   }
