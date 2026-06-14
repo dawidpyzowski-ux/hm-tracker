@@ -1,4 +1,5 @@
-/* db-shim.js v3 — S.getAllLogs() → DB.getAll() SYNC */
+
+/* db-shim.js v4 — S.getAllLogs() + PLAN_FLAT + DB.getDetail SYNC */
 (function(){
   "use strict";
   var TAG = "[DB-Shim]";
@@ -44,17 +45,12 @@
         var durationMin = estimateDuration(log.pace, km);
         var planType = null;
         try {
-          if(typeof PLAN !== "undefined"){
-            for(var wi = 0; wi < PLAN.length; wi++){
-              var w = PLAN[wi];
-              for(var di = 0; di < w.days.length; di++){
-                var d = w.days[di];
-                if(typeof getDayDate === "function" && getDayDate(w.start, d.dow) === date){
-                  planType = d.type;
-                  break;
-                }
+          if(window.PLAN_FLAT){
+            for(var pi = 0; pi < window.PLAN_FLAT.length; pi++){
+              if(window.PLAN_FLAT[pi].date === date){
+                planType = window.PLAN_FLAT[pi].type;
+                break;
               }
-              if(planType) break;
             }
           }
         } catch(e){}
@@ -135,7 +131,7 @@
       activities.sort(function(a,b){ return b.date.localeCompare(a.date); });
       _cache = activities;
       _cacheTime = Date.now();
-      console.log(TAG, "Zaladowano", activities.length, "aktywnosci (enriched v3)");
+      console.log(TAG, "v4", activities.length, "aktywnosci enriched");
       return Promise.resolve(activities);
     } catch(e){
       console.error(TAG, "Blad:", e);
@@ -154,5 +150,5 @@
     _cacheTime = 0;
   };
 
-  console.log(TAG, "v3 SYNC zainstalowany");
+  console.log(TAG, "v4 SYNC+PLAN_FLAT zainstalowany");
 })();
