@@ -324,6 +324,7 @@ function strTimer(btn){let sec=90;btn.disabled=true;const el=document.getElement
 function toggleNotify(){if(Notify.isEnabled()){Notify.disable()}else{Notify.requestPermission().then(ok=>{if(ok)Notify.enable()})}rSett()}
 function showPacer(){document.querySelectorAll('.scr').forEach(el=>el.classList.remove('act'));document.getElementById('pacer-view').classList.add('act');Pacer.renderPacer()}
 
+
 // --- INIT ---
 
 document.querySelector('.tabs').addEventListener('click',e=>{const tab=e.target.closest('.tab');if(tab)nav(tab.dataset.s)});
@@ -331,3 +332,21 @@ DB.init().then(function(){
   (async()=>{if(window.location.search.includes('code=')){const ok=await Strava.handleCallback();if(ok){toast('Strava polaczona!');await Strava.syncWorkouts()}}nav('dash')})();
 });
 
+// --- SERVICE WORKER + AUTO-UPDATE ---
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').then(function(reg){
+    reg.addEventListener('updatefound',function(){
+      var nw=reg.installing;
+      nw.addEventListener('statechange',function(){
+        if(nw.state==='installed'&&navigator.serviceWorker.controller){
+          var bar=document.createElement('div');
+          bar.innerHTML='🔄 Nowa wersja dostepna! <button onclick="location.reload()" style="margin-left:8px;padding:4px 12px;border-radius:6px;border:none;background:#0A84FF;color:#fff;cursor:pointer">Odswiez</button>';
+          bar.style.cssText='position:fixed;top:0;left:0;right:0;padding:10px 16px;background:#1a1a2e;color:#fff;font-size:14px;z-index:9999;text-align:center;border-bottom:2px solid #0A84FF';
+          document.body.appendChild(bar);
+        }
+      });
+    });
+    // Check for updates every 5 min
+    setInterval(function(){reg.update();},300000);
+  });
+}
