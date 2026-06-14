@@ -131,32 +131,40 @@ var TrainScore = (function() {
 
   // === LAP CLASSIFIER ===
   
+
   function _classifyLaps(laps, plan) {
     if (!laps || laps.length === 0) return [];
     var classified = [];
     var i;
 
-    // For interval/fartlek/tempo: use plan structure to identify roles
+    // === INTERVALS / FARTLEK / TEMPO ===
     if (plan.category === 'intervals' || plan.category === 'fartlek' || plan.category === 'tempo') {
+      var targetPace = plan.repPace || 300;
       for (i = 0; i < laps.length; i++) {
         var lap = laps[i];
         var pace = _lapPace(lap);
         var distKm = lap.distance / 1000;
         var role = 'work';
 
-        // First lap: warmup if plan has WU and lap matches ~WU distance and is slow
-        if (i === 0 && plan.warmup > 0 && distKm >= plan.warmup * 0.6 && distKm <= plan.warmup * 1.5) {
+        // Warmup: first lap, matches ~WU distance, significantly slower than target
+        if (i === 0 && plan.warmup > 0 && distKm >= plan.warmup * 0.6 && pace > targetPace + 40) {
           role = 'warmup';
         }
-        // Very short laps (< 0.8km) = rest/trucht between intervals
+        // Very short laps (< 0.8km) = rest/trucht
         else if (distKm < 0.8) {
           role = 'rest';
         }
-        // Last 1-2 laps: cooldown if plan has CD and pace is slow
-        else if (plan.cooldown > 0 && i >= laps.length - 2) {
-          // Check if this lap is significantly slower than the work pace target
-          var targetPace = plan.repPace || 300;
-          if (pace > targetPace + 60) {
+        // Cooldown: last laps, slow, after all work reps done
+        else if (i >= laps.length - 2 && pace > targetPace + 40) {
+          // Count work laps so far
+          var workCount = 0;
+          for (var c = 0; c < classified.length; c++) {
+            if (classified[c].role === 'work') workCount++;
+          }
+          // If we already have enough reps, this is cooldown
+          if (plan.reps > 0 && workCount >= plan.reps) {
+            role = 'cooldown';
+          } else if (pace > targetPace + 80) {
             role = 'cooldown';
           }
         }
@@ -169,6 +177,41 @@ var TrainScore = (function() {
       }
       return classified;
     }
+
+    // === STEADY (Easy, Recovery, Long, Easy+Rytmy) ===
+    for (i = 0; i < laps.length; i++) {
+      var lap2 = laps[i];
+      var pace2 = _lapPace(lap2);
+      var distKm2 = lap2.distance / 1000;
+      var role2 = 'work';
+
+      // Strides detection: short (< 0.5km) + fast (< 5:00/km = 300s)
+      if (distKm2 < 0.5 && pace2 < 300) {
+        role2 = 'stride';
+      }
+      // Short + slow = jog between strides or rest
+      else if (distKm2 < 0.5 && pace2 >= 300) {
+        role2 = 'rest';
+      }
+      // Cooldown: if plan has CD, last large lap that's slower
+      else if (plan.cooldown > 0 && i === laps.length - 1 && distKm2 >= 0.8 && distKm2 <= plan.cooldown * 1.5) {
+        // Check if there's a main work lap before this
+        var hasMainWork = false;
+        for (var ch = 0; ch < classified.length; ch++) {
+          if (classified[ch].role === 'work' && classified[ch].distKm >= 2) hasMainWork = true;
+        }
+        if (hasMainWork) role2 = 'cooldown';
+      }
+
+      classified.push({
+        index: i, role: role2, distKm: distKm2, pace: pace2,
+        hr: lap2.average_heartrate || 0, maxHR: lap2.max_heartrate || 0,
+        name: lap2.name || '', time: lap2.moving_time || lap2.elapsed_time || 0
+      });
+    }
+    return classified;
+  }
+
 
     // For steady runs: all splits are "work" (handled elsewhere)
     for (i = 0; i < laps.length; i++) {
@@ -206,26 +249,15 @@ var TrainScore = (function() {
     var workLaps = classified.filter(function(l) { return l.role === 'work'; });
     var restLaps = classified.filter(function(l) { return l.role === 'rest'; });
 
+    
     // STEADY (easy, recovery, long)
-   
     if (plan.category === 'steady' && plan.steadyPace > 0) {
       var targetMin = plan.steadyPace;
       var targetMax = plan.steadyPaceMax || plan.steadyPace;
       
-      // If has strides or CD: only evaluate the main steady portion (steadyKm)
-      var evalLaps = workLaps;
-      if (plan.hasStrides || plan.cooldown > 0) {
-        var mainKm = plan.steadyKm || plan.totalKm;
-        evalLaps = [];
-        var cumDist = 0;
-        for (var ei = 0; ei < workLaps.length; ei++) {
-          cumDist += workLaps[ei].distKm;
-          if (cumDist <= mainKm + 0.5) {
-            evalLaps.push(workLaps[ei]);
-          }
-        }
-        if (evalLaps.length === 0) evalLaps = workLaps;
-      }
+      // Only evaluate 'work' role (excludes strides, rest, cooldown)
+      var evalLaps = classified.filter(function(l) { return l.role === 'work'; });
+      if (evalLaps.length === 0) evalLaps = workLaps;
       
       var avgPace = 0;
       if (evalLaps.length > 0) {
@@ -252,7 +284,9 @@ var TrainScore = (function() {
       }
       
       if (plan.hasStrides) {
-        msgs.push('Rytmy wykryte - ocena tempa tylko z glownej czesci (' + (plan.steadyKm || '?') + ' km)');
+        var evalDist = 0;
+        for (var ed = 0; ed < evalLaps.length; ed++) evalDist += evalLaps[ed].distKm;
+        msgs.push('Rytmy pominiete w ocenie (' + evalLaps.length + ' lap, ' + Math.round(evalDist * 10) / 10 + ' km oceniane)');
       }
       
       return { score: _clamp(Math.round(diff), 0, 100), msgs: msgs };
