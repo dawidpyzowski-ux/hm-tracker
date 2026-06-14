@@ -354,11 +354,13 @@ var TrainScore = (function() {
     var msgs = [];
     var score = 80;
 
+ 
     if (isEasy) {
       var avgHR = 0, cnt = 0;
       for (var i = 0; i < classified.length; i++) {
-        if (classified[i].hr > 0) { avgHR += classified[i].hr; cnt++; }
+        if (classified[i].role === 'work' && classified[i].hr > 0) { avgHR += classified[i].hr; cnt++; }
       }
+
       if (cnt > 0) {
         avgHR = avgHR / cnt;
         if (avgHR < 150) { score = 100; msgs.push('HR ' + Math.round(avgHR) + ' bpm - swietnie w Z2'); }
