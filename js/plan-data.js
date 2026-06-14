@@ -70,5 +70,6 @@
   
   if(!window._PLAN_ORIG) window._PLAN_ORIG = window.PLAN;
   window.PLAN_FLAT_MAP = existing;
+  window._PLAN_WEEKS = window.PLAN;
 
 })();
