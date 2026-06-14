@@ -403,6 +403,11 @@ DB.init().then(function(){
     }
     nav('dash');
 
+    
+    // Sprint 11: PLAN_FLAT dostepny jako lookup
+    try{if(window.PLAN_FLAT){window.PLAN_FLAT_MAP={};window.PLAN_FLAT.forEach(function(p){window.PLAN_FLAT_MAP[p.date]=p})}}catch(e){}
+
+
     // Sprint 11: Inicjalizacja Smart Notifications
     try{
       if(typeof SmartNotifications!=='undefined'){
