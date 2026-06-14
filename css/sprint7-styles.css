@@ -181,3 +181,14 @@
 .wa-btn{padding:6px 16px;border-radius:8px;border:1px solid #333;background:#1a1a2e;color:#8E8E93;font-size:13px;cursor:pointer}
 .wa-btn.act{background:#0A84FF;color:#fff;border-color:#0A84FF}
 
+
+.wa-netto{display:flex;gap:12px;margin-top:6px;flex-wrap:wrap}
+.wa-netto-item{font-size:13px;padding:4px 10px;border-radius:6px;background:#1a1a2e}
+.wa-netto-item.pace{color:#FF9F0A}
+.wa-netto-item.hr{color:#FF453A}
+.wa-netto-item.ok{color:#30D158}
+.wa-score-info{flex:1}
+.wa-training{background:#1a1a2e;border-radius:8px;padding:10px;margin:8px 0}
+.wa-training-label{font-size:13px;color:#8E8E93}
+.wa-training-type{font-size:15px;font-weight:600;color:#fff;margin:4px 0}
+.wa-fasting-verdict{font-size:14px;font-weight:700}
