@@ -188,7 +188,7 @@ const Coach = (() => {
     }
 
     // --- Recovery Time Pattern ---
-    var hardTypes = ["Intervals","Tempo","Long Run","Race","Fartlek"];
+    var hardTypes = ["intervals","Interwaly","tempo","long_run","Long Run","race","fartlek","Race","Intervals","Tempo","Fartlek"];
     var recoveryTimes = [];
     var sorted = activities.slice().sort(function(a,b){
       return (a.date||"").localeCompare(b.date||"");
