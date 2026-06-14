@@ -67,4 +67,8 @@
 
   window.PLAN_FLAT.sort(function(a,b){ return a.date.localeCompare(b.date); });
   console.log("[PlanData] Zaladowano", window.PLAN_FLAT.length, "wpisow planu");
+  
+  if(!window._PLAN_ORIG) window._PLAN_ORIG = window.PLAN;
+  window.PLAN_FLAT_MAP = existing;
+
 })();
