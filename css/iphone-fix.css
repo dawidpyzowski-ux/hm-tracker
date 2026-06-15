@@ -1,10 +1,32 @@
-/* iphone-fix.css v3 */
+/* iphone-fix.css v4 - SURGICAL: exact selectors only */
+
+/* Only apply in standalone PWA mode (iPhone home screen) */
 @media all and (display-mode: standalone) {
-  body {
+
+  /* Each screen content - push below Dynamic Island */
+  .scr {
     padding-top: env(safe-area-inset-top, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Bell icon - push down */
+  .notif-bell-wrap {
+    margin-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* Bottom tab bar - space for home indicator */
+  nav.tabs {
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+    height: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Content area needs bottom margin so last items not hidden behind taller nav */
+  body {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    padding-top: 0px; /* NO top padding on body */
   }
 }
+
+/* Coach dark mode colors */
 .coach-race{background:#111827!important;color:#e5e7eb!important;border:1px solid #374151!important}
 .coach-race-name{color:#f9fafb!important}
 .coach-race div{color:#e5e7eb!important}
