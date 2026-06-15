@@ -1,0 +1,64 @@
+/* iphone-fix.css - iPhone PWA fixes */
+
+/* Safe areas - push nav below Dynamic Island */
+html {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+nav, .nav, .navbar, .tabs, header,
+[class*="nav"], [class*="header"], [class*="tab-bar"] {
+  padding-top: env(safe-area-inset-top, 20px) !important;
+}
+nav, .nav, .navbar {
+  top: 0 !important;
+  padding-top: calc(env(safe-area-inset-top, 20px) + 8px) !important;
+}
+.bottom-nav, .tab-bar-bottom, [class*="bottom"] {
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+}
+@media all and (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top, 44px);
+    padding-bottom: env(safe-area-inset-bottom, 34px);
+  }
+  nav, .nav, .navbar, .tabs, header,
+  [class*="nav"], [class*="header"] {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 9999 !important;
+    padding-top: calc(env(safe-area-inset-top, 44px) + 4px) !important;
+  }
+}
+
+/* Dark mode font color fixes */
+@media (prefers-color-scheme: dark) {
+  body, .app { color: #e5e7eb !important; }
+  .briefing-bar-label, .briefing-plan-key, .briefing-form-key,
+  .coach-reason, .coach-tip, .coach-insight,
+  [class*="label"], [class*="desc"], [class*="sub"],
+  [class*="secondary"], [class*="muted"], [class*="gray"] {
+    color: #d1d5db !important;
+  }
+  .briefing-plan-val, .briefing-form-val,
+  [class*="value"], [class*="val"], [class*="stat"] {
+    color: #f3f4f6 !important;
+  }
+  h1, h2, h3, h4, h5, h6,
+  .briefing-card-title, [class*="title"] {
+    color: #f9fafb !important;
+  }
+  .weather-badge {
+    background: #1e3a5f !important;
+    color: #7dd3fc !important;
+  }
+  .trends-chart h4 { color: #d1d5db !important; }
+  .coach-rest { background: #1e3a5f !important; color: #93c5fd !important; }
+  .coach-easy { background: #064e3b !important; color: #6ee7b7 !important; }
+  .coach-go { background: #2e1065 !important; color: #c4b5fd !important; }
+  .coach-race { background: #1f2937 !important; color: #e5e7eb !important; }
+  .coach-warning { background: #450a0a !important; color: #fca5a5 !important; }
+  .coach-fitness span { background: #374151 !important; }
+  .briefing-card { background: #1f2937 !important; color: #e5e7eb !important; }
+  .stat-grid div, .stat-box, [class*="stat-"] { color: #f3f4f6 !important; }
+  a { color: #60a5fa !important; }
+}
