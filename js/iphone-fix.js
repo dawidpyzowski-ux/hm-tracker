@@ -1,4 +1,4 @@
-/* iphone-fix.js v3 */
+/* iphone-fix.js v4 */
 (function(){"use strict";
 var TAG="[iPhone-Fix]";
 var meta=document.querySelector('meta[name="viewport"]');
@@ -22,5 +22,5 @@ function fixDups(){
 }
 setTimeout(fixDups,2000);
 setTimeout(fixDups,4000);
-console.log(TAG,"v3 OK");
+console.log(TAG,"v4 OK");
 })();
