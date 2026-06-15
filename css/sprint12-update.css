@@ -1,32 +1,64 @@
-/* sprint12-update.css */
-.briefing-coach{border-left:4px solid #8b5cf6}
-.coach-headline{font-size:1.1em;font-weight:700;padding:8px 12px;border-radius:6px;margin:8px 0}
-.coach-rest{background:#dbeafe;color:#1e40af;border-left:4px solid #3b82f6}
-.coach-easy{background:#d1fae5;color:#065f46;border-left:4px solid #22c55e}
-.coach-go{background:#ede9fe;color:#5b21b6;border-left:4px solid #8b5cf6}
-.coach-suggestion{font-weight:600;color:#374151;margin:4px 0}
-.coach-reason{color:#6b7280;font-size:.9em;margin:2px 0 8px}
-.coach-fitness{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
-.coach-fitness span{background:#f3f4f6;padding:4px 10px;border-radius:12px;font-size:.85em;font-weight:500}
-.coach-ctl{color:#3b82f6!important}
-.coach-atl{color:#ef4444!important}
-.coach-tsb{color:#f59e0b!important}
-.coach-trend{color:#6b7280!important}
-.coach-race{background:#f9fafb;border-radius:8px;padding:10px;margin:8px 0}
-.coach-race-name{font-weight:700;margin-bottom:4px}
-.coach-status-ahead,.coach-status-on_track{color:#22c55e;font-weight:700}
-.coach-status-behind{color:#f59e0b;font-weight:700}
-.coach-status-at_risk{color:#ef4444;font-weight:700}
-.coach-warning{background:#fef2f2;color:#dc2626;padding:6px 10px;border-radius:6px;font-weight:600;margin:4px 0}
-.coach-insights{margin:8px 0}
-.coach-insights h4{font-size:.9em;color:#374151;margin:4px 0}
-.coach-insight{color:#6b7280;font-size:.85em;margin:2px 0;padding-left:8px;border-left:2px solid #8b5cf6}
-.coach-tips{margin:8px 0}
-.coach-tips h4{font-size:.9em;color:#374151;margin:4px 0}
-.coach-tip{color:#6b7280;font-size:.85em;margin:2px 0;padding-left:8px;border-left:2px solid #22c55e}
-.briefing-forecast{border-left:4px solid #60a5fa}
-.briefing-weather-info{display:flex;flex-wrap:wrap;gap:12px;padding:6px 0}
-.weather-badge{display:inline-block;background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:10px;font-size:.8em;margin-top:4px}
-.trends-title{text-align:center;color:#1f2937;margin:12px 0}
-.trends-chart{margin:12px 0;background:#fff;border-radius:10px;padding:10px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
-.trends-chart h4{font-size:.9em;color:#374151;margin:0 0 6px}
+/* iphone-fix.css v2 - iPhone PWA fixes */
+
+/* SAFE AREA */
+html{padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+body{padding-top:env(safe-area-inset-top,0px)!important;padding-bottom:env(safe-area-inset-bottom,0px)!important}
+.safe-area-spacer{height:env(safe-area-inset-top,44px);min-height:env(safe-area-inset-top,44px);width:100%;display:block;flex-shrink:0}
+.scr,[class*="screen"],#content,main,.container,.app-content{padding-top:env(safe-area-inset-top,44px)!important}
+@media all and (display-mode:standalone){body{padding-top:env(safe-area-inset-top,47px)!important}.scr,[class*="screen"],#content,main{padding-top:env(safe-area-inset-top,47px)!important}}
+table:first-child,.stat-table:first-child{margin-top:env(safe-area-inset-top,44px)!important}
+select{margin-top:4px}
+.tab-bar,.tabs,nav,.navbar,.bottom-nav,[class*="tab-bar"]{padding-bottom:env(safe-area-inset-bottom,0px)!important}
+
+/* DARK MODE TEXT */
+body,.app{color:#e5e7eb!important}
+p,span,div,label,td,th,li,small{color:inherit}
+h1,h2,h3,h4,h5,h6,.briefing-card-title,[class*="title"]{color:#f9fafb!important}
+[class*="label"],[class*="desc"],[class*="sub"],[class*="secondary"],[class*="muted"],[class*="gray"],[class*="hint"],[class*="note"]{color:#d1d5db!important}
+[class*="value"],[class*="val"],[class*="stat"],.briefing-plan-val,.briefing-form-val{color:#f3f4f6!important}
+a{color:#60a5fa!important}
+
+/* COACH CARD DARK MODE */
+.briefing-coach{background:#1f2937!important;color:#e5e7eb!important;border-left:4px solid #8b5cf6!important}
+.coach-headline.coach-rest{background:#1e3a5f!important;color:#93c5fd!important;border-left-color:#3b82f6!important}
+.coach-headline.coach-easy{background:#064e3b!important;color:#6ee7b7!important;border-left-color:#22c55e!important}
+.coach-headline.coach-go{background:#2e1065!important;color:#c4b5fd!important;border-left-color:#8b5cf6!important}
+.coach-suggestion{color:#fbbf24!important;font-weight:600!important}
+.coach-reason{color:#d1d5db!important}
+.coach-fitness span{background:#374151!important}
+.coach-ctl{color:#60a5fa!important}
+.coach-atl{color:#f87171!important}
+.coach-tsb{color:#fbbf24!important}
+.coach-trend{color:#d1d5db!important}
+
+/* RACE SECTION - bright text */
+.coach-race{background:#111827!important;color:#e5e7eb!important;border:1px solid #374151!important;border-radius:8px!important;padding:12px!important}
+.coach-race-name{color:#f9fafb!important;font-weight:700!important;font-size:1em!important}
+.coach-race div{color:#e5e7eb!important}
+.coach-race strong{color:#fbbf24!important;font-size:1.1em!important}
+.coach-status-ahead,.coach-status-on_track{color:#22c55e!important;font-weight:700!important}
+.coach-status-behind{color:#fbbf24!important;font-weight:700!important}
+.coach-status-at_risk{color:#ef4444!important;font-weight:700!important;font-size:1.1em!important}
+
+/* WARNINGS - dark red */
+.coach-warning{background:#450a0a!important;color:#fca5a5!important;border:1px solid #7f1d1d!important}
+
+/* INSIGHTS - bright */
+.coach-insights{margin:10px 0!important}
+.coach-insights h4{color:#c4b5fd!important;font-size:.95em!important}
+.coach-insight{color:#d1d5db!important;font-size:.9em!important;border-left:2px solid #8b5cf6!important;padding-left:10px!important;margin:6px 0!important}
+
+/* TIPS - bright */
+.coach-tips h4{color:#86efac!important;font-size:.95em!important}
+.coach-tip{color:#d1d5db!important;font-size:.9em!important;border-left:2px solid #22c55e!important;padding-left:10px!important;margin:6px 0!important}
+
+/* BRIEFING CARDS */
+.briefing-card{background:#1f2937!important;color:#e5e7eb!important}
+.briefing-bar-label{color:#d1d5db!important}
+.briefing-plan-key,.briefing-form-key{color:#9ca3af!important}
+.weather-badge{background:#1e3a5f!important;color:#7dd3fc!important}
+.stat-grid div,.stat-box,[class*="stat-box"],.stat-label,.stat-value{color:#f3f4f6!important}
+.report-header,.report-nav,[class*="report-head"]{padding-top:env(safe-area-inset-top,44px)!important}
+.compare-header,[class*="compare-head"]{padding-top:env(safe-area-inset-top,44px)!important}
+.trends-chart{background:#1f2937!important}
+.trends-chart h4{color:#d1d5db!important}
