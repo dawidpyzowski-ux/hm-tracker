@@ -117,8 +117,7 @@ const Strava={
 
       const byDate={};
       for(const a of runs){
-        const d=new Date(a.start_date_local);
-        const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+        const key=(a.start_date_local||a.start_date||'').slice(0,10);
         if(!byDate[key])byDate[key]=[];
         byDate[key].push(a);
       }
