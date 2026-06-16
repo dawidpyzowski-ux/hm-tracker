@@ -186,13 +186,15 @@ const SmartNotifications = (() => {
       }
 
      
-      if (n) { n.onclick = () => {
-        window.focus();
-        n.close();
 
-      };
-      // Auto-close po 8s
-      setTimeout(() => n.close(), 8000);
+   if (n) {
+        n.onclick = () => {
+          window.focus();
+          n.close();
+        };
+        setTimeout(() => n.close(), 8000);
+      }
+
     } catch (e) {
       console.warn(TAG, "Błąd browser notification", e);
     }
