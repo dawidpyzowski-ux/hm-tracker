@@ -15,4 +15,3 @@ return{score:score,level:lev,recommendation:rec,factors:factors,warnings:warning
 function getReadiness(){if(typeof HealthImport==="undefined")return null;var t=HealthImport.getToday();if(!t)return null;return calcReadiness(t,HealthImport.getBaselines(14));}
 return{calcReadiness:calcReadiness,getReadiness:getReadiness};
 })();
-`
