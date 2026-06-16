@@ -307,7 +307,7 @@ function rSett(){
   const stats=Shoes.getStats();
   if(stats.length){stats.forEach(s=>{const cls=s.pct>=80?'danger':s.pct>=60?'warn':'ok';h+=`<div class="shoe-card"><div class="shoe-head"><span class="shoe-name">👟 ${s.shoe.name}</span><span class="shoe-type">${s.shoe.type}</span></div><div class="shoe-km">${s.km} / ${s.shoe.maxKm} km (${s.pct}%)</div><div class="shoe-bar"><div class="shoe-fill ${cls}" style="width:${Math.min(100,s.pct)}%"></div></div>${s.pct>=80?'<div class="shoe-alert">⚠️ Czas na nowe buty!</div>':''}<div class="shoe-actions"><button onclick="Shoes.retire(${s.shoe.id});toast('Wycofano');rSett()">Wycofaj</button><button onclick="if(confirm('Usunac?')){Shoes.del(${s.shoe.id});rSett()}">Usun</button></div></div>`})}else{h+=`<div class="empty">Brak butow. Dodaj swoja pierwsza pare!</div>`}
   h+=`</div></div>`;
-  if(typeof Notify!=='undefined')h+=Notify.renderToggle();
+  h+='<div style="margin:12px 0"><button onclick="SmartNotifications_requestPerm()" style="width:100%;padding:12px;border-radius:8px;background:#3b82f6;color:#fff;border:none;font-size:1em;cursor:pointer">Wlacz powiadomienia</button></div>';
   h+=`<div class="ss"><div class="stit">Strava</div><div class="card"><p style="font-size:13px;color:var(--fg2);margin-bottom:12px">${Strava.isConnected()?'✅ Polaczono ze Strava':'Polacz konto Strava aby importowac treningi.'}</p>${Strava.isConnected()?'<button class="btns" onclick="syncStr()">🔄 Synchronizuj</button><button class="btnd" onclick="Strava.disconnect();rSett();toast(\'Rozlaczono\')">Rozlacz</button>':'<button class="btn-str" onclick="Strava.authorize()">Polacz ze Strava</button>'}</div></div>`;
   h+=`<div class="ss"><div class="stit">Dane</div><button class="btns" onclick="exportData()">📤 Eksportuj (JSON)</button><button class="btnd" onclick="if(confirm('Na pewno?')){S.clearAll();toast('Usunieto');rSett()}">🗑️ Usun dane</button></div>`;
   // Sprint 11: wersja zaktualizowana
@@ -437,4 +437,5 @@ if('serviceWorker' in navigator){
     // Check for updates every 5 min
     setInterval(function(){reg.update();},300000);
   });
+  function SmartNotifications_requestPerm(){if(typeof Notification!=='undefined'){Notification.requestPermission().then(function(r){alert('Powiadomienia: '+r)});}else{alert('Brak wsparcia Notification API');}}
 }
