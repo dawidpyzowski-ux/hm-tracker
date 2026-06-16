@@ -169,15 +169,27 @@ const SmartNotifications = (() => {
       return;
     }
     try {
-      const n = new Notification(title, {
+    
+      var opts = {
         body: body || "",
         icon: icon || "🏃",
         badge: "🏃",
         tag: "hmtracker-" + Date.now(),
-      });
-      n.onclick = () => {
+      };
+      var n = null;
+      if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+        navigator.serviceWorker.ready.then(function(reg) {
+          reg.showNotification(title, opts);
+        });
+      } else {
+        n = new Notification(title, opts);
+      }
+
+     
+      if (n) { n.onclick = () => {
         window.focus();
         n.close();
+
       };
       // Auto-close po 8s
       setTimeout(() => n.close(), 8000);
