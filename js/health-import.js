@@ -1,5 +1,4 @@
-
-/* health-import.js v3b — HM Tracker Sprint 13+
+/* health-import.js v4 — HM Tracker Sprint 13+
    Matched to iOS Shortcut "HM Health" URL params:
    ?health=1&date=YYYY-MM-DD&sleep=MIN&deep=MIN&rem=MIN&core=MIN&rhr=BPM&hrv=raw,list
 */
@@ -21,7 +20,12 @@ const HealthImport = (() => {
     return Math.round(arr.reduce((a, b) => a + b, 0) / arr.length);
   }
 
-  /* ── init: read URL params & save ── */
+  function localDateStr() {
+    const d = new Date();
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+      .toISOString().slice(0, 10);
+  }
+
   function init() {
     const p = new URLSearchParams(window.location.search);
     if (p.get('health') !== '1') return null;
@@ -37,16 +41,13 @@ const HealthImport = (() => {
 
     const hrvRaw = parseList(p.get('hrv'));
     const hrv    = avg(hrvRaw);
-
     const rhr = Math.round(parseNum(p.get('rhr')));
-
     const energy   = parseInt(p.get('energy'))   || 0;
     const soreness = parseInt(p.get('soreness')) || 0;
 
     const entry = {
       date, sleepMin, deepMin, remMin, coreMin,
-      rhr, hrv, hrvRaw,
-      energy, soreness,
+      rhr, hrv, hrvRaw, energy, soreness,
       ts: Date.now()
     };
 
@@ -55,7 +56,6 @@ const HealthImport = (() => {
     return entry;
   }
 
-  /* ── storage ── */
   function save(entry) {
     const all = getAll();
     const idx = all.findIndex(e => e.date === entry.date);
@@ -74,7 +74,7 @@ const HealthImport = (() => {
   }
 
   function getToday() {
-    return getByDate(new Date().toISOString().slice(0, 10));
+    return getByDate(localDateStr());
   }
 
   function getLatest() {
@@ -82,34 +82,37 @@ const HealthImport = (() => {
     return all.length ? all[all.length - 1] : null;
   }
 
-  /* ── baselines: averages from all historical data ── */
+  function getHistory(days) {
+    const all = getAll();
+    if (!days) return all;
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - days * 86400000)
+      .toISOString().slice(0, 10);
+    return all.filter(e => e.date >= cutoff);
+  }
+
   function getBaselines() {
     const all = getAll();
     if (!all.length) {
-      // defaults when no history yet
       return { sleepMin: 420, deepMin: 60, remMin: 90, coreMin: 270, rhr: 55, hrv: 40 };
     }
-    const sum = (key) => {
+    const a = (key) => {
       const vals = all.map(e => e[key] || 0).filter(v => v > 0);
-      return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+      return vals.length ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : 0;
     };
     return {
-      sleepMin: sum('sleepMin'),
-      deepMin:  sum('deepMin'),
-      remMin:   sum('remMin'),
-      coreMin:  sum('coreMin'),
-      rhr:      sum('rhr'),
-      hrv:      sum('hrv')
+      sleepMin: a('sleepMin'), deepMin: a('deepMin'),
+      remMin: a('remMin'), coreMin: a('coreMin'),
+      rhr: a('rhr'), hrv: a('hrv')
     };
   }
 
-  /* ── manual form (fallback when no Shortcut data) ── */
   function renderForm(containerId) {
     const el = document.getElementById(containerId);
     if (!el) return;
     el.innerHTML = `
       <div class="health-checkin" style="padding:12px;border-radius:12px;background:var(--card-bg,#1e1e1e);margin-bottom:12px;">
-        <h3 style="margin:0 0 8px">🩺 Health Check-in</h3>
+        <h3 style="margin:0 0 8px">\u{1FA7A} Health Check-in</h3>
         <p style="font-size:0.85em;opacity:0.7;margin:0 0 10px">No data from Apple Health today. Enter manually:</p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
           <label style="font-size:0.85em">Sleep (min)<input type="number" id="hf-sleep" style="width:100%;padding:6px;border-radius:8px;border:1px solid #444;background:#111;color:#fff"></label>
@@ -128,16 +131,11 @@ const HealthImport = (() => {
   function saveForm() {
     const g = id => parseInt(document.getElementById(id)?.value) || 0;
     const entry = {
-      date: new Date().toISOString().slice(0, 10),
-      sleepMin: g('hf-sleep'),
-      deepMin: g('hf-deep'),
-      remMin: g('hf-rem'),
-      coreMin: g('hf-core'),
-      rhr: g('hf-rhr'),
-      hrv: g('hf-hrv'),
-      hrvRaw: [],
-      energy: g('hf-energy'),
-      soreness: g('hf-sore'),
+      date: localDateStr(),
+      sleepMin: g('hf-sleep'), deepMin: g('hf-deep'),
+      remMin: g('hf-rem'), coreMin: g('hf-core'),
+      rhr: g('hf-rhr'), hrv: g('hf-hrv'), hrvRaw: [],
+      energy: g('hf-energy'), soreness: g('hf-sore'),
       ts: Date.now()
     };
     save(entry);
@@ -145,8 +143,7 @@ const HealthImport = (() => {
     location.reload();
   }
 
-  /* ── public API ── */
-  return { init, getAll, getByDate, getToday, getLatest, getBaselines, renderForm, saveForm };
+  return { init, getAll, getByDate, getToday, getLatest, getHistory, getBaselines, renderForm, saveForm };
 })();
 
 HealthImport.init();
