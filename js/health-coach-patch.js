@@ -1,3 +1,4 @@
+
 /* health-coach-patch.js v2 */
 (function(){"use strict";var TAG="[HealthPatch]";
 if(typeof Briefing!=="undefined"&&Briefing.render){
@@ -21,8 +22,13 @@ readiness.factors.forEach(function(f){var fc=f.pts>0?"#22c55e":f.pts<0?"#ef4444"
 h+="</div>";
 if(readiness.warnings.length>0)readiness.warnings.forEach(function(w){h+="<p style='background:#450a0a;color:#fca5a5;padding:5px 8px;border-radius:6px;margin:3px 0;font-size:0.8em;'>"+w+"</p>";});
 if(ss&&ss.missing&&ss.missing.length>0){h+="<div style='background:#1e1b4b;border-radius:6px;padding:6px 8px;margin:6px 0;'><p style='color:#a5b4fc;font-size:0.75em;margin:0;'>Brakujace dane:</p>";ss.missing.forEach(function(m){h+="<p style='color:#818cf8;font-size:0.75em;margin:1px 0;'>- "+m+"</p>";});h+="</div>";}
-h+="<div style='margin-top:10px;text-align:center;'><div id='health-hist-box'></div><button onclick='var hc=document.getElementById("health-hist-box");if(hc.innerHTML){hc.innerHTML="";}else{HealthHistory.render("health-hist-box");}' style='padding:8px 16px;border-radius:6px;background:#1f2937;border:1px solid #4b5563;color:#60a5fa;font-size:0.85em;cursor:pointer;'>Pokaz historie</button></div>";
+h+="<div style='margin-top:10px;text-align:center;'><div id='health-hist-box'></div></div>";
 card.innerHTML=h;
+var btn=document.createElement("button");
+btn.textContent="Pokaz historie";
+btn.style.cssText="padding:8px 16px;border-radius:6px;background:#1f2937;border:1px solid #4b5563;color:#60a5fa;font-size:0.85em;cursor:pointer;margin-top:6px;";
+btn.addEventListener("click",function(){var hc=document.getElementById("health-hist-box");if(hc.innerHTML){hc.innerHTML="";}else{HealthHistory.render("health-hist-box");}});
+card.appendChild(btn);
 var cc=c.querySelector(".briefing-coach");if(cc&&cc.nextSibling)c.insertBefore(card,cc.nextSibling);else c.appendChild(card);
 }else{
 var pr=document.createElement("div");pr.className="briefing-card briefing-health";
