@@ -2,7 +2,6 @@
 /* health-trends.js - Sprint 13.2: Trend Analysis + Smart Alerts */
 var HealthTrends=(function(){"use strict";
 var TAG="[Trends]";
-
 function linreg(arr){
   var n=arr.length;if(n<3)return{slope:0,trend:"flat",r2:0};
   var sx=0,sy=0,sxy=0,sx2=0;
@@ -15,12 +14,10 @@ function linreg(arr){
   var trend=Math.abs(slope)<0.3?"flat":slope>0?"up":"down";
   return{slope:Math.round(slope*100)/100,trend:trend,r2:Math.round(r2*100)/100,mean:Math.round(mean*10)/10};
 }
-
 function analyze(days){
   if(typeof HealthImport==="undefined")return null;
   var hist=HealthImport.getHistory(days||14);
   if(hist.length<3)return{alerts:[{type:"info",msg:"Za malo danych (min. 3 dni) do analizy trendow"}],trends:{}};
-
   hist.reverse();
   var rhrs=[],hrvs=[],sleeps=[],deeps=[],rems=[];
   hist.forEach(function(h){
@@ -30,35 +27,30 @@ function analyze(days){
     if(h.deepMin&&h.deepMin>0)deeps.push(h.deepMin);
     if(h.remMin&&h.remMin>0)rems.push(h.remMin);
   });
-
   var rhrT=linreg(rhrs);
   var hrvT=linreg(hrvs);
   var sleepT=linreg(sleeps);
   var deepT=linreg(deeps);
   var remT=linreg(rems);
-
   var alerts=[];
-  var baselines=HealthImport.getBaselines(14);
-
+  var baselines=HealthImport.getBaselines();
   if(rhrT.trend==="up"&&rhrT.slope>0.5){
     alerts.push({type:"warning",metric:"RHR",msg:"RHR rosnie (+"+(rhrT.slope*7).toFixed(1)+" bpm/tydzien) -- mozliwe zmeczenie",severity:rhrT.slope>1?"high":"medium"});
   }
-  if(baselines&&baselines.rhrAvg&&rhrs.length>0){
+  if(baselines&&baselines.rhr&&rhrs.length>0){
     var lastRhr=rhrs[rhrs.length-1];
-    var diff=lastRhr-baselines.rhrAvg;
+    var diff=lastRhr-baselines.rhr;
     if(diff>7){alerts.push({type:"danger",metric:"RHR",msg:"RHR +"+diff.toFixed(0)+" bpm vs norma! Odpoczynek lub choroba?",severity:"high"});}
     else if(diff>4){alerts.push({type:"warning",metric:"RHR",msg:"RHR podwyzszone +"+diff.toFixed(0)+" bpm vs norma",severity:"medium"});}
   }
-
   if(hrvT.trend==="down"&&hrvT.slope<-0.5){
     alerts.push({type:"warning",metric:"HRV",msg:"HRV spada ("+(hrvT.slope*7).toFixed(1)+" ms/tydzien) -- organizm nie regeneruje",severity:hrvT.slope<-1?"high":"medium"});
   }
-  if(baselines&&baselines.hrvAvg&&hrvs.length>0){
+  if(baselines&&baselines.hrv&&hrvs.length>0){
     var lastHrv=hrvs[hrvs.length-1];
-    var hdiff=lastHrv-baselines.hrvAvg;
-    if(hdiff<-10){alerts.push({type:"danger",metric:"HRV",msg:"HRV bardzo niskie! "+lastHrv+"ms vs norma "+baselines.hrvAvg.toFixed(0)+"ms",severity:"high"});}
+    var hdiff=lastHrv-baselines.hrv;
+    if(hdiff<-10){alerts.push({type:"danger",metric:"HRV",msg:"HRV bardzo niskie! "+lastHrv+"ms vs norma "+baselines.hrv.toFixed(0)+"ms",severity:"high"});}
   }
-
   var shortSleep=0;
   for(var si=Math.max(0,sleeps.length-3);si<sleeps.length;si++){
     if(sleeps[si]<360)shortSleep++;
@@ -67,24 +59,20 @@ function analyze(days){
   if(sleepT.trend==="down"&&sleepT.slope<-5){
     alerts.push({type:"warning",metric:"Sen",msg:"Czas snu maleje ("+(sleepT.slope*7).toFixed(0)+" min/tydzien)",severity:"medium"});
   }
-
   var lowDeep=0;
   for(var di=Math.max(0,deeps.length-3);di<deeps.length;di++){
     if(deeps[di]<30)lowDeep++;
   }
   if(lowDeep>=2){alerts.push({type:"warning",metric:"Deep",msg:"Deep sleep < 30min "+lowDeep+"x w ostatnich 3 dniach -- slaba regeneracja",severity:"high"});}
-
   if(rhrT.trend==="up"&&hrvT.trend==="down"){
     alerts.push({type:"danger",metric:"Ogolne",msg:"Zmeczenie rosnie! RHR w gore + HRV w dol. Priorytet: regeneracja!",severity:"high"});
   }
-
   if(rhrT.trend==="down"&&rhrT.slope<-0.3){
     alerts.push({type:"positive",metric:"RHR",msg:"RHR spada -- dobra regeneracja!",severity:"low"});
   }
   if(hrvT.trend==="up"&&hrvT.slope>0.3){
     alerts.push({type:"positive",metric:"HRV",msg:"HRV rosnie -- organizm sie regeneruje!",severity:"low"});
   }
-
   var trends={
     rhr:{data:rhrT,arrow:rhrT.trend==="up"?"\u2191":rhrT.trend==="down"?"\u2193":"\u2192",good:rhrT.trend==="down"||rhrT.trend==="flat"},
     hrv:{data:hrvT,arrow:hrvT.trend==="up"?"\u2191":hrvT.trend==="down"?"\u2193":"\u2192",good:hrvT.trend==="up"||hrvT.trend==="flat"},
@@ -92,12 +80,10 @@ function analyze(days){
     deep:{data:deepT,arrow:deepT.trend==="up"?"\u2191":deepT.trend==="down"?"\u2193":"\u2192",good:deepT.trend==="up"||deepT.trend==="flat"},
     rem:{data:remT,arrow:remT.trend==="up"?"\u2191":remT.trend==="down"?"\u2193":"\u2192",good:remT.trend==="up"||remT.trend==="flat"}
   };
-
   fireNotifications(alerts);
   console.log(TAG,"Analyzed",hist.length,"days. Alerts:",alerts.length);
   return{alerts:alerts,trends:trends,days:hist.length};
 }
-
 function fireNotifications(alerts){
   if(typeof Notification==="undefined"||Notification.permission!=="granted")return;
   var high=alerts.filter(function(a){return a.severity==="high"&&(a.type==="danger"||a.type==="warning");});
@@ -111,6 +97,5 @@ function fireNotifications(alerts){
     }
   }catch(e){console.log(TAG,"Notification error:",e);}
 }
-
 return{analyze:analyze,linreg:linreg};
 })();
