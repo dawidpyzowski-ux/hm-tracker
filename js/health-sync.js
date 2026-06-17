@@ -12,14 +12,17 @@ var HealthSync = (function() {
     try {
       var data = HealthImport.getAll();
 
-      await fetch(BASE_URL, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Master-Key": API_KEY
-        },
-        body: JSON.stringify(data)
-      });
+   
+await fetch(BASE_URL, {
+  method: "PUT",
+  headers: {
+    "Content-Type": "application/json",
+    "X-Master-Key": API_KEY,
+    "X-Bin-Versioning": "false"   // 🔥 CRITICAL FIX
+  },
+  body: JSON.stringify(data)
+});
+
 
       console.log("[Sync] ✅ PUSH OK", data.length);
     } catch (e) {
@@ -29,11 +32,13 @@ var HealthSync = (function() {
 
   async function pull() {
     try {
-      var res = await fetch(BASE_URL, {
-        headers: {
-          "X-Master-Key": API_KEY
-        }
-      });
+      
+var res = await fetch(BASE_URL + "/latest", {
+  headers: {
+    "X-Master-Key": API_KEY
+  }
+});
+
 
       var json = await res.json();
       var data = json.record || [];
