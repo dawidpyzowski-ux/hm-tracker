@@ -1,5 +1,5 @@
 
-var CACHE_VER = 'hm-v31';
+var CACHE_VER = 'hm-v32';
 var ASSETS = [
   './',
   './index.html',
