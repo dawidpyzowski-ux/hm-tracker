@@ -1,5 +1,5 @@
 
-/* health-import.js v3 — HM Tracker Sprint 13+
+/* health-import.js v3b — HM Tracker Sprint 13+
    Matched to iOS Shortcut "HM Health" URL params:
    ?health=1&date=YYYY-MM-DD&sleep=MIN&deep=MIN&rem=MIN&core=MIN&rhr=BPM&hrv=raw,list
 */
@@ -82,6 +82,27 @@ const HealthImport = (() => {
     return all.length ? all[all.length - 1] : null;
   }
 
+  /* ── baselines: averages from all historical data ── */
+  function getBaselines() {
+    const all = getAll();
+    if (!all.length) {
+      // defaults when no history yet
+      return { sleepMin: 420, deepMin: 60, remMin: 90, coreMin: 270, rhr: 55, hrv: 40 };
+    }
+    const sum = (key) => {
+      const vals = all.map(e => e[key] || 0).filter(v => v > 0);
+      return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+    };
+    return {
+      sleepMin: sum('sleepMin'),
+      deepMin:  sum('deepMin'),
+      remMin:   sum('remMin'),
+      coreMin:  sum('coreMin'),
+      rhr:      sum('rhr'),
+      hrv:      sum('hrv')
+    };
+  }
+
   /* ── manual form (fallback when no Shortcut data) ── */
   function renderForm(containerId) {
     const el = document.getElementById(containerId);
@@ -125,7 +146,7 @@ const HealthImport = (() => {
   }
 
   /* ── public API ── */
-  return { init, getAll, getByDate, getToday, getLatest, renderForm, saveForm };
+  return { init, getAll, getByDate, getToday, getLatest, getBaselines, renderForm, saveForm };
 })();
 
 HealthImport.init();
