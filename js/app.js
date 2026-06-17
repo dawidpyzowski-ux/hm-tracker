@@ -439,3 +439,8 @@ if('serviceWorker' in navigator){
   });
   function SmartNotifications_requestPerm(){if(typeof Notification!=='undefined'){Notification.requestPermission().then(function(r){alert('Powiadomienia: '+r)});}else{alert('Brak wsparcia Notification API');}}
 }
+
+if (typeof HealthSync !== "undefined") {
+  HealthSync.auto();
+}
+
