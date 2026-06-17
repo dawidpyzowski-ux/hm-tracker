@@ -1,7 +1,5 @@
-/* health-import.js v4 — HM Tracker Sprint 13+
-   Matched to iOS Shortcut "HM Health" URL params:
-   ?health=1&date=YYYY-MM-DD&sleep=MIN&deep=MIN&rem=MIN&core=MIN&rhr=BPM&hrv=raw,list
-*/
+
+/* health-import.js v5 — HM Tracker Sprint 14: auto-sync */
 const HealthImport = (() => {
   const STORE_KEY = 'health_data';
 
@@ -53,6 +51,14 @@ const HealthImport = (() => {
 
     save(entry);
     console.log('[Health] Saved', date, entry);
+
+    // 🔥 AUTO-PUSH do chmury
+    if (typeof HealthSync !== 'undefined') {
+      HealthSync.push().then(ok => {
+        console.log('[Health] Auto-push:', ok ? '✅' : '❌');
+      });
+    }
+
     return entry;
   }
 
@@ -140,6 +146,12 @@ const HealthImport = (() => {
     };
     save(entry);
     console.log('[Health] Manual save', entry);
+
+    // 🔥 AUTO-PUSH po manual save
+    if (typeof HealthSync !== 'undefined') {
+      HealthSync.push();
+    }
+
     location.reload();
   }
 
