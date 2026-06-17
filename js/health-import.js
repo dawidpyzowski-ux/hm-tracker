@@ -1,3 +1,4 @@
+
 /* health-import.js v3 — HM Tracker Sprint 13+
    Matched to iOS Shortcut "HM Health" URL params:
    ?health=1&date=YYYY-MM-DD&sleep=MIN&deep=MIN&rem=MIN&core=MIN&rhr=BPM&hrv=raw,list
@@ -20,6 +21,7 @@ const HealthImport = (() => {
     return Math.round(arr.reduce((a, b) => a + b, 0) / arr.length);
   }
 
+  /* ── init: read URL params & save ── */
   function init() {
     const p = new URLSearchParams(window.location.search);
     if (p.get('health') !== '1') return null;
@@ -53,6 +55,7 @@ const HealthImport = (() => {
     return entry;
   }
 
+  /* ── storage ── */
   function save(entry) {
     const all = getAll();
     const idx = all.findIndex(e => e.date === entry.date);
@@ -79,7 +82,50 @@ const HealthImport = (() => {
     return all.length ? all[all.length - 1] : null;
   }
 
-  return { init, getAll, getByDate, getToday, getLatest };
+  /* ── manual form (fallback when no Shortcut data) ── */
+  function renderForm(containerId) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = `
+      <div class="health-checkin" style="padding:12px;border-radius:12px;background:var(--card-bg,#1e1e1e);margin-bottom:12px;">
+        <h3 style="margin:0 0 8px">🩺 Health Check-in</h3>
+        <p style="font-size:0.85em;opacity:0.7;margin:0 0 10px">No data from Apple Health today. Enter manually:</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <label style="font-size:0.85em">Sleep (min)<input type="number" id="hf-sleep" style="width:100%;padding:6px;border-radius:8px;border:1px solid #444;background:#111;color:#fff"></label>
+          <label style="font-size:0.85em">Deep (min)<input type="number" id="hf-deep" style="width:100%;padding:6px;border-radius:8px;border:1px solid #444;background:#111;color:#fff"></label>
+          <label style="font-size:0.85em">REM (min)<input type="number" id="hf-rem" style="width:100%;padding:6px;border-radius:8px;border:1px solid #444;background:#111;color:#fff"></label>
+          <label style="font-size:0.85em">Core (min)<input type="number" id="hf-core" style="width:100%;padding:6px;border-radius:8px;border:1px solid #444;background:#111;color:#fff"></label>
+          <label style="font-size:0.85em">RHR (bpm)<input type="number" id="hf-rhr" style="width:100%;padding:6px;border-radius:8px;border:1px solid #444;background:#111;color:#fff"></label>
+          <label style="font-size:0.85em">HRV (ms)<input type="number" id="hf-hrv" style="width:100%;padding:6px;border-radius:8px;border:1px solid #444;background:#111;color:#fff"></label>
+          <label style="font-size:0.85em">Energy (1-5)<input type="number" id="hf-energy" min="1" max="5" style="width:100%;padding:6px;border-radius:8px;border:1px solid #444;background:#111;color:#fff"></label>
+          <label style="font-size:0.85em">Soreness (1-5)<input type="number" id="hf-sore" min="1" max="5" style="width:100%;padding:6px;border-radius:8px;border:1px solid #444;background:#111;color:#fff"></label>
+        </div>
+        <button onclick="HealthImport.saveForm()" style="margin-top:10px;width:100%;padding:10px;border:none;border-radius:8px;background:#4CAF50;color:#fff;font-weight:bold;cursor:pointer">Save Check-in</button>
+      </div>`;
+  }
+
+  function saveForm() {
+    const g = id => parseInt(document.getElementById(id)?.value) || 0;
+    const entry = {
+      date: new Date().toISOString().slice(0, 10),
+      sleepMin: g('hf-sleep'),
+      deepMin: g('hf-deep'),
+      remMin: g('hf-rem'),
+      coreMin: g('hf-core'),
+      rhr: g('hf-rhr'),
+      hrv: g('hf-hrv'),
+      hrvRaw: [],
+      energy: g('hf-energy'),
+      soreness: g('hf-sore'),
+      ts: Date.now()
+    };
+    save(entry);
+    console.log('[Health] Manual save', entry);
+    location.reload();
+  }
+
+  /* ── public API ── */
+  return { init, getAll, getByDate, getToday, getLatest, renderForm, saveForm };
 })();
 
 HealthImport.init();
