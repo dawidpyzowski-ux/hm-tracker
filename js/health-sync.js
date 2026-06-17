@@ -4,7 +4,7 @@ var HealthSync = (function() {
   "use strict";
 
   var BIN_ID = "6a32eeddf5f4af5e2903de81";
-  var API_KEY = "TUTAJ_WKLEJ_API_KEY"; // <-- TYLKO TO PODMIEN!
+  var API_KEY = "$2a$10$6NbODl6x2IbzQwZ4TV9OieTf5BG9zhHT54SibqBhcT/cUTUWsLxBS"; // <-- TYLKO TO PODMIEN!
 
   var BASE_URL = "https://api.jsonbin.io/v3/b/" + BIN_ID;
 
