@@ -3,21 +3,40 @@ var HealthCross = (function() {
   "use strict";
   var TAG = "[HealthCross]";
 
-  function getTrainingData() {
+  
+function getTrainingData() {
     if (typeof S === "undefined" || !S.getAllLogs) return [];
-    var logs = S.getAllLogs();
-    if (!logs || !logs.length) return [];
-    return logs.map(function(l) {
+    var rawLogs = S.getAllLogs();
+    if (!rawLogs) return [];
+
+    // S.getAllLogs() zwraca obiekt { "YYYY-MM-DD": {distance, pace, ...} }
+    // Konwertujemy na tablice
+    var logsArray = [];
+    if (Array.isArray(rawLogs)) {
+      logsArray = rawLogs;
+    } else if (typeof rawLogs === "object") {
+      var dates = Object.keys(rawLogs);
+      for (var i = 0; i < dates.length; i++) {
+        var entry = rawLogs[dates[i]];
+        if (entry) {
+          entry.date = entry.date || dates[i];
+          logsArray.push(entry);
+        }
+      }
+    }
+
+    return logsArray.map(function(l) {
       return {
         date: l.date || "",
-        km: parseFloat(l.km) || 0,
+        km: parseFloat(l.km || l.distance || 0),
         pace: l.pace || "",
-        type: l.type || "",
+        type: l.type || l.workout_type || "",
         duration: l.duration || "",
-        hr: l.hr || 0
+        hr: l.hr || l.avg_hr || 0
       };
     }).filter(function(l) { return l.date && l.km > 0; });
   }
+
 
   function paceToSec(pace) {
     if (!pace) return 0;
