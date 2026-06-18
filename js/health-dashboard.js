@@ -72,17 +72,38 @@
 
       contentEl.innerHTML = "<p style='color:#9ca3af;text-align:center;padding:20px;'>\u23F3 Loading...</p>";
 
+    
       setTimeout(function() {
         if (tabId === "hd-tab-charts" && typeof HealthCharts !== "undefined") {
           HealthCharts.render("hd-content");
-        } else if (tabId === "hd-tab-insights" && typeof HealthCross !== "undefined") {
-          HealthCross.render("hd-content");
+        } else if (tabId === "hd-tab-insights") {
+          // 1. Cross-analysis
+          if (typeof HealthCross !== "undefined") {
+            HealthCross.render("hd-content");
+          } else {
+            contentEl.innerHTML = "";
+          }
+          // 2. AI Coach (dodatkowy box pod cross)
+          if (typeof HealthCoachAI !== "undefined") {
+            var aiBox = document.createElement("div");
+            aiBox.id = "hd-ai";
+            contentEl.appendChild(aiBox);
+            HealthCoachAI.render("hd-ai");
+          }
+          // 3. Weekly Report (pod AI)
+          if (typeof HealthWeekly !== "undefined") {
+            var weeklyBox = document.createElement("div");
+            weeklyBox.id = "hd-weekly";
+            contentEl.appendChild(weeklyBox);
+            HealthWeekly.render("hd-weekly");
+          }
         } else if (tabId === "hd-tab-history" && typeof HealthHistory !== "undefined") {
           HealthHistory.render("hd-content");
         } else {
           contentEl.innerHTML = "<p style='color:#9ca3af;text-align:center;padding:20px;'>Modul nie zaladowany</p>";
         }
       }, 50);
+
     }
 
     tabs.forEach(function(t) {
