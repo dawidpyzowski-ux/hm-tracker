@@ -1,5 +1,11 @@
 
-/* db-shim.js v4 — S.getAllLogs() + PLAN_FLAT + DB.getDetail SYNC */
+/* db-shim.js v5 — S.getAllLogs() + PLAN_FLAT + DB.getDetail SYNC
+   FIXES:
+   - preserves log.type as fallback (no more null type)
+   - exact date match only for plan attachment
+   - adds plan_date + plan_id for downstream matching engines
+   - removes __PLAN_USED_DATES (handled outside this layer)
+*/
 (function(){
   "use strict";
   var TAG = "[DB-Shim]";
@@ -37,41 +43,38 @@
       var logs = S.getAllLogs();
       var activities = [];
       var dates = Object.keys(logs);
+
       for(var i = 0; i < dates.length; i++){
         var date = dates[i];
         var log = logs[date];
+
         if(!log.distance || parseFloat(log.distance) <= 0) continue;
+
         var km = parseFloat(log.distance);
         var durationMin = estimateDuration(log.pace, km);
-        
-var planType = null;
 
-try {
-  if(window.PLAN_FLAT){
-    // 🔥 globalny tracker użytych dni planu
-    window.__PLAN_USED_DATES = window.__PLAN_USED_DATES || {};
+        // === TYPE RESOLUTION (FIXED) ===
+        // 1) start with type from the log itself (preserve Strava/manual data)
+        // 2) override with plan type ONLY if exact date match exists
+        var planType = log.type || log.workout_type || log.planType || null;
+        var planDate = null;
+        var planId = null;
 
-    for(var pi = 0; pi < window.PLAN_FLAT.length; pi++){
-      var p = window.PLAN_FLAT[pi];
+        try {
+          if(window.PLAN_FLAT){
+            for(var pi = 0; pi < window.PLAN_FLAT.length; pi++){
+              var p = window.PLAN_FLAT[pi];
 
-      // ✅ musi być dokładnie ten dzień
-      if(p.date === date){
-
-        // ✅ jeśli już przypisany → pomiń
-        if(window.__PLAN_USED_DATES[p.date]){
-          continue;
-        }
-
-        planType = p.type;
-
-        // ✅ oznacz jako użyty
-        window.__PLAN_USED_DATES[p.date] = true;
-
-        break;
-      }
-    }
-  }
-} catch(e){}
+              // Exact date match only — no distance-based fuzzy matching here
+              if(p.date === date){
+                planType = p.type || planType;
+                planDate = p.date;
+                planId = p.id || p.key || p.date;
+                break;
+              }
+            }
+          }
+        } catch(e){}
 
         var act = {
           date: date,
@@ -93,7 +96,9 @@ try {
           feeling: log.feeling || null,
           notes: log.notes || null,
           type: planType || null,
-          workout_type: null,
+          workout_type: planType || null,
+          plan_date: planDate,
+          plan_id: planId,
           total_elevation_gain: null,
           elevation_gain: null,
           calories: null,
@@ -103,6 +108,7 @@ try {
           gear_id: null,
           gear: null
         };
+
         if(log.strava_id){
           try {
             var detail = DB.getDetail(log.strava_id);
@@ -119,6 +125,7 @@ try {
               if(detail.max_hr) act.max_hr = detail.max_hr;
               if(detail.gear) act.gear = detail.gear;
               if(detail.gear_id) act.gear_id = detail.gear_id;
+
               if(!act.pace && detail.splits && detail.splits.length > 0){
                 var speeds = [];
                 for(var si = 0; si < detail.splits.length; si++){
@@ -131,6 +138,7 @@ try {
                   act.avg_pace = act.pace;
                 }
               }
+
               if(!act.duration_min && detail.splits && detail.splits.length > 0){
                 var totalSec = 0;
                 for(var k = 0; k < detail.splits.length; k++){
@@ -145,12 +153,14 @@ try {
             }
           } catch(e){}
         }
+
         activities.push(act);
       }
+
       activities.sort(function(a,b){ return b.date.localeCompare(a.date); });
       _cache = activities;
       _cacheTime = Date.now();
-      console.log(TAG, "v4", activities.length, "aktywnosci enriched");
+      console.log(TAG, "v5", activities.length, "aktywnosci enriched");
       return Promise.resolve(activities);
     } catch(e){
       console.error(TAG, "Blad:", e);
@@ -169,5 +179,5 @@ try {
     _cacheTime = 0;
   };
 
-  console.log(TAG, "v4 SYNC+PLAN_FLAT zainstalowany");
+  console.log(TAG, "v5 SYNC+PLAN_FLAT zainstalowany");
 })();
