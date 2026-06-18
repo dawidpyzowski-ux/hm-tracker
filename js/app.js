@@ -17,11 +17,28 @@ function findShiftedLog(wStart,wEnd,targetDate,targetKm){
     const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dy=String(d.getDate()).padStart(2,'0');
     const nearby=y+'-'+m+'-'+dy;
     if(nearby<wStart||nearby>wEnd)continue;
+    
     const nLog=S.getLog(nearby);
     if(nLog&&nLog.distance){
       const nKm=parseFloat(nLog.distance);
-      if(nKm>=targetKm*0.6&&nKm<=targetKm*1.4)return{date:nearby,log:nLog};
+      // Ciasna tolerancja 85-115% (zamiast 60-140%)
+      if(nKm<targetKm*0.85||nKm>targetKm*1.15)continue;
+      // Sprawdz czy ten dzien NIE mial wlasnego planu (zeby nie kradnac)
+      let ownPlanKm=0;
+      try{
+        if(window.PLAN_FLAT){
+          const ownP=window.PLAN_FLAT.find(p=>p.date===nearby);
+          if(ownP)ownPlanKm=ownP.km||0;
+        }
+      }catch(e){}
+      if(ownPlanKm>0){
+        const ownRatio=nKm/ownPlanKm;
+        // Jesli pasuje do wlasnego planu (+/-15%) — zostaw go w spokoju
+        if(ownRatio>=0.85&&ownRatio<=1.15)continue;
+      }
+      return{date:nearby,log:nLog};
     }
+
   }
   return null;
 }
