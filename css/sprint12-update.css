@@ -62,3 +62,24 @@ a{color:#60a5fa!important}
 .compare-header,[class*="compare-head"]{padding-top:env(safe-area-inset-top,44px)!important}
 .trends-chart{background:#1f2937!important}
 .trends-chart h4{color:#d1d5db!important}
+
+
+/* iPhone UX fixes — Sprint 15 */
+.briefing-card {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
+
+button, .hd-tab {
+  min-height: 44px;
+}
+
+body {
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-top: env(safe-area-inset-top);
+}
+
+#hd-content button,
+#hd-sync-btn {
+  min-height: 44px;
+  touch-action: manipulation;
+}
