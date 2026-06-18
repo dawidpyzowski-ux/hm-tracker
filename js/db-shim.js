@@ -43,17 +43,36 @@
         if(!log.distance || parseFloat(log.distance) <= 0) continue;
         var km = parseFloat(log.distance);
         var durationMin = estimateDuration(log.pace, km);
-        var planType = null;
-        try {
-          if(window.PLAN_FLAT){
-            for(var pi = 0; pi < window.PLAN_FLAT.length; pi++){
-              if(window.PLAN_FLAT[pi].date === date){
-                planType = window.PLAN_FLAT[pi].type;
-                break;
-              }
-            }
-          }
-        } catch(e){}
+        
+var planType = null;
+
+try {
+  if(window.PLAN_FLAT){
+    // 🔥 globalny tracker użytych dni planu
+    window.__PLAN_USED_DATES = window.__PLAN_USED_DATES || {};
+
+    for(var pi = 0; pi < window.PLAN_FLAT.length; pi++){
+      var p = window.PLAN_FLAT[pi];
+
+      // ✅ musi być dokładnie ten dzień
+      if(p.date === date){
+
+        // ✅ jeśli już przypisany → pomiń
+        if(window.__PLAN_USED_DATES[p.date]){
+          continue;
+        }
+
+        planType = p.type;
+
+        // ✅ oznacz jako użyty
+        window.__PLAN_USED_DATES[p.date] = true;
+
+        break;
+      }
+    }
+  }
+} catch(e){}
+
         var act = {
           date: date,
           start_date: date,
