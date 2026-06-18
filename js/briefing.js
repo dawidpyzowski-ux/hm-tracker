@@ -75,25 +75,70 @@ const Briefing = (() => {
     return {level,alerts,color,acwr,consecutive:consec,spike};
   }
 
-  function getTodayPlan() {
+
+function getTodayPlan(){
     try {
-      var plan=window.PLAN_FLAT||[], today=todayISO();
+      if(!window.PLAN_FLAT) return null;
+      var today=todayISO();
+      var plan=window.PLAN_FLAT;
       var entry=plan.find(function(p){return p.date===today;});
       if(!entry) return null;
+
+      // 1) Trening DZIS — najwyzszy priorytet
       var logToday=S.getLog(today);
-      if(logToday && logToday.distance){entry._status="done";entry._logDate=today;return entry;}
+      if(logToday && logToday.distance){
+        entry._status="done";
+        entry._logDate=today;
+        return entry;
+      }
+
+      // 2) Sprawdz "wczesniej zrobiony" — TYLKO jesli:
+      //    - dystans pasuje (ratio 0.85-1.15, ciasniej!)
+      //    - typ treningu pasuje (intervals/tempo/long/easy)
+      //    - w tym dniu NIE bylo wlasnego planu (zeby nie kradnac)
+      function normalizeType(t){
+        var s=(t||"").toLowerCase();
+        if(s.indexOf("interval")>=0||s.indexOf("interw")>=0) return "intervals";
+        if(s.indexOf("tempo")>=0||s.indexOf("fartlek")>=0) return "tempo";
+        if(s.indexOf("long")>=0) return "long";
+        if(s.indexOf("recovery")>=0) return "recovery";
+        return "easy";
+      }
+      var entryType=normalizeType(entry.type);
+
       for(var i=1;i<=2;i++){
         var d=new Date(today);d.setDate(d.getDate()-i);
         var prevDate=d.toISOString().slice(0,10);
         var log=S.getLog(prevDate);
-        if(log && log.distance){
-          var ratio=parseFloat(log.distance)/entry.km;
-          if(ratio>0.7 && ratio<1.4){entry._status="moved";entry._logDate=prevDate;return entry;}
+        if(!log || !log.distance) continue;
+
+        // CHECK A: czy ten dzien mial WLASNY plan? Jesli tak — zostaw go w spokoju
+        var ownPlan=plan.find(function(p){return p.date===prevDate;});
+        if(ownPlan){
+          var ownRatio=parseFloat(log.distance)/(ownPlan.km||1);
+          // Jesli trening pasuje do wlasnego planu (±15%) — to nie jest "przeniesiony", to jest "swoj"
+          if(ownRatio>0.85 && ownRatio<1.15) continue;
         }
+
+        // CHECK B: dystans w ciasnej tolerancji (±15%)
+        var ratio=parseFloat(log.distance)/entry.km;
+        if(ratio<0.85 || ratio>1.15) continue;
+
+        // CHECK C: typ treningu pasuje
+        var logType=normalizeType(log.type||log.workout_type);
+        if(logType!=="easy" && entryType!=="easy" && logType!==entryType) continue;
+
+        // Wszystko sie zgadza — to faktycznie "moved"
+        entry._status="moved";
+        entry._logDate=prevDate;
+        return entry;
       }
-      entry._status="pending";return entry;
+
+      entry._status="pending";
+      return entry;
     } catch(e){console.warn(TAG,"PLAN error",e);return null;}
   }
+
 
   function getRecentForm(activities, days) {
     if(!days) days=7;
