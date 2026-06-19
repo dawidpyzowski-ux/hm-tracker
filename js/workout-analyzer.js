@@ -533,7 +533,7 @@ return {
       "<button onclick='document.getElementById(\"wa-modal\").remove()' style='background:#ef4444;border:none;color:white;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:1em;'>\u00D7</button>" +
       "</div>" +
       "<div id='wa-content' style='color:#e5e7eb;line-height:1.6;'>" +
-      "<p style='color:#9ca3af;text-align:center;padding:30px;'>\u23F3 AI analizuje Twój trening (DeepSeek R1)...</p>" +
+      "<p style='color:#9ca3af;text-align:center;padding:30px;'>\u23F3 AI analizuje Twój trening ...</p>" +
       "</div>" +
       "</div>";
 
