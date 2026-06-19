@@ -310,16 +310,62 @@ var DailyCoachEngine = (function() {
     var longestRun = month30.length ? month30.reduce(function(max,t) { return t.km > max.km ? t : max; }, month30[0]) : null;
 
     // Best interval (work pace)
+
+    // Best interval — try WORK pace via TrainScore first, fallback to overall pace
     var bestInterval = null;
+    var bestWorkPaceSec = Infinity;
+
     trainings.slice(0, 30).forEach(function(t) {
       var type = (t.type || "").toLowerCase();
-      if ((type.indexOf("interv") >= 0 || type.indexOf("interw") >= 0) && t.pace) {
-        var paceSec = paceToSec(t.pace);
-        if (paceSec > 0 && (!bestInterval || paceSec < paceToSec(bestInterval.pace))) {
-          bestInterval = t;
+      var isInterval = type.indexOf("interv") >= 0 || type.indexOf("interw") >= 0;
+      if (!isInterval) return;
+
+      // Try TrainScore for real work pace
+      var workPace = null;
+      var source = "overall";
+      try {
+        if (typeof TrainScore !== "undefined") {
+          var ts = TrainScore.evaluate(t.date);
+          if (ts && ts.classified) {
+            var workLaps = ts.classified.filter(function(l) {
+              var r = String(l.role || "").toLowerCase();
+              return r === "work" || r.indexOf("work") >= 0;
+            });
+            if (workLaps.length > 0) {
+              var totalDist = 0, totalDur = 0;
+              workLaps.forEach(function(l) {
+                if (l.distKm > 0 && l.duration > 0) {
+                  totalDist += l.distKm;
+                  totalDur += l.duration;
+                }
+              });
+              if (totalDist > 0) {
+                workPace = Math.round(totalDur / totalDist);
+                source = "work";
+              }
+            }
+          }
         }
+      } catch (e) {}
+
+      // Fallback: use overall pace
+      if (!workPace && t.pace) {
+        workPace = paceToSec(t.pace);
+        source = "overall";
+      }
+
+      if (workPace && workPace > 0 && workPace < bestWorkPaceSec) {
+        bestWorkPaceSec = workPace;
+        bestInterval = {
+          date: t.date,
+          km: t.km,
+          pace: secToPace(workPace),
+          pace_source: source,
+          overall_pace: t.pace
+        };
       }
     });
+
 
     return {
       week_km: +weekKm.toFixed(1),
@@ -338,7 +384,8 @@ var DailyCoachEngine = (function() {
   // ============================================
   // 5. RACE CONTEXT
   // ============================================
-  function getRaceContext(today, raceDate, raceTarget, training) {
+
+function getRaceContext(today, raceDate, raceTarget, training) {
     var todayD = new Date(today);
     var raceD = new Date(raceDate);
     var daysToRace = Math.round((raceD - todayD) / 86400000);
@@ -346,25 +393,38 @@ var DailyCoachEngine = (function() {
     var phase;
     if (daysToRace <= 0) phase = "race_done";
     else if (daysToRace <= 14) phase = "taper";
-    else if (daysToRace <= 35) phase = "peak";
-    else if (daysToRace <= 70) phase = "build";
+    else if (daysToRace <= 42) phase = "peak";        // 6 tygodni
+    else if (daysToRace <= 84) phase = "build";       // 12 tygodni
     else phase = "base";
+
 
     // Endurance
     var longestKm = training && training.longest_recent ? training.longest_recent.km : 0;
     var enduranceStatus = longestKm >= 18 ? "ready" : longestKm >= 15 ? "near_ready" : longestKm >= 12 ? "developing" : "early";
 
     // Speed
-    var speedStatus = "unknown", speedGap = null;
+
+    var speedStatus = "unknown", speedGap = null, speedSource = null;
     if (training && training.best_interval && training.best_interval.pace) {
       var bestSec = paceToSec(training.best_interval.pace);
       var targetSec = paceToSec(raceTarget);
       speedGap = bestSec - targetSec;
-      if (speedGap <= 5) speedStatus = "ready";
-      else if (speedGap <= 15) speedStatus = "close";
-      else if (speedGap <= 30) speedStatus = "developing";
-      else speedStatus = "early";
+      speedSource = training.best_interval.pace_source || "overall";
+
+      // Tighter thresholds when using real work pace
+      if (speedSource === "work") {
+        if (speedGap <= 0) speedStatus = "ready";
+        else if (speedGap <= 10) speedStatus = "close";
+        else if (speedGap <= 20) speedStatus = "developing";
+        else speedStatus = "early";
+      } else {
+        // Overall pace is naturally slower than race pace
+        if (speedGap <= 30) speedStatus = "close";
+        else if (speedGap <= 60) speedStatus = "developing";
+        else speedStatus = "early";
+      }
     }
+
 
     var overall = (speedStatus === "ready" && enduranceStatus === "ready") ? "race_ready" :
                   speedStatus === "ready" ? "speed_ok_need_endurance" :
@@ -378,6 +438,7 @@ var DailyCoachEngine = (function() {
       longest_run_km: longestKm,
       speed_status: speedStatus,
       speed_gap_sec_per_km: speedGap,
+      speed_source: speedSource,           // ← DODAJ
       overall_readiness: overall
     };
   }
