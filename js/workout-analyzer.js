@@ -507,8 +507,15 @@ analytics: {
         throw new Error("HTTP " + res.status + ": " + errText);
       }
 
-      var data = await res.json();
-      return { analysis: data.analysis, timestamp: data.timestamp, debug: payload };
+
+var data = await res.json();
+return { 
+  analysis: data.analysis, 
+  timestamp: data.timestamp, 
+  model: data.model || "AI",
+  debug: payload 
+};
+
     } catch (e) {
       console.error(TAG, "Error:", e);
       return { error: e.message };
