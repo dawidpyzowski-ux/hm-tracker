@@ -109,7 +109,10 @@ var WorkoutAnalyzer = (function() {
 
     var workPaces = workLaps.map(function(l) {
       if (!l.distKm || !l.duration) return 0;
-      return Math.round(l.duration / l.distKm);
+      
+if (!l.distKm || !l.duration || l.distKm <= 0) return null;
+return Math.round(l.duration / l.distKm);
+
     }).filter(function(p) { return p > 0; });
 
     var workHRs = workLaps.map(function(l) { return Math.round(l.avgHR || 0); }).filter(function(h) { return h > 0; });
