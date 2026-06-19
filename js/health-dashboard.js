@@ -1,4 +1,5 @@
-/* health-dashboard.js v1 — Sprint 14: UI Integration */
+
+/* health-dashboard.js v3 — Sprint 14 + 17: UI Integration + Cloudflare AI */
 (function() {
   "use strict";
   var TAG = "[Dashboard]";
@@ -72,10 +73,10 @@
 
       contentEl.innerHTML = "<p style='color:#9ca3af;text-align:center;padding:20px;'>\u23F3 Loading...</p>";
 
-    
       setTimeout(function() {
         if (tabId === "hd-tab-charts" && typeof HealthCharts !== "undefined") {
           HealthCharts.render("hd-content");
+
         } else if (tabId === "hd-tab-insights") {
           // 1. Cross-analysis
           if (typeof HealthCross !== "undefined") {
@@ -83,27 +84,38 @@
           } else {
             contentEl.innerHTML = "";
           }
-          // 2. AI Coach (dodatkowy box pod cross)
+
+          // 2. AI Coach (basic — algorithm based)
           if (typeof HealthCoachAI !== "undefined") {
             var aiBox = document.createElement("div");
             aiBox.id = "hd-ai";
             contentEl.appendChild(aiBox);
             HealthCoachAI.render("hd-ai");
           }
-          // 3. Weekly Report (pod AI)
+
+          // 2b. 🔥 AI Coach Cloudflare (Llama 3.3 - real AI!)
+          if (typeof AICoach !== "undefined") {
+            var aiCloudBox = document.createElement("div");
+            aiCloudBox.id = "hd-ai-cloud";
+            contentEl.appendChild(aiCloudBox);
+            AICoach.render("hd-ai-cloud");
+          }
+
+          // 3. Weekly Report
           if (typeof HealthWeekly !== "undefined") {
             var weeklyBox = document.createElement("div");
             weeklyBox.id = "hd-weekly";
             contentEl.appendChild(weeklyBox);
             HealthWeekly.render("hd-weekly");
           }
+
         } else if (tabId === "hd-tab-history" && typeof HealthHistory !== "undefined") {
           HealthHistory.render("hd-content");
+
         } else {
           contentEl.innerHTML = "<p style='color:#9ca3af;text-align:center;padding:20px;'>Modul nie zaladowany</p>";
         }
       }, 50);
-
     }
 
     tabs.forEach(function(t) {
@@ -139,8 +151,8 @@
       });
     }
 
-    console.log(TAG, "Health Dashboard rendered (" + hist.length + " dni)");
+    console.log(TAG, "Health Dashboard rendered v3 (" + hist.length + " dni)");
   };
 
-  console.log(TAG, "Health Dashboard patch loaded v1");
+  console.log(TAG, "Health Dashboard patch loaded v3 + Cloudflare AI");
 })();
