@@ -462,7 +462,17 @@ trainings.slice(0, 30).forEach(function(t) {
         return { date: t.date, type: t.type, km: t.km, pace: t.pace, hr: t.avg_hr };
       }),
       longest_recent: longestRun ? { date: longestRun.date, km: longestRun.km, pace: longestRun.pace } : null,
-      best_interval: bestInterval ? { date: bestInterval.date, km: bestInterval.km, pace: bestInterval.pace } : null
+     
+best_interval: bestInterval ? {
+  date: bestInterval.date,
+  km: bestInterval.km,
+  type: bestInterval.type,
+  pace: bestInterval.pace,
+  pace_source: bestInterval.pace_source,
+  overall_pace: bestInterval.overall_pace,
+  plan_type: bestInterval.plan_type
+} : null
+
     };
   }
 
