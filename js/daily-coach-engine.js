@@ -300,243 +300,367 @@ function normalizeTrainings() {
 }
 
 
-  function getTrainingContext(today) {
-    var trainings = normalizeTrainings();
-    if (!trainings.length) return null;
+ 
+function getTrainingContext(today) {
+  var trainings = normalizeTrainings();
+  if (!trainings.length) return null;
 
-    var todayD = new Date(today);
-    var weekStart = new Date(todayD.getTime() - 7 * 86400000).toISOString().slice(0, 10);
-    var weekTrainings = trainings.filter(function(t) { return t.date >= weekStart && t.date <= today; });
+  var todayD = new Date(today);
+  var weekStart = new Date(todayD.getTime() - 7 * 86400000).toISOString().slice(0, 10);
+  var weekTrainings = trainings.filter(function(t) {
+    return t.date >= weekStart && t.date <= today;
+  });
 
-    var weekKm = weekTrainings.reduce(function(s,t) { return s + t.km; }, 0);
+  var weekKm = weekTrainings.reduce(function(s, t) {
+    return s + t.km;
+  }, 0);
 
-    // Days since last
-    var lastT = trainings[0];
-    var daysSinceLast = lastT ? Math.round((todayD - new Date(lastT.date)) / 86400000) : null;
+  // Days since last
+  var lastT = trainings[0];
+  var daysSinceLast = lastT ? Math.round((todayD - new Date(lastT.date)) / 86400000) : null;
 
-    // Days since last hard
-    var hardKeywords = ["interv", "interw", "tempo", "long", "race", "fartlek"];
-    var lastHard = trainings.find(function(t) {
-      var type = (t.type || "").toLowerCase();
-      return hardKeywords.some(function(h) { return type.indexOf(h) >= 0; });
+  // Days since last hard
+  var hardKeywords = ["interv", "interw", "tempo", "long", "race", "fartlek"];
+  var lastHard = trainings.find(function(t) {
+    var type = (t.type || t.plan_type || "").toLowerCase();
+    return hardKeywords.some(function(h) {
+      return type.indexOf(h) >= 0;
     });
-    var daysSinceHard = lastHard ? Math.round((todayD - new Date(lastHard.date)) / 86400000) : null;
+  });
 
-    // Consecutive training days (back from yesterday)
-    var consecDays = 0;
-    var dateSet = {};
-    trainings.forEach(function(t) { dateSet[t.date] = true; });
-    for (var i = 1; i < 60; i++) {
-      var d = new Date(todayD.getTime() - i * 86400000).toISOString().slice(0, 10);
-      if (dateSet[d]) consecDays++;
-      else break;
+  var daysSinceHard = lastHard ? Math.round((todayD - new Date(lastHard.date)) / 86400000) : null;
+
+  // Consecutive training days
+  var consecDays = 0;
+  var dateSet = {};
+  trainings.forEach(function(t) {
+    dateSet[t.date] = true;
+  });
+
+  for (var i = 1; i < 60; i++) {
+    var d = new Date(todayD.getTime() - i * 86400000).toISOString().slice(0, 10);
+    if (dateSet[d]) consecDays++;
+    else break;
+  }
+
+  // Longest run last 30 days
+  var month30 = trainings.filter(function(t) {
+    var dd = (todayD - new Date(t.date)) / 86400000;
+    return dd >= 0 && dd <= 30;
+  });
+
+  var longestRun = month30.length
+    ? month30.reduce(function(max, t) {
+        return t.km > max.km ? t : max;
+      }, month30[0])
+    : null;
+
+  // ============================================================
+  // CURRENT SPEED REFERENCE
+  // Instead of fastest-ever interval, use recent relevant work pace.
+  // Priority:
+  // 1. latest interval from last 14 days with real work pace
+  // 2. if no such interval: latest interval from last 30 days with work pace
+  // 3. if no work pace: latest interval with overall pace fallback
+  // ============================================================
+
+  function isIntervalType(t) {
+    t = String(t || "").toLowerCase();
+    return t.indexOf("interv") >= 0 ||
+           t.indexOf("interw") >= 0 ||
+           t.indexOf("interval") >= 0 ||
+           t.indexOf("interwa") >= 0;
+  }
+
+  function getLapPaceSec(l) {
+    var p = l.pace || l.paceSec || l.avgPace || l.avg_pace || null;
+
+    if (typeof p === "string" && p.indexOf(":") > -1) {
+      return paceToSec(p);
     }
 
-    // Longest run last 30 days
-    var month30 = trainings.filter(function(t) {
-      var dd = (todayD - new Date(t.date)) / 86400000;
-      return dd >= 0 && dd <= 30;
-    });
-    var longestRun = month30.length ? month30.reduce(function(max,t) { return t.km > max.km ? t : max; }, month30[0]) : null;
+    if (p !== null && p !== undefined) {
+      p = parseFloat(p);
+      if (isFinite(p) && p > 0 && p < 1500) return Math.round(p);
+    }
 
-    // Best interval (work pace)
+    var dist = parseFloat(l.distKm || l.distanceKm || l.km || 0);
+    if (!dist && l.distance) dist = parseFloat(l.distance) / 1000;
 
-   
-// Best interval — real WORK pace via TrainScore, fallback to overall pace
-var bestInterval = null;
-var bestWorkPaceSec = Infinity;
+    var dur = parseFloat(
+      l.durationSec ||
+      l.duration_s ||
+      l.moving_time ||
+      l.elapsed_time ||
+      l.time ||
+      l.duration ||
+      0
+    );
 
-function isIntervalType(t) {
-  t = String(t || "").toLowerCase();
-  return t.indexOf("interv") >= 0 ||
-         t.indexOf("interw") >= 0 ||
-         t.indexOf("interval") >= 0 ||
-         t.indexOf("interwa") >= 0;
-}
+    if (dur > 0 && dur < 60) dur = dur * 60;
 
-function getLapPaceSec(l) {
-  // 1. Jeśli TrainScore ma pace jako sekundy/km albo "mm:ss"
-  var p = l.pace || l.paceSec || l.avgPace || l.avg_pace || null;
+    if (dist > 0 && dur > 0) {
+      var pace = Math.round(dur / dist);
+      if (isFinite(pace) && pace > 0 && pace < 1500) return pace;
+    }
 
-  if (typeof p === "string" && p.indexOf(":") > -1) {
-    return paceToSec(p);
+    return null;
   }
 
-  if (p !== null && p !== undefined) {
-    p = parseFloat(p);
-    if (isFinite(p) && p > 0 && p < 1500) return Math.round(p);
-  }
+  function getIntervalCandidate(t) {
+    var type = t.type || t.plan_type || "";
+    if (!isIntervalType(type)) return null;
 
-  // 2. Fallback: duration / distKm
-  var dist = parseFloat(l.distKm || l.distanceKm || l.km || 0);
-  if (!dist && l.distance) dist = parseFloat(l.distance) / 1000;
+    var daysAgo = Math.round((todayD - new Date(t.date)) / 86400000);
+    if (daysAgo < 0) return null;
 
-  var dur = parseFloat(
-    l.durationSec ||
-    l.duration_s ||
-    l.moving_time ||
-    l.elapsed_time ||
-    l.time ||
-    l.duration ||
-    0
-  );
+    var workPace = null;
+    var source = "overall";
+    var trainScoreTotal = null;
+    var workLapCount = 0;
 
-  // jeśli duration wygląda jak minuty, zamień na sekundy
-  if (dur > 0 && dur < 60) dur = dur * 60;
+    // Try TrainScore for real work pace
+    try {
+      if (typeof TrainScore !== "undefined") {
+        var ts = TrainScore.evaluate(t.date);
 
-  if (dist > 0 && dur > 0) {
-    var pace = Math.round(dur / dist);
-    if (isFinite(pace) && pace > 0 && pace < 1500) return pace;
-  }
+        if (ts) {
+          trainScoreTotal = ts.total || null;
+        }
 
-  return null;
-}
-
-trainings.slice(0, 30).forEach(function(t) {
-  var type = t.type || t.plan_type || "";
-  if (!isIntervalType(type)) return;
-
-  var workPace = null;
-  var source = "overall";
-
-  // Try TrainScore for real work pace
-  try {
-    if (typeof TrainScore !== "undefined") {
-      var ts = TrainScore.evaluate(t.date);
-      if (ts && ts.classified) {
-        var workLaps = ts.classified.filter(function(l) {
-          var r = String(l.role || l.type || "").toLowerCase();
-          return r === "work" ||
-                 r.indexOf("work") >= 0 ||
-                 r.indexOf("interv") >= 0 ||
-                 r.indexOf("interw") >= 0;
-        });
-
-        var paces = workLaps
-          .map(getLapPaceSec)
-          .filter(function(p) {
-            return p && p > 0 && isFinite(p);
+        if (ts && ts.classified) {
+          var workLaps = ts.classified.filter(function(l) {
+            var r = String(l.role || l.type || "").toLowerCase();
+            return r === "work" ||
+                   r.indexOf("work") >= 0 ||
+                   r.indexOf("interv") >= 0 ||
+                   r.indexOf("interw") >= 0;
           });
 
-        if (paces.length > 0) {
-          workPace = Math.round(
-            paces.reduce(function(a,b) { return a + b; }, 0) / paces.length
-          );
-          source = "work";
+          workLapCount = workLaps.length;
+
+          var paces = workLaps
+            .map(getLapPaceSec)
+            .filter(function(p) {
+              return p && p > 0 && isFinite(p);
+            });
+
+          if (paces.length > 0) {
+            workPace = Math.round(
+              paces.reduce(function(a, b) { return a + b; }, 0) / paces.length
+            );
+            source = "work";
+          }
         }
       }
+    } catch(e) {
+      console.warn(TAG, "TrainScore interval reference failed for", t.date, e);
     }
-  } catch(e) {
-    console.warn(TAG, "TrainScore best interval failed for", t.date, e);
-  }
 
-  // Fallback: use overall activity pace
-  if (!workPace && t.pace) {
-    workPace = paceToSec(t.pace);
-    source = "overall";
-  }
+    // Fallback: overall pace
+    if (!workPace && t.pace) {
+      workPace = paceToSec(t.pace);
+      source = "overall";
+    }
 
-  if (workPace && workPace > 0 && workPace < bestWorkPaceSec) {
-    bestWorkPaceSec = workPace;
-    bestInterval = {
+    if (!workPace || workPace <= 0) return null;
+
+    return {
       date: t.date,
       km: t.km,
       type: type,
       pace: secToPace(workPace),
+      pace_sec: workPace,
       pace_source: source,
       overall_pace: t.pace,
-      plan_type: t.plan_type || null
+      plan_type: t.plan_type || null,
+      train_score: trainScoreTotal,
+      work_laps: workLapCount,
+      days_ago: daysAgo
     };
   }
-});
 
+  var intervalCandidates = trainings
+    .map(getIntervalCandidate)
+    .filter(function(c) { return !!c; });
 
+  // Prefer recent real work pace from last 14 days
+  var recentWorkCandidates = intervalCandidates
+    .filter(function(c) {
+      return c.pace_source === "work" && c.days_ago <= 14;
+    })
+    .sort(function(a, b) {
+      return b.date.localeCompare(a.date);
+    });
 
-    return {
-      week_km: +weekKm.toFixed(1),
-      week_sessions: weekTrainings.length,
-      days_since_last: daysSinceLast,
-      days_since_hard: daysSinceHard,
-      consecutive_days: consecDays,
-      last_3_trainings: trainings.slice(0, 3).map(function(t) {
-        return { date: t.date, type: t.type, km: t.km, pace: t.pace, hr: t.avg_hr };
-      }),
-      longest_recent: longestRun ? { date: longestRun.date, km: longestRun.km, pace: longestRun.pace } : null,
-     
-best_interval: bestInterval ? {
-  date: bestInterval.date,
-  km: bestInterval.km,
-  type: bestInterval.type,
-  pace: bestInterval.pace,
-  pace_source: bestInterval.pace_source,
-  overall_pace: bestInterval.overall_pace,
-  plan_type: bestInterval.plan_type
-} : null
+  // Fallback: real work pace from last 30 days
+  var olderWorkCandidates = intervalCandidates
+    .filter(function(c) {
+      return c.pace_source === "work" && c.days_ago <= 30;
+    })
+    .sort(function(a, b) {
+      return b.date.localeCompare(a.date);
+    });
 
-    };
+  // Fallback: overall interval pace from last 14 days
+  var recentOverallCandidates = intervalCandidates
+    .filter(function(c) {
+      return c.pace_source === "overall" && c.days_ago <= 14;
+    })
+    .sort(function(a, b) {
+      return b.date.localeCompare(a.date);
+    });
+
+  var bestInterval = null;
+  var intervalReferenceLogic = null;
+
+  if (recentWorkCandidates.length) {
+    bestInterval = recentWorkCandidates[0];
+    intervalReferenceLogic = "latest_work_pace_last_14d";
+  } else if (olderWorkCandidates.length) {
+    bestInterval = olderWorkCandidates[0];
+    intervalReferenceLogic = "latest_work_pace_last_30d";
+  } else if (recentOverallCandidates.length) {
+    bestInterval = recentOverallCandidates[0];
+    intervalReferenceLogic = "latest_overall_interval_pace_last_14d";
   }
+
+  return {
+    week_km: +weekKm.toFixed(1),
+    week_sessions: weekTrainings.length,
+    days_since_last: daysSinceLast,
+    days_since_hard: daysSinceHard,
+    consecutive_days: consecDays,
+
+    last_3_trainings: trainings.slice(0, 3).map(function(t) {
+      return {
+        date: t.date,
+        type: t.type,
+        plan_type: t.plan_type,
+        km: t.km,
+        pace: t.pace,
+        hr: t.avg_hr
+      };
+    }),
+
+    longest_recent: longestRun ? {
+      date: longestRun.date,
+      km: longestRun.km,
+      pace: longestRun.pace
+    } : null,
+
+    best_interval: bestInterval ? {
+      date: bestInterval.date,
+      km: bestInterval.km,
+      type: bestInterval.type,
+      pace: bestInterval.pace,
+      pace_source: bestInterval.pace_source,
+      overall_pace: bestInterval.overall_pace,
+      plan_type: bestInterval.plan_type,
+      train_score: bestInterval.train_score,
+      work_laps: bestInterval.work_laps,
+      days_ago: bestInterval.days_ago,
+      reference_logic: intervalReferenceLogic
+    } : null,
+
+    interval_candidates_debug: intervalCandidates.slice(0, 5)
+  };
+}
+
 
   // ============================================
   // 5. RACE CONTEXT
   // ============================================
 
+
 function getRaceContext(today, raceDate, raceTarget, training) {
-    var todayD = new Date(today);
-    var raceD = new Date(raceDate);
-    var daysToRace = Math.round((raceD - todayD) / 86400000);
+  var todayD = new Date(today);
+  var raceD = new Date(raceDate);
+  var daysToRace = Math.round((raceD - todayD) / 86400000);
 
-    var phase;
-    if (daysToRace <= 0) phase = "race_done";
-    else if (daysToRace <= 14) phase = "taper";
-    else if (daysToRace <= 42) phase = "peak";        // 6 tygodni
-    else if (daysToRace <= 84) phase = "build";       // 12 tygodni
-    else phase = "base";
+  var phase;
+  if (daysToRace <= 0) phase = "race_done";
+  else if (daysToRace <= 14) phase = "taper";
+  else if (daysToRace <= 42) phase = "peak";
+  else if (daysToRace <= 84) phase = "build";
+  else phase = "base";
 
+  // Endurance
+  var longestKm = training && training.longest_recent ? training.longest_recent.km : 0;
+  var enduranceStatus =
+    longestKm >= 18 ? "ready" :
+    longestKm >= 15 ? "near_ready" :
+    longestKm >= 12 ? "developing" :
+    "early";
 
-    // Endurance
-    var longestKm = training && training.longest_recent ? training.longest_recent.km : 0;
-    var enduranceStatus = longestKm >= 18 ? "ready" : longestKm >= 15 ? "near_ready" : longestKm >= 12 ? "developing" : "early";
+  // Speed
+  var speedStatus = "unknown";
+  var speedGap = null;
+  var speedSource = null;
+  var speedReference = null;
 
-    // Speed
+  if (training && training.best_interval && training.best_interval.pace) {
+    var bestSec = paceToSec(training.best_interval.pace);
+    var targetSec = paceToSec(raceTarget);
 
-    var speedStatus = "unknown", speedGap = null, speedSource = null;
-    if (training && training.best_interval && training.best_interval.pace) {
-      var bestSec = paceToSec(training.best_interval.pace);
-      var targetSec = paceToSec(raceTarget);
-      speedGap = bestSec - targetSec;
-      speedSource = training.best_interval.pace_source || "overall";
+    speedGap = bestSec - targetSec;
+    speedSource = training.best_interval.pace_source || "overall";
 
-      // Tighter thresholds when using real work pace
-      if (speedSource === "work") {
-        if (speedGap <= 0) speedStatus = "ready";
-        else if (speedGap <= 10) speedStatus = "close";
-        else if (speedGap <= 20) speedStatus = "developing";
-        else speedStatus = "early";
-      } else {
-        // Overall pace is naturally slower than race pace
-        if (speedGap <= 30) speedStatus = "close";
-        else if (speedGap <= 60) speedStatus = "developing";
-        else speedStatus = "early";
-      }
-    }
-
-
-    var overall = (speedStatus === "ready" && enduranceStatus === "ready") ? "race_ready" :
-                  speedStatus === "ready" ? "speed_ok_need_endurance" :
-                  enduranceStatus === "ready" ? "endurance_ok_need_speed" : "still_building";
-
-    return {
-      days_to_race: daysToRace,
-      phase: phase,
-      target_pace: raceTarget,
-      endurance_status: enduranceStatus,
-      longest_run_km: longestKm,
-      speed_status: speedStatus,
-      speed_gap_sec_per_km: speedGap,
-      speed_source: speedSource,           // ← DODAJ
-      overall_readiness: overall
+    speedReference = {
+      date: training.best_interval.date,
+      pace: training.best_interval.pace,
+      source: speedSource,
+      days_ago: training.best_interval.days_ago,
+      reference_logic: training.best_interval.reference_logic,
+      train_score: training.best_interval.train_score || null
     };
+
+    if (speedSource === "work") {
+      if (speedGap <= 0) speedStatus = "ready";
+      else if (speedGap <= 10) speedStatus = "close";
+      else if (speedGap <= 20) speedStatus = "developing";
+      else speedStatus = "early";
+    } else {
+      // Overall session pace is naturally slower than true race capability
+      if (speedGap <= 30) speedStatus = "close";
+      else if (speedGap <= 60) speedStatus = "developing";
+      else speedStatus = "early";
+    }
   }
+
+  var overall;
+
+  if (speedStatus === "ready" && enduranceStatus === "ready") {
+    overall = "race_ready";
+  } else if ((speedStatus === "ready" || speedStatus === "close") && enduranceStatus === "ready") {
+    overall = "endurance_ready_speed_close";
+  } else if ((speedStatus === "ready" || speedStatus === "close") && enduranceStatus === "near_ready") {
+    overall = "speed_ok_need_endurance";
+  } else if (speedStatus === "ready" || speedStatus === "close") {
+    overall = "speed_ok_endurance_building";
+  } else if (enduranceStatus === "ready" || enduranceStatus === "near_ready") {
+    overall = "endurance_ok_need_speed";
+  } else {
+    overall = "still_building";
+  }
+
+  return {
+    days_to_race: daysToRace,
+    phase: phase,
+    target_pace: raceTarget,
+
+    endurance_status: enduranceStatus,
+    longest_run_km: longestKm,
+
+    speed_status: speedStatus,
+    speed_gap_sec_per_km: speedGap,
+    speed_source: speedSource,
+    speed_reference: speedReference,
+
+    overall_readiness: overall
+  };
+}
+
 
   // ============================================
   // 6. DECISION TREE
