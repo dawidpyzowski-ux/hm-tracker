@@ -1,70 +1,29 @@
-/* ai-coach.js — Cloudflare Workers AI Coach */
+
+/* ai-coach.js v3 — MAX Daily Coach with rich preprocessing */
 var AICoach = (function() {
   "use strict";
 
-  // ⚠️ PODMIEŃ NA SWÓJ URL WORKERA
   var WORKER_URL = "https://hm-tracker-ai.dawid-pyzowski.workers.dev";
-
   var CACHE_KEY = "ai_analysis_cache";
-  var CACHE_TTL_HOURS = 6; // przez 6h ten sam wynik
+  var CACHE_TTL_HOURS = 3;
 
   async function analyze(force) {
-    // Cache check
     if (!force) {
       var cached = getCache();
       if (cached) return cached;
     }
 
-    if (typeof HealthImport === "undefined" || typeof S === "undefined") {
-      return { error: "Brakuje modułów health/training" };
+    if (typeof DailyCoachEngine === "undefined") {
+      return { error: "DailyCoachEngine not loaded" };
     }
 
-    var health = HealthImport.getAll();
-    if (health.length < 3) {
-      return { error: "Za mało danych health (min 3 dni)" };
-    }
+    var engineData = DailyCoachEngine.compute();
+    if (engineData.error) return { error: engineData.error };
 
-    // Konwertuj treningi
-    var rawLogs = S.getAllLogs();
-    var training = [];
-    Object.keys(rawLogs).sort().forEach(function(d) {
-      var l = rawLogs[d];
-      if (!l || (!l.distance && !l.km)) return;
-      training.push({
-        date: d,
-        km: parseFloat(l.km || l.distance),
-        pace: l.pace || "",
-        type: l.type || l.workout_type || "",
-        hr: l.hr || l.avg_hr || 0
-      });
-    });
-
-    if (training.length < 3) {
-      return { error: "Za mało treningów (min 3)" };
-    }
-
-    // Przygotuj payload
-    var payload = {
-      healthData: health.slice(-14).map(function(h) {
-        return {
-          date: h.date,
-          sleep_h: (h.sleepMin / 60).toFixed(1),
-          deep_min: h.deepMin,
-          rem_min: h.remMin,
-          rhr: h.rhr,
-          hrv: h.hrv
-        };
-      }),
-      trainingData: training,
-      raceTarget: {
-        name: "Wizz Air Prague Night HM",
-        date: "2026-09-06",
-        pace: "4:59"
-      }
-    };
+    var payload = Object.assign({ mode: "daily-v2" }, engineData);
 
     try {
-      console.log("[AICoach] Wysylam zapytanie...");
+      console.log("[AICoach] Wysylam rich payload do Workera...");
       var res = await fetch(WORKER_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -77,13 +36,12 @@ var AICoach = (function() {
       }
 
       var data = await res.json();
-      console.log("[AICoach] Otrzymano:", data);
-
       var result = {
         analysis: data.analysis,
-        timestamp: data.timestamp || new Date().toISOString()
+        timestamp: data.timestamp || new Date().toISOString(),
+        model: data.model || "AI",
+        debug: engineData
       };
-
       setCache(result);
       return result;
     } catch (e) {
@@ -104,21 +62,18 @@ var AICoach = (function() {
   }
 
   function setCache(data) {
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); }
-    catch (e) {}
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch(e) {}
   }
 
-  function clearCache() {
-    localStorage.removeItem(CACHE_KEY);
-  }
+  function clearCache() { localStorage.removeItem(CACHE_KEY); }
 
   async function render(containerId) {
     var c = document.getElementById(containerId);
     if (!c) return;
 
     c.innerHTML = "<div style='background:#1f2937;border-radius:10px;padding:14px;margin-top:10px;'>" +
-      "<h4 style='margin:0 0 10px;color:#f9fafb;'>\u{1F916} AI Coach (Cloudflare)</h4>" +
-      "<p style='color:#9ca3af;text-align:center;'>\u23F3 Analizuje dane...</p>" +
+      "<h4 style='margin:0 0 10px;color:#f9fafb;'>\u{1F916} AI Coach Analysis</h4>" +
+      "<p style='color:#9ca3af;text-align:center;'>\u23F3 AI analizuje Twoje dane...</p>" +
       "</div>";
 
     var result = await analyze();
@@ -132,22 +87,40 @@ var AICoach = (function() {
       return;
     }
 
-    // Render analysis
     var ts = new Date(result.timestamp).toLocaleString();
-    var html = "<div style='background:linear-gradient(135deg,#1e3a8a 0%,#1f2937 100%);border-radius:12px;padding:16px;margin-top:10px;border:1px solid #3b82f6;'>";
-    html += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;'>";
-    html += "<h4 style='margin:0;color:#f9fafb;'>\u{1F916} AI Coach Analysis</h4>";
-    html += "<button onclick='AICoach.refresh(\"" + containerId + "\")' style='background:#374151;border:none;color:#60a5fa;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75em;'>\u{1F504} Odswiez</button>";
+    var modelLabel = result.model || "AI";
+    var readinessColor = result.debug && result.debug.readiness ? result.debug.readiness.color : "blue";
+    var readinessScore = result.debug && result.debug.readiness ? result.debug.readiness.score : "?";
+    var readinessLabel = result.debug && result.debug.readiness ? result.debug.readiness.label : "";
+
+    var colorMap = { green: "#22c55e", lightgreen: "#84cc16", yellow: "#f59e0b", orange: "#f97316", red: "#ef4444" };
+    var borderColor = colorMap[readinessColor] || "#3b82f6";
+
+    var html = "<div style='background:linear-gradient(135deg,#1e3a8a 0%,#1f2937 100%);border-radius:12px;padding:16px;margin-top:10px;border:2px solid " + borderColor + ";'>";
+
+    // Header z readiness score
+    html += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #374151;'>";
+    html += "<div>";
+    html += "<h4 style='margin:0;color:#f9fafb;'>\u{1F916} AI Daily Coach</h4>";
+    html += "<div style='color:" + borderColor + ";font-size:0.85em;font-weight:600;margin-top:2px;'>" + readinessLabel + " (" + readinessScore + "/100)</div>";
+    html += "</div>";
+    html += "<button onclick='AICoach.refresh(\"" + containerId + "\")' style='background:#374151;border:none;color:#60a5fa;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8em;'>\u{1F504} Odswiez</button>";
     html += "</div>";
 
-    // Format analysis text (replace \n with <br>)
     var formatted = (result.analysis || "")
       .replace(/\n\n/g, "<br><br>")
       .replace(/\n/g, "<br>")
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 
-    html += "<div style='color:#e5e7eb;font-size:0.92em;line-height:1.5;'>" + formatted + "</div>";
-    html += "<div style='margin-top:10px;padding-top:8px;border-top:1px solid #374151;color:#6b7280;font-size:0.7em;text-align:right;'>" + ts + "</div>";
+    html += "<div style='color:#e5e7eb;font-size:0.92em;line-height:1.55;'>" + formatted + "</div>";
+
+    // Collapsible debug
+    html += "<details style='margin-top:12px;'>";
+    html += "<summary style='cursor:pointer;color:#6b7280;font-size:0.7em;'>Dane Engine (debug)</summary>";
+    html += "<pre style='background:#000;padding:10px;border-radius:6px;font-size:0.65em;overflow-x:auto;color:#86efac;max-height:300px;overflow-y:auto;'>" + JSON.stringify(result.debug, null, 2) + "</pre>";
+    html += "</details>";
+
+    html += "<div style='margin-top:8px;color:#6b7280;font-size:0.7em;text-align:right;'>" + ts + " | " + modelLabel + "</div>";
     html += "</div>";
 
     c.innerHTML = html;
@@ -158,10 +131,5 @@ var AICoach = (function() {
     render(containerId);
   }
 
-  return {
-    analyze: analyze,
-    render: render,
-    refresh: refresh,
-    clearCache: clearCache
-  };
+  return { analyze: analyze, render: render, refresh: refresh, clearCache: clearCache };
 })();
