@@ -3,7 +3,7 @@ var AICoach = (function() {
   "use strict";
 
   // ⚠️ PODMIEŃ NA SWÓJ URL WORKERA
-  var WORKER_URL = "hm-tracker-ai.dawid-pyzowski.workers.dev";
+  var WORKER_URL = "https://hm-tracker-ai.dawid-pyzowski.workers.dev";
 
   var CACHE_KEY = "ai_analysis_cache";
   var CACHE_TTL_HOURS = 6; // przez 6h ten sam wynik
