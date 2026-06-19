@@ -99,50 +99,218 @@ var WorkoutAnalyzer = (function() {
     };
   }
 
-  function analyzeWorkLaps(classified, planType) {
-    if (!classified || !classified.length) return null;
+  
+function analyzeWorkLaps(classified, planType) {
+  if (!classified || !classified.length) return null;
 
-    var workLaps = classified.filter(function(l) { return l.role === "work"; });
-    var restLaps = classified.filter(function(l) { return l.role === "rest" || l.role === "recovery"; });
+  function getRole(l) {
+    return String(l.role || l.type || l.segment || "").toLowerCase();
+  }
 
-    if (workLaps.length < 2) return null;
+  function isWorkLap(l) {
+    var r = getRole(l);
+    return r === "work" ||
+           r === "interval" ||
+           r === "rep" ||
+           r === "fast" ||
+           r.indexOf("work") >= 0 ||
+           r.indexOf("interv") >= 0 ||
+           r.indexOf("interw") >= 0;
+  }
 
-    var workPaces = workLaps.map(function(l) {
-      if (!l.distKm || !l.duration) return 0;
-      
-if (!l.distKm || !l.duration || l.distKm <= 0) return null;
-return Math.round(l.duration / l.distKm);
+  function isRestLap(l) {
+    var r = getRole(l);
+    return r === "rest" ||
+           r === "recovery" ||
+           r === "jog" ||
+           r.indexOf("rest") >= 0 ||
+           r.indexOf("recover") >= 0 ||
+           r.indexOf("trucht") >= 0;
+  }
 
-    }).filter(function(p) { return p && p > 0 && isFinite(p); });
+  function getDistKm(l) {
+    var d =
+      l.distKm ||
+      l.distanceKm ||
+      l.km ||
+      l.dist ||
+      0;
 
-    
-var workHRs = workLaps.map(function(l) {
-  return l.avgHR ? Math.round(l.avgHR) : null;
-}).filter(function(h) { return h && h > 0; });
+    if (!d && l.distance) d = l.distance / 1000;
+    d = parseFloat(d);
 
-    var workStddev = stddev(workPaces);
+    return isFinite(d) && d > 0 ? d : null;
+  }
 
-    var restPaces = restLaps.map(function(l) {
-      if (!l.distKm || !l.duration) return 0;
-      return Math.round(l.duration / l.distKm);
-    }).filter(function(p) { return p > 0; });
+  function getDurationSec(l) {
+    var d =
+      l.durationSec ||
+      l.duration_s ||
+      l.moving_time ||
+      l.elapsed_time ||
+      l.time ||
+      l.duration ||
+      0;
 
+    d = parseFloat(d);
+
+    // Jeśli duration wygląda jak minuty, a nie sekundy
+    // np. 4.8 zamiast 288, przelicz na sekundy
+    if (d > 0 && d < 60) d = d * 60;
+
+    return isFinite(d) && d > 0 ? d : null;
+  }
+
+  function getPaceSec(l) {
+    // Najważniejsze: TrainScore często ma pace już jako sec/km
+    var p =
+      l.pace ||
+      l.paceSec ||
+      l.avgPace ||
+      l.avg_pace ||
+      null;
+
+    if (typeof p === "string" && p.indexOf(":") > -1) {
+      var parts = p.split(":");
+      if (parts.length === 2) {
+        var sec = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        return isFinite(sec) && sec > 0 ? sec : null;
+      }
+    }
+
+    if (p !== null && p !== undefined) {
+      p = parseFloat(p);
+      if (isFinite(p) && p > 0 && p < 1500) return Math.round(p);
+    }
+
+    // Fallback: duration / distance
+    var dist = getDistKm(l);
+    var dur = getDurationSec(l);
+
+    if (dist && dur) {
+      var pace = Math.round(dur / dist);
+      return isFinite(pace) && pace > 0 && pace < 1500 ? pace : null;
+    }
+
+    return null;
+  }
+
+  function getHR(l) {
+    var h =
+      l.avgHR ||
+      l.avg_hr ||
+      l.hr ||
+      l.average_heartrate ||
+      l.averageHR ||
+      null;
+
+    h = parseFloat(h);
+    return isFinite(h) && h > 0 ? Math.round(h) : null;
+  }
+
+  function secToPace(s) {
+    if (!s || !isFinite(s) || s <= 0) return "-";
+    var m = Math.floor(s / 60);
+    var sec = Math.round(s % 60);
+    return m + ":" + String(sec).padStart(2, "0");
+  }
+
+  function avg(arr) {
+    if (!arr || !arr.length) return null;
+    return Math.round(arr.reduce(function(a, b) { return a + b; }, 0) / arr.length);
+  }
+
+  function stddev(arr) {
+    if (!arr || arr.length < 2) return 0;
+    var mean = arr.reduce(function(a, b) { return a + b; }, 0) / arr.length;
+    var variance = arr.reduce(function(s, v) {
+      return s + Math.pow(v - mean, 2);
+    }, 0) / arr.length;
+    return Math.round(Math.sqrt(variance));
+  }
+
+  var workLaps = classified.filter(isWorkLap);
+  var restLaps = classified.filter(isRestLap);
+
+  var workPaces = workLaps
+    .map(getPaceSec)
+    .filter(function(p) { return p && p > 0 && isFinite(p); });
+
+  var restPaces = restLaps
+    .map(getPaceSec)
+    .filter(function(p) { return p && p > 0 && isFinite(p); });
+
+  var workHRs = workLaps
+    .map(getHR)
+    .filter(function(h) { return h && h > 0 && isFinite(h); });
+
+  var restHRs = restLaps
+    .map(getHR)
+    .filter(function(h) { return h && h > 0 && isFinite(h); });
+
+  if (!workPaces.length) {
     return {
       reps: workLaps.length,
-      work_pace_avg: secToPace(Math.round(workPaces.reduce(function(a, b) { return a + b; }, 0) / workPaces.length)),
-      work_pace_range: secToPace(Math.min.apply(null, workPaces.filter(p => p > 0))) + " — " + secToPace(Math.max.apply(null, workPaces)),
-      work_pace_consistency: workStddev < 5 ? "A+ (super consistent)" : workStddev < 10 ? "A (consistent)" : workStddev < 20 ? "B (acceptable)" : "C (variable)",
-      work_hr_avg: workHRs.length ? Math.round(workHRs.reduce(function(a, b) { return a + b; }, 0) / workHRs.length) : null,
-      work_hr_max: workHRs.length ? Math.max.apply(null, workHRs) : null,
-      rest_pace_avg: restPaces.length ? secToPace(Math.round(restPaces.reduce(function(a, b) { return a + b; }, 0) / restPaces.length)) : null,
-      fade_analysis: workPaces.length >= 3 ? {
-        first_rep_pace: secToPace(workPaces[0]),
-        last_rep_pace: secToPace(workPaces[workPaces.length - 1]),
-        fade_sec: workPaces[workPaces.length - 1] - workPaces[0],
-        grade: Math.abs(workPaces[workPaces.length - 1] - workPaces[0]) < 5 ? "excellent (no fade)" : workPaces[workPaces.length - 1] - workPaces[0] > 10 ? "fatigue visible" : "minor fade"
-      } : null
+      error: "Brak poprawnych danych pace dla odcinkow work",
+      raw_work_laps_sample: workLaps.slice(0, 3)
     };
   }
+
+  var minWork = Math.min.apply(null, workPaces);
+  var maxWork = Math.max.apply(null, workPaces);
+  var workStddev = stddev(workPaces);
+
+  var consistency;
+  if (workStddev < 5) consistency = "A+ (super consistent)";
+  else if (workStddev < 10) consistency = "A (consistent)";
+  else if (workStddev < 20) consistency = "B (acceptable)";
+  else consistency = "C (variable)";
+
+  var fade = null;
+  if (workPaces.length >= 2) {
+    var first = workPaces[0];
+    var last = workPaces[workPaces.length - 1];
+    var fadeSec = last - first;
+
+    fade = {
+      first_rep_pace: secToPace(first),
+      last_rep_pace: secToPace(last),
+      fade_sec: fadeSec,
+      grade:
+        Math.abs(fadeSec) < 5 ? "excellent (no fade)" :
+        fadeSec > 10 ? "fatigue visible" :
+        fadeSec < -10 ? "strong finish" :
+        "minor fade"
+    };
+  }
+
+  return {
+    reps: workLaps.length,
+    rest_reps: restLaps.length,
+
+    work_pace_avg: secToPace(avg(workPaces)),
+    work_pace_range: secToPace(minWork) + " — " + secToPace(maxWork),
+    work_pace_stddev_sec: workStddev,
+    work_pace_consistency: consistency,
+
+    work_hr_avg: workHRs.length ? avg(workHRs) : null,
+    work_hr_max: workHRs.length ? Math.max.apply(null, workHRs) : null,
+
+    rest_pace_avg: restPaces.length ? secToPace(avg(restPaces)) : null,
+    rest_hr_avg: restHRs.length ? avg(restHRs) : null,
+
+    fade_analysis: fade,
+
+    raw_counts: {
+      classified_total: classified.length,
+      work_laps: workLaps.length,
+      rest_laps: restLaps.length,
+      valid_work_paces: workPaces.length,
+      valid_work_hrs: workHRs.length
+    }
+  };
+}
+
 
   function compareToBaseline(workout, baseline) {
     if (!baseline) return null;
