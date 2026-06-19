@@ -251,24 +251,54 @@ var DailyCoachEngine = (function() {
   // ============================================
   // 4. TRAINING CONTEXT
   // ============================================
-  function normalizeTrainings() {
-    if (typeof S === "undefined" || !S.getAllLogs) return [];
-    var logs = S.getAllLogs();
-    var arr = [];
-    Object.keys(logs).forEach(function(d) {
-      var l = logs[d];
-      if (l && (l.distance || l.km)) {
-        arr.push({
-          date: d,
-          km: parseFloat(l.km || l.distance) || 0,
-          pace: l.pace || "",
-          type: l.type || l.workout_type || "",
-          avg_hr: l.hr || l.avg_hr || null
-        });
+
+function normalizeTrainings() {
+  if (typeof S === "undefined" || !S.getAllLogs) return [];
+
+  var logs = S.getAllLogs();
+  var arr = [];
+
+  Object.keys(logs).forEach(function(d) {
+    var l = logs[d];
+    if (!l || (!l.distance && !l.km)) return;
+
+    // Fallback typu z PLAN_FLAT, bo S.getAllLogs często ma type: ""
+    var planType = "";
+    var planKm = null;
+    var planPace = "";
+    var planNotes = "";
+
+    try {
+      if (window.PLAN_FLAT) {
+        var p = window.PLAN_FLAT.find(function(x) { return x.date === d; });
+        if (p) {
+          planType = p.type || "";
+          planKm = p.km || null;
+          planPace = p.pace || "";
+          planNotes = p.notes || p.desc || "";
+        }
       }
+    } catch(e) {}
+
+    var finalType = l.type || l.workout_type || planType || "";
+
+    arr.push({
+      date: d,
+      km: parseFloat(l.km || l.distance) || 0,
+      pace: l.pace || "",
+      type: finalType,
+      plan_type: planType,
+      plan_km: planKm,
+      plan_pace: planPace,
+      plan_notes: planNotes,
+      avg_hr: l.hr || l.avg_hr || null,
+      strava_id: l.strava_id || null
     });
-    return arr.sort(function(a,b) { return b.date.localeCompare(a.date); });
-  }
+  });
+
+  return arr.sort(function(a,b) { return b.date.localeCompare(a.date); });
+}
+
 
   function getTrainingContext(today) {
     var trainings = normalizeTrainings();
