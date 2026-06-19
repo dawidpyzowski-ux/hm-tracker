@@ -113,9 +113,13 @@ var WorkoutAnalyzer = (function() {
 if (!l.distKm || !l.duration || l.distKm <= 0) return null;
 return Math.round(l.duration / l.distKm);
 
-    }).filter(function(p) { return p > 0; });
+    }).filter(function(p) { return p && p > 0 && isFinite(p); });
 
-    var workHRs = workLaps.map(function(l) { return Math.round(l.avgHR || 0); }).filter(function(h) { return h > 0; });
+    
+var workHRs = workLaps.map(function(l) {
+  return l.avgHR ? Math.round(l.avgHR) : null;
+}).filter(function(h) { return h && h > 0; });
+
     var workStddev = stddev(workPaces);
 
     var restPaces = restLaps.map(function(l) {
@@ -126,7 +130,7 @@ return Math.round(l.duration / l.distKm);
     return {
       reps: workLaps.length,
       work_pace_avg: secToPace(Math.round(workPaces.reduce(function(a, b) { return a + b; }, 0) / workPaces.length)),
-      work_pace_range: secToPace(Math.min.apply(null, workPaces)) + " — " + secToPace(Math.max.apply(null, workPaces)),
+      work_pace_range: secToPace(Math.min.apply(null, workPaces.filter(p => p > 0))) + " — " + secToPace(Math.max.apply(null, workPaces)),
       work_pace_consistency: workStddev < 5 ? "A+ (super consistent)" : workStddev < 10 ? "A (consistent)" : workStddev < 20 ? "B (acceptable)" : "C (variable)",
       work_hr_avg: workHRs.length ? Math.round(workHRs.reduce(function(a, b) { return a + b; }, 0) / workHRs.length) : null,
       work_hr_max: workHRs.length ? Math.max.apply(null, workHRs) : null,
