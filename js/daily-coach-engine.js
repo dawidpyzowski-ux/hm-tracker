@@ -341,60 +341,115 @@ function normalizeTrainings() {
 
     // Best interval (work pace)
 
-    // Best interval — try WORK pace via TrainScore first, fallback to overall pace
-    var bestInterval = null;
-    var bestWorkPaceSec = Infinity;
+   
+// Best interval — real WORK pace via TrainScore, fallback to overall pace
+var bestInterval = null;
+var bestWorkPaceSec = Infinity;
 
-    trainings.slice(0, 30).forEach(function(t) {
-      var type = (t.type || "").toLowerCase();
-      var isInterval = type.indexOf("interv") >= 0 || type.indexOf("interw") >= 0;
-      if (!isInterval) return;
+function isIntervalType(t) {
+  t = String(t || "").toLowerCase();
+  return t.indexOf("interv") >= 0 ||
+         t.indexOf("interw") >= 0 ||
+         t.indexOf("interval") >= 0 ||
+         t.indexOf("interwa") >= 0;
+}
 
-      // Try TrainScore for real work pace
-      var workPace = null;
-      var source = "overall";
-      try {
-        if (typeof TrainScore !== "undefined") {
-          var ts = TrainScore.evaluate(t.date);
-          if (ts && ts.classified) {
-            var workLaps = ts.classified.filter(function(l) {
-              var r = String(l.role || "").toLowerCase();
-              return r === "work" || r.indexOf("work") >= 0;
-            });
-            if (workLaps.length > 0) {
-              var totalDist = 0, totalDur = 0;
-              workLaps.forEach(function(l) {
-                if (l.distKm > 0 && l.duration > 0) {
-                  totalDist += l.distKm;
-                  totalDur += l.duration;
-                }
-              });
-              if (totalDist > 0) {
-                workPace = Math.round(totalDur / totalDist);
-                source = "work";
-              }
-            }
-          }
+function getLapPaceSec(l) {
+  // 1. Jeśli TrainScore ma pace jako sekundy/km albo "mm:ss"
+  var p = l.pace || l.paceSec || l.avgPace || l.avg_pace || null;
+
+  if (typeof p === "string" && p.indexOf(":") > -1) {
+    return paceToSec(p);
+  }
+
+  if (p !== null && p !== undefined) {
+    p = parseFloat(p);
+    if (isFinite(p) && p > 0 && p < 1500) return Math.round(p);
+  }
+
+  // 2. Fallback: duration / distKm
+  var dist = parseFloat(l.distKm || l.distanceKm || l.km || 0);
+  if (!dist && l.distance) dist = parseFloat(l.distance) / 1000;
+
+  var dur = parseFloat(
+    l.durationSec ||
+    l.duration_s ||
+    l.moving_time ||
+    l.elapsed_time ||
+    l.time ||
+    l.duration ||
+    0
+  );
+
+  // jeśli duration wygląda jak minuty, zamień na sekundy
+  if (dur > 0 && dur < 60) dur = dur * 60;
+
+  if (dist > 0 && dur > 0) {
+    var pace = Math.round(dur / dist);
+    if (isFinite(pace) && pace > 0 && pace < 1500) return pace;
+  }
+
+  return null;
+}
+
+trainings.slice(0, 30).forEach(function(t) {
+  var type = t.type || t.plan_type || "";
+  if (!isIntervalType(type)) return;
+
+  var workPace = null;
+  var source = "overall";
+
+  // Try TrainScore for real work pace
+  try {
+    if (typeof TrainScore !== "undefined") {
+      var ts = TrainScore.evaluate(t.date);
+      if (ts && ts.classified) {
+        var workLaps = ts.classified.filter(function(l) {
+          var r = String(l.role || l.type || "").toLowerCase();
+          return r === "work" ||
+                 r.indexOf("work") >= 0 ||
+                 r.indexOf("interv") >= 0 ||
+                 r.indexOf("interw") >= 0;
+        });
+
+        var paces = workLaps
+          .map(getLapPaceSec)
+          .filter(function(p) {
+            return p && p > 0 && isFinite(p);
+          });
+
+        if (paces.length > 0) {
+          workPace = Math.round(
+            paces.reduce(function(a,b) { return a + b; }, 0) / paces.length
+          );
+          source = "work";
         }
-      } catch (e) {}
-
-      // Fallback: use overall pace
-      if (!workPace && t.pace) {
-        workPace = paceToSec(t.pace);
-        source = "overall";
       }
+    }
+  } catch(e) {
+    console.warn(TAG, "TrainScore best interval failed for", t.date, e);
+  }
 
-      if (workPace && workPace > 0 && workPace < bestWorkPaceSec) {
-        bestWorkPaceSec = workPace;
-        bestInterval = {
-          date: t.date,
-          km: t.km,
-          pace: secToPace(workPace),
-          pace_source: source,
-          overall_pace: t.pace
-        };
-      }
-    });
+  // Fallback: use overall activity pace
+  if (!workPace && t.pace) {
+    workPace = paceToSec(t.pace);
+    source = "overall";
+  }
+
+  if (workPace && workPace > 0 && workPace < bestWorkPaceSec) {
+    bestWorkPaceSec = workPace;
+    bestInterval = {
+      date: t.date,
+      km: t.km,
+      type: type,
+      pace: secToPace(workPace),
+      pace_source: source,
+      overall_pace: t.pace,
+      plan_type: t.plan_type || null
+    };
+  }
+});
+
 
 
     return {
