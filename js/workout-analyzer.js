@@ -189,8 +189,18 @@ var WorkoutAnalyzer = (function() {
 
     var trainScore = null;
     var workLapAnalysis = null;
-    var planType = (activity.type || "").toLowerCase();
-    if (planType.indexOf("interv") >= 0 && typeof TrainScore !== "undefined") {
+    
+var planType = (activity.type || "").toLowerCase();
+
+function isIntervalType(t) {
+  return t.indexOf("interv") >= 0 ||
+         t.indexOf("interw") >= 0 ||
+         t.indexOf("interval") >= 0 ||
+         t.indexOf("interwa") >= 0;
+}
+
+if (isIntervalType(planType) && typeof TrainScore !== "undefined") {
+
       try {
         var ts = TrainScore.evaluate(activity.date);
         if (ts) {
