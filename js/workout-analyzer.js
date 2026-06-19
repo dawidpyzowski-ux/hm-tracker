@@ -261,15 +261,18 @@ if (isIntervalType(planType) && typeof TrainScore !== "undefined") {
 
     var payload = {
       mode: "workout",
-      workout: {
-        date: activity.date,
-        type: activity.type || "",
-        km: activity.km,
-        avg_pace: activity.pace,
-        avg_hr: activity.avg_hr || activity.average_heartrate,
-        duration_min: activity.duration_min,
-        notes: activity.notes
-      },
+
+workout: {
+  date: activity.date,
+  type: activity.type || "",
+  km: activity.km,
+  pace: activity.pace || activity.avg_pace,
+  avg_pace: activity.pace || activity.avg_pace,
+  avg_hr: activity.avg_hr || activity.average_heartrate,
+  duration_min: activity.duration_min,
+  notes: activity.notes
+},
+
       // SMART PRECOMPUTED ANALYTICS
       analytics: {
         splits_analysis: splitAnalysis,
