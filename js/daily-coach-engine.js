@@ -301,12 +301,14 @@ function normalizeTrainings() {
 
 
  
+
 function getTrainingContext(today) {
   var trainings = normalizeTrainings();
   if (!trainings.length) return null;
 
   var todayD = new Date(today);
   var weekStart = new Date(todayD.getTime() - 7 * 86400000).toISOString().slice(0, 10);
+
   var weekTrainings = trainings.filter(function(t) {
     return t.date >= weekStart && t.date <= today;
   });
@@ -315,12 +317,13 @@ function getTrainingContext(today) {
     return s + t.km;
   }, 0);
 
-  // Days since last
+  // Days since last training
   var lastT = trainings[0];
   var daysSinceLast = lastT ? Math.round((todayD - new Date(lastT.date)) / 86400000) : null;
 
-  // Days since last hard
+  // Days since last hard training
   var hardKeywords = ["interv", "interw", "tempo", "long", "race", "fartlek"];
+
   var lastHard = trainings.find(function(t) {
     var type = (t.type || t.plan_type || "").toLowerCase();
     return hardKeywords.some(function(h) {
@@ -333,6 +336,7 @@ function getTrainingContext(today) {
   // Consecutive training days
   var consecDays = 0;
   var dateSet = {};
+
   trainings.forEach(function(t) {
     dateSet[t.date] = true;
   });
@@ -357,11 +361,17 @@ function getTrainingContext(today) {
 
   // ============================================================
   // CURRENT SPEED REFERENCE
-  // Instead of fastest-ever interval, use recent relevant work pace.
-  // Priority:
-  // 1. latest interval from last 14 days with real work pace
-  // 2. if no such interval: latest interval from last 30 days with work pace
-  // 3. if no work pace: latest interval with overall pace fallback
+  //
+  // Nie wybieramy już "najszybszego ever" z 30 dni.
+  // Wybieramy najświeższy sensowny work pace.
+  //
+  // Priorytet:
+  // 1. latest work pace z ostatnich 14 dni
+  // 2. jeśli brak: latest work pace z ostatnich 30 dni
+  // 3. jeśli brak: latest overall interval pace z 14 dni
+  //
+  // Dodatkowo liczymy stability/confidence:
+  // - jeśli mamy mniej niż 3 work pace w 14 dni, nie oznaczamy speed jako "ready"
   // ============================================================
 
   function isIntervalType(t) {
@@ -381,7 +391,9 @@ function getTrainingContext(today) {
 
     if (p !== null && p !== undefined) {
       p = parseFloat(p);
-      if (isFinite(p) && p > 0 && p < 1500) return Math.round(p);
+      if (isFinite(p) && p > 0 && p < 1500) {
+        return Math.round(p);
+      }
     }
 
     var dist = parseFloat(l.distKm || l.distanceKm || l.km || 0);
@@ -401,7 +413,9 @@ function getTrainingContext(today) {
 
     if (dist > 0 && dur > 0) {
       var pace = Math.round(dur / dist);
-      if (isFinite(pace) && pace > 0 && pace < 1500) return pace;
+      if (isFinite(pace) && pace > 0 && pace < 1500) {
+        return pace;
+      }
     }
 
     return null;
@@ -419,7 +433,6 @@ function getTrainingContext(today) {
     var trainScoreTotal = null;
     var workLapCount = 0;
 
-    // Try TrainScore for real work pace
     try {
       if (typeof TrainScore !== "undefined") {
         var ts = TrainScore.evaluate(t.date);
@@ -457,7 +470,6 @@ function getTrainingContext(today) {
       console.warn(TAG, "TrainScore interval reference failed for", t.date, e);
     }
 
-    // Fallback: overall pace
     if (!workPace && t.pace) {
       workPace = paceToSec(t.pace);
       source = "overall";
@@ -484,7 +496,6 @@ function getTrainingContext(today) {
     .map(getIntervalCandidate)
     .filter(function(c) { return !!c; });
 
-  // Prefer recent real work pace from last 14 days
   var recentWorkCandidates = intervalCandidates
     .filter(function(c) {
       return c.pace_source === "work" && c.days_ago <= 14;
@@ -493,7 +504,6 @@ function getTrainingContext(today) {
       return b.date.localeCompare(a.date);
     });
 
-  // Fallback: real work pace from last 30 days
   var olderWorkCandidates = intervalCandidates
     .filter(function(c) {
       return c.pace_source === "work" && c.days_ago <= 30;
@@ -502,7 +512,6 @@ function getTrainingContext(today) {
       return b.date.localeCompare(a.date);
     });
 
-  // Fallback: overall interval pace from last 14 days
   var recentOverallCandidates = intervalCandidates
     .filter(function(c) {
       return c.pace_source === "overall" && c.days_ago <= 14;
@@ -510,6 +519,39 @@ function getTrainingContext(today) {
     .sort(function(a, b) {
       return b.date.localeCompare(a.date);
     });
+
+  // Stability check — czy speed jest powtarzalny
+  var recentWorkPaces = recentWorkCandidates.map(function(c) {
+    return c.pace_sec;
+  });
+
+  var speedStability = {
+    sample_n: recentWorkPaces.length,
+    stddev_sec: null,
+    stable: false,
+    confidence: "low"
+  };
+
+  if (recentWorkPaces.length >= 3) {
+    var avg = recentWorkPaces.reduce(function(a, b) {
+      return a + b;
+    }, 0) / recentWorkPaces.length;
+
+    var variance = recentWorkPaces.reduce(function(s, v) {
+      return s + Math.pow(v - avg, 2);
+    }, 0) / recentWorkPaces.length;
+
+    var std = Math.round(Math.sqrt(variance));
+
+    speedStability.stddev_sec = std;
+    speedStability.stable = std <= 8;
+    speedStability.confidence = std <= 8 ? "high" : "medium";
+  } else if (recentWorkPaces.length === 2) {
+    var diff = Math.abs(recentWorkPaces[0] - recentWorkPaces[1]);
+    speedStability.stddev_sec = diff;
+    speedStability.stable = false;
+    speedStability.confidence = "medium_low";
+  }
 
   var bestInterval = null;
   var intervalReferenceLogic = null;
@@ -554,23 +596,29 @@ function getTrainingContext(today) {
       km: bestInterval.km,
       type: bestInterval.type,
       pace: bestInterval.pace,
+      pace_sec: bestInterval.pace_sec,
       pace_source: bestInterval.pace_source,
       overall_pace: bestInterval.overall_pace,
       plan_type: bestInterval.plan_type,
       train_score: bestInterval.train_score,
       work_laps: bestInterval.work_laps,
       days_ago: bestInterval.days_ago,
-      reference_logic: intervalReferenceLogic
+      reference_logic: intervalReferenceLogic,
+      speed_stability: speedStability
     } : null,
 
-    interval_candidates_debug: intervalCandidates.slice(0, 5)
+    speed_stability: speedStability,
+
+    interval_candidates_debug: intervalCandidates.slice(0, 6)
   };
 }
+
 
 
   // ============================================
   // 5. RACE CONTEXT
   // ============================================
+
 
 
 function getRaceContext(today, raceDate, raceTarget, training) {
@@ -585,19 +633,19 @@ function getRaceContext(today, raceDate, raceTarget, training) {
   else if (daysToRace <= 84) phase = "build";
   else phase = "base";
 
-  // Endurance
   var longestKm = training && training.longest_recent ? training.longest_recent.km : 0;
+
   var enduranceStatus =
     longestKm >= 18 ? "ready" :
     longestKm >= 15 ? "near_ready" :
     longestKm >= 12 ? "developing" :
     "early";
 
-  // Speed
   var speedStatus = "unknown";
   var speedGap = null;
   var speedSource = null;
   var speedReference = null;
+  var speedConfidence = "low";
 
   if (training && training.best_interval && training.best_interval.pace) {
     var bestSec = paceToSec(training.best_interval.pace);
@@ -606,22 +654,39 @@ function getRaceContext(today, raceDate, raceTarget, training) {
     speedGap = bestSec - targetSec;
     speedSource = training.best_interval.pace_source || "overall";
 
+    var stability = training.best_interval.speed_stability || training.speed_stability || {
+      sample_n: 0,
+      stddev_sec: null,
+      stable: false,
+      confidence: "low"
+    };
+
+    speedConfidence = stability.confidence || "low";
+
     speedReference = {
       date: training.best_interval.date,
       pace: training.best_interval.pace,
       source: speedSource,
       days_ago: training.best_interval.days_ago,
       reference_logic: training.best_interval.reference_logic,
-      train_score: training.best_interval.train_score || null
+      train_score: training.best_interval.train_score || null,
+      stability: stability
     };
 
     if (speedSource === "work") {
-      if (speedGap <= 0) speedStatus = "ready";
-      else if (speedGap <= 10) speedStatus = "close";
-      else if (speedGap <= 20) speedStatus = "developing";
-      else speedStatus = "early";
+      // Conservative logic:
+      // - if one recent workout is faster than target but not stable, status = close
+      // - speed = ready only when repeated enough and stable
+      if (speedGap <= 0 && stability.stable === true && stability.sample_n >= 3) {
+        speedStatus = "ready";
+      } else if (speedGap <= 10) {
+        speedStatus = "close";
+      } else if (speedGap <= 20) {
+        speedStatus = "developing";
+      } else {
+        speedStatus = "early";
+      }
     } else {
-      // Overall session pace is naturally slower than true race capability
       if (speedGap <= 30) speedStatus = "close";
       else if (speedGap <= 60) speedStatus = "developing";
       else speedStatus = "early";
@@ -656,10 +721,12 @@ function getRaceContext(today, raceDate, raceTarget, training) {
     speed_gap_sec_per_km: speedGap,
     speed_source: speedSource,
     speed_reference: speedReference,
+    speed_confidence: speedConfidence,
 
     overall_readiness: overall
   };
 }
+
 
 
   // ============================================
