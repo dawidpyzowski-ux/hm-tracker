@@ -347,6 +347,32 @@ function analyzeWorkLaps(classified, planType) {
     });
   }
 
+  
+function getIntervalRaceGap(workLapAnalysis) {
+  if (!workLapAnalysis || !workLapAnalysis.work_pace_avg || workLapAnalysis.work_pace_avg === "-") {
+    return null;
+  }
+
+  var workPaceSec = paceToSec(workLapAnalysis.work_pace_avg);
+  var targetSec = paceToSec("4:59");
+
+  if (!workPaceSec || !targetSec) return null;
+
+  var gap = workPaceSec - targetSec;
+
+  return {
+    work_pace: workLapAnalysis.work_pace_avg,
+    hm_target_pace: "4:59",
+    gap_sec_per_km: gap,
+    interpretation:
+      gap <= 5 ? "very close to HM target pace" :
+      gap <= 15 ? "close, achievable with consistency" :
+      gap <= 30 ? "moderate gap, needs endurance-specific work" :
+      "large gap, needs significant improvement"
+  };
+}
+
+
   async function analyze(activity) {
     if (!activity) return { error: "Brak aktywności" };
 
@@ -449,11 +475,14 @@ workout: {
 },
 
       // SMART PRECOMPUTED ANALYTICS
-      analytics: {
-        splits_analysis: splitAnalysis,
-        work_lap_analysis: workLapAnalysis,
-        comparison: comparison
-      },
+      
+analytics: {
+  splits_analysis: splitAnalysis,
+  work_lap_analysis: workLapAnalysis,
+  comparison: comparison,
+  interval_race_gap: getIntervalRaceGap(workLapAnalysis)
+},
+
       train_score: trainScore,
       pre_workout_health: health,
       race_target: {
