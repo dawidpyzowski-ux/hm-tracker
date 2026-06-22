@@ -460,6 +460,41 @@ if (isIntervalType(planType) && typeof TrainScore !== "undefined") {
       }
     } catch (e) {}
 
+
+    // 🌡️ Weather + heat stress context
+    var weather = null;
+    var heatStress = null;
+    if (typeof WeatherHistory !== "undefined" && WeatherHistory.getForActivity) {
+      try {
+        var w = await WeatherHistory.getForActivity(activity);
+        if (w) {
+          weather = {
+            temp_c: w.temp,
+            feels_like_c: w.apparent,
+            humidity_pct: w.humidity,
+            wind_kmh: w.wind,
+            conditions: w.description,
+            hour_of_workout: w.hour,
+            hour_source: w.hour_source,
+            location_source: w.location_source,
+            heat_index_c: w.heat_index
+          };
+          heatStress = w.heat_stress || null;
+        }
+      } catch (e) {
+        console.warn("[WorkoutAnalyzer] Weather fetch failed:", e);
+      }
+    }
+
+    // 🏷️ Smart type classification
+    var typeMeta = null;
+    if (typeof TrainingClassifier !== "undefined") {
+      try {
+        typeMeta = TrainingClassifier.classifyWithMetadata(activity.type || activity.workout_type);
+      } catch (e) {}
+    }
+
+    
     var payload = {
       mode: "workout",
 
@@ -475,6 +510,11 @@ workout: {
 },
 
       // SMART PRECOMPUTED ANALYTICS
+
+
+type_classification: typeMeta,    // ← NOWE
+weather: weather,                  // ← NOWE
+heat_stress: heatStress,           // ← NOWE
       
 analytics: {
   splits_analysis: splitAnalysis,
