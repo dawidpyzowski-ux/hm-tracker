@@ -42,12 +42,21 @@ function _getStrava(sid) {
     return (+parts[0]) * 60 + (+parts[1] || 0);
   }
 
-  function _weekKey(dateStr) {
+
+function _weekKey(dateStr) {
+    // ISO 8601 week (PL standard): poniedzialek = poczatek tygodnia
+    // Sourced from ISO 8601 algorithm
     var d = new Date(dateStr);
-    var j1 = new Date(d.getFullYear(), 0, 1);
-    var wn = Math.ceil(((d - j1) / 86400000 + j1.getDay() + 1) / 7);
-    return d.getFullYear() + '-W' + (wn < 10 ? '0' : '') + wn;
+    // UTC by zeby uniknac timezone drift
+    var dUTC = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    // Thursday in current week decides the year
+    dUTC.setUTCDate(dUTC.getUTCDate() + 4 - (dUTC.getUTCDay() || 7));
+    var yearStart = new Date(Date.UTC(dUTC.getUTCFullYear(), 0, 1));
+    var wn = Math.ceil((((dUTC - yearStart) / 86400000) + 1) / 7);
+    var year = dUTC.getUTCFullYear();
+    return year + '-W' + (wn < 10 ? '0' : '') + wn;
   }
+
 
   function _minettiCost(grade) {
     var i = grade;
