@@ -600,7 +600,7 @@ return {
       JSON.stringify(result.debug, null, 2) + "</pre>" +
       "</details>" +
       "<div style='margin-top:8px;color:#6b7280;font-size:0.7em;text-align:right;'>" +
-      new Date(result.timestamp).toLocaleString() + " | DeepSeek R1</div>";
+      new Date(result.timestamp).toLocaleString() + " | AI </div>";
   }
 
   return { analyze: analyze, renderAsModal: renderAsModal };
