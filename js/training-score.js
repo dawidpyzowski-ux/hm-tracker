@@ -248,12 +248,30 @@ var TrainScore = (function() {
       var evalLaps = classified.filter(function(l) { return l.role === 'work'; });
       if (evalLaps.length === 0) evalLaps = workLaps;
       
-      var avgPace = 0;
+     
+var avgPace = 0;
       if (evalLaps.length > 0) {
-        var sum = 0;
-        for (var i = 0; i < evalLaps.length; i++) sum += evalLaps[i].pace;
-        avgPace = sum / evalLaps.length;
+        // Distance-weighted average (bo lapy mogą mieć rozne dlugosci)
+        var totalSec = 0;
+        var totalDist = 0;
+        for (var i = 0; i < evalLaps.length; i++) {
+          var lapDist = parseFloat(evalLaps[i].distKm || evalLaps[i].distance_km || evalLaps[i].km || 1);
+          var lapPace = parseFloat(evalLaps[i].pace || 0);
+          if (lapPace > 0 && lapDist > 0) {
+            totalSec += lapPace * lapDist;
+            totalDist += lapDist;
+          }
+        }
+        if (totalDist > 0) {
+          avgPace = totalSec / totalDist;
+        } else {
+          // Fallback: arithmetic mean
+          var sum = 0;
+          for (var i = 0; i < evalLaps.length; i++) sum += evalLaps[i].pace;
+          avgPace = sum / evalLaps.length;
+        }
       }
+
       
       var isEasy = type.toLowerCase().indexOf('easy') !== -1 || type.toLowerCase().indexOf('recovery') !== -1 || type.toLowerCase().indexOf('regen') !== -1;
       var diff = 0;
