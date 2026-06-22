@@ -73,7 +73,7 @@ const Strava={
 
   _extractDetail(d){
     if(!d||!d.id)return null;
-    return{splits:d.splits_metric||[],laps:d.laps||[],cadence:d.average_cadence||null,max_hr:d.max_heartrate||null,max_speed:d.max_speed||null,calories:d.calories||null,suffer_score:d.suffer_score||null,elev_high:d.elev_high||null,elev_low:d.elev_low||null,total_elevation_gain:d.total_elevation_gain||null,gear:d.gear?d.gear.name:null,description:d.description||null};
+return{splits:d.splits_metric||[],laps:d.laps||[],cadence:d.average_cadence||null,max_hr:d.max_heartrate||null,max_speed:d.max_speed||null,calories:d.calories||null,suffer_score:d.suffer_score||null,elev_high:d.elev_high||null,elev_low:d.elev_low||null,total_elevation_gain:d.total_elevation_gain||null,gear:d.gear?d.gear.name:null,description:d.description||null,start_date_local:d.start_date_local||null,start_latlng:d.start_latlng||null,end_latlng:d.end_latlng||null,timezone:d.timezone||null};
   },
 
   _betterActivity(a,b){
