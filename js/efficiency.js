@@ -124,7 +124,20 @@ const Efficiency = (() => {
    *  classifyTypeSimple — prosta klasyfikacja po pace
    * ------------------------------------------------------- */
 
-  function classifyTypeSimple(act) {
+
+function classifyTypeSimple(act) {
+    // 1. PRIORYTET: użyj TrainingClassifier jeśli jest dostępny
+    if (typeof TrainingClassifier !== "undefined" && TrainingClassifier.classify) {
+      var fromType = TrainingClassifier.classify(act.type || act.workout_type);
+      if (fromType) {
+        // Mapuj na EF wewnętrzne nazwy
+        if (fromType === "long") return "long_run";
+        if (fromType === "recovery") return "easy";
+        return fromType; // tempo, intervals, easy
+      }
+    }
+
+    // 2. Fallback: stara klasyfikacja po pace
     const km = parseFloat(act.distance_km || act.km || 0);
     const paceS = parsePace(act.pace || act.avg_pace);
 
@@ -136,6 +149,7 @@ const Efficiency = (() => {
     }
     return "easy";
   }
+
 
   const TYPE_COLORS = {
     easy: "#3b82f6",
