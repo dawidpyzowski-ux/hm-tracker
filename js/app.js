@@ -418,10 +418,24 @@ DB.init().then(function(){
       const ok=await Strava.handleCallback();
       if(ok){toast('Strava polaczona!');await Strava.syncWorkouts()}
     }
+  
     nav('dash');
 
-    
+    // Sprint 19: Auto-enrich weather przy starcie (background)
+    try {
+      if (typeof WeatherHistory !== 'undefined' && WeatherHistory.enrichAll) {
+        DB.getAll().then(function(acts) {
+          WeatherHistory.enrichAll(acts).then(function(enriched) {
+            console.log('[App] Weather enriched:', enriched, '/', acts.length);
+          }).catch(function(e) {
+            console.warn('[App] Weather enrich failed:', e);
+          });
+        });
+      }
+    } catch(e) { console.warn('[App] Weather init error:', e); }
+
     // Sprint 11: PLAN_FLAT dostepny jako lookup
+
     try{if(window.PLAN_FLAT){window.PLAN_FLAT_MAP={};window.PLAN_FLAT.forEach(function(p){window.PLAN_FLAT_MAP[p.date]=p})}}catch(e){}
 
 
