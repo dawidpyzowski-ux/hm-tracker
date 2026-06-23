@@ -44,7 +44,7 @@ function findShiftedLog(wStart,wEnd,targetDate,targetKm){
 }
 
 // Sprint 11: dodano briefing, compare, report, efficiency do mapy renderowania
-function nav(s){CUR=s;document.querySelectorAll('.scr').forEach(el=>el.classList.remove('act'));document.querySelectorAll('.tab').forEach(el=>el.classList.remove('act'));document.getElementById('s-'+s).classList.add('act');document.querySelector(`.tab[data-s="${s}"]`).classList.add('act');({dash:rDash,plan:rPlan,nutr:rNutr,stat:rStat,sett:rSett,briefing:rBriefing,compare:rCompare,report:rReport,efficiency:rEfficiency})[s]()}
+function nav(s){CUR=s;document.querySelectorAll('.scr').forEach(el=>el.classList.remove('act'));document.querySelectorAll('.tab').forEach(el=>el.classList.remove('act'));document.getElementById('s-'+s).classList.add('act');document.querySelector(`.tab[data-s="${s}"]`).classList.add('act');({dash:rDash,plan:rPlan,nutr:rNutr,stat:rStat,sett:rSett,briefing:rBriefing,compare:rCompare,report:rReport,efficiency:rEfficiency,bodyform:rBodyForm})[s]()
 
 function rBodyForm(){
   try{
