@@ -848,10 +848,240 @@ function getRaceContext(today, raceDate, raceTarget, training) {
     } catch(e) { return []; }
   }
 
+  
+  // ============================================
+  // 8. EXISTING MODULE INTEGRATIONS (Sprint 20)
+  // ============================================
+  function getCoachAdvice() {
+    if (typeof Coach === "undefined" || !Coach.getAdvice) return null;
+    try {
+      if (typeof DB === "undefined" || !DB.getAll) return null;
+      // Coach.getAdvice używa cached promise from DB.getAll
+      // wykorzystamy DBs synchronicznie via existing data
+      var advice = null;
+      DB.getAll().then(function(acts) {
+        advice = Coach.getAdvice(acts, window.PLAN_FLAT);
+      });
+      // Awaitowanie nie zadziała tu — używamy fallback przez window cache
+      // ALE Coach.getAdvice jest synchroniczne (po DB cache)
+      var sync = (function() {
+        if (!Coach._cachedAdvice) return null;
+        return Coach._cachedAdvice;
+      })();
+      return sync;
+    } catch(e) { return null; }
+  }
+
+  // Async wrapper - lepiej wczytaj raz przy starcie
+  async function getCoachAdviceAsync() {
+    if (typeof Coach === "undefined" || !Coach.getAdvice) return null;
+    if (typeof DB === "undefined" || !DB.getAll) return null;
+    try {
+      var acts = await DB.getAll();
+      return Coach.getAdvice(acts, window.PLAN_FLAT);
+    } catch(e) { return null; }
+  }
+
+  function getWeeklyReportData() {
+    if (typeof WeeklyReport === "undefined") return null;
+    try {
+      var current = WeeklyReport.getWeekActivities(0);
+      var previous = WeeklyReport.getWeekActivities(-1);
+      var plan = WeeklyReport.getWeekPlan(0);
+      var planPrev = WeeklyReport.getWeekPlan(-1);
+      
+      var statsCur = WeeklyReport.calcStats(current);
+      var statsPrev = WeeklyReport.calcStats(previous);
+      var adherence = WeeklyReport.calcAdherence(current, plan);
+      var grade = WeeklyReport.calcGrade(adherence, statsCur);
+      
+      return {
+        current: {
+          stats: statsCur,
+          plan: plan,
+          adherence: adherence,
+          grade: grade
+        },
+        previous: {
+          stats: statsPrev,
+          plan: planPrev
+        },
+        week_over_week: {
+          km_change: statsCur && statsPrev ? +(statsCur.km - statsPrev.km).toFixed(1) : null,
+          km_change_pct: statsCur && statsPrev && statsPrev.km > 0 ? 
+            Math.round((statsCur.km - statsPrev.km) / statsPrev.km * 100) : null,
+          sessions_change: statsCur && statsPrev ? statsCur.workouts - statsPrev.workouts : null
+        }
+      };
+    } catch(e) { 
+      console.warn(TAG, "WeeklyReport failed:", e);
+      return null; 
+    }
+  }
+
+  function getWeekScore() {
+    if (typeof TrainScore === "undefined" || !TrainScore.weekScore) return null;
+    try {
+      return TrainScore.weekScore();
+    } catch(e) { return null; }
+  }
+
+  function calculateACWR(activities, today) {
+    if (!activities || !activities.length) return null;
+    var todayD = new Date(today);
+    var acuteLoad = 0, chronicLoad = 0;
+    
+    activities.forEach(function(a) {
+      var daysAgo = (todayD - new Date(a.date)) / 86400000;
+      if (daysAgo < 0 || daysAgo > 28) return;
+      
+      // Load = km × intensity factor
+      var paceStr = a.pace || "6:00";
+      var paceSec = paceToSec(paceStr);
+      
+      // Intensity factor based on pace
+      var intensityFactor;
+      if (paceSec === 0 || paceSec > 400) intensityFactor = 0.7;        // recovery/easy
+      else if (paceSec > 360) intensityFactor = 0.85;                    // easy
+      else if (paceSec > 320) intensityFactor = 1.0;                     // moderate
+      else if (paceSec > 280) intensityFactor = 1.2;                     // tempo
+      else intensityFactor = 1.4;                                        // hard/intervals
+      
+      var load = parseFloat(a.km || 0) * intensityFactor;
+      
+      chronicLoad += load;
+      if (daysAgo <= 7) acuteLoad += load;
+    });
+    
+    var acuteAvg = acuteLoad / 7;
+    var chronicAvg = chronicLoad / 28;
+    var acwr = chronicAvg > 0 ? +(acuteAvg / chronicAvg).toFixed(2) : 0;
+    
+    var zone, interpretation, risk_pct;
+    if (acwr < 0.8) {
+      zone = "undertrained";
+      interpretation = "Możesz dodać objętość — jesteś poniżej optymalnej strefy";
+      risk_pct = 10;
+    } else if (acwr <= 1.3) {
+      zone = "sweet_spot";
+      interpretation = "Optymalna strefa progresji — utrzymaj rytm";
+      risk_pct = 5;
+    } else if (acwr <= 1.5) {
+      zone = "caution";
+      interpretation = "Ostrożnie z dodawaniem — zbliżasz się do strefy ryzyka";
+      risk_pct = 35;
+    } else {
+      zone = "high_risk";
+      interpretation = "Wysokie ryzyko kontuzji — odpocznij/zmniejsz objętość";
+      risk_pct = 65;
+    }
+    
+    return {
+      acwr: acwr,
+      zone: zone,
+      acute_7d_load: +acuteLoad.toFixed(1),
+      chronic_28d_load: +chronicLoad.toFixed(1),
+      injury_risk_pct: risk_pct,
+      interpretation: interpretation
+    };
+  }
+
+  function canAddTraining(acwr, weeklyReport, readiness, training, race) {
+    var blockers = [];
+    var allowances = [];
+    
+    // Blokery
+    if (acwr) {
+      if (acwr.zone === "high_risk") {
+        blockers.push("ACWR " + acwr.acwr + " (high risk — ryzyko kontuzji 65%)");
+      } else if (acwr.zone === "caution") {
+        blockers.push("ACWR " + acwr.acwr + " (caution — ryzyko 35%)");
+      }
+    }
+    
+    if (readiness && readiness.score < 55) {
+      blockers.push("Readiness " + readiness.score + "/100 zbyt niskie");
+    }
+    
+    if (training && training.consecutive_days >= 4) {
+      blockers.push(training.consecutive_days + " dni z rzędu treningowe — potrzebny rest");
+    }
+    
+    if (weeklyReport && weeklyReport.week_over_week && weeklyReport.week_over_week.km_change_pct > 15) {
+      blockers.push("Wzrost vs poprzedni tydzień +" + weeklyReport.week_over_week.km_change_pct + "% (10% rule!)");
+    }
+    
+    // Pozytywy
+    if (acwr) {
+      if (acwr.zone === "undertrained") {
+        allowances.push("ACWR " + acwr.acwr + " (undertrained — możesz dodać)");
+      } else if (acwr.zone === "sweet_spot") {
+        allowances.push("ACWR " + acwr.acwr + " (sweet spot)");
+      }
+    }
+    
+    if (readiness && readiness.score >= 75) {
+      allowances.push("Readiness " + readiness.score + "/100 — bardzo dobre");
+    }
+    
+    if (training && training.days_since_hard !== null && training.days_since_hard >= 2) {
+      allowances.push(training.days_since_hard + " dni od hard — odpowiedni recovery");
+    }
+    
+    // Decision tree
+    var verdict, what, km, reason;
+    
+    if (blockers.length >= 2) {
+      verdict = "no";
+      what = null;
+      km = null;
+      reason = "Wiele sygnałów ostrzegawczych — trzymaj się planu lub zmniejsz objętość";
+    } else if (blockers.length === 1) {
+      verdict = "modify_plan_only";
+      what = null;
+      km = null;
+      reason = "Jeden sygnał ostrzegawczy — nie dodawaj, ale realizuj plan ostrożnie";
+    } else if (allowances.length >= 3) {
+      verdict = "yes";
+      what = "easy";
+      km = "8-10";
+      reason = "Wszystkie sygnały zielone — możesz dorzucić easy run";
+    } else if (allowances.length >= 2) {
+      verdict = "yes_easy";
+      what = "easy";
+      km = "6-8";
+      reason = "Większość sygnałów zielonych — easy run OK";
+    } else if (allowances.length >= 1) {
+      verdict = "yes_if_feel_good";
+      what = "easy";
+      km = "5-6";
+      reason = "Pojedynczy zielony sygnał — easy run jeśli czujesz się dobrze";
+    } else {
+      verdict = "stick_to_plan";
+      what = null;
+      km = null;
+      reason = "Brak jasnych sygnałów — trzymaj się planu";
+    }
+    
+    return {
+      verdict: verdict,
+      what: what,
+      km: km,
+      reason: reason,
+      blockers: blockers,
+      allowances: allowances,
+      blocker_count: blockers.length,
+      allowance_count: allowances.length
+    };
+  }
+
+
+  
   // ============================================
   // MAIN: COMPUTE EVERYTHING
   // ============================================
-  function compute() {
+ 
+  async function compute() {
     if (typeof HealthImport === "undefined") return { error: "HealthImport not loaded" };
 
     var today = localToday();
@@ -881,6 +1111,23 @@ function getRaceContext(today, raceDate, raceTarget, training) {
     var recommendation = recommendToday(readiness, anomalies, training, planToday);
     var crossInsights = getCrossInsights();
 
+    // === SPRINT 20: Wciągamy istniejące moduły ===
+    var coachAdvice = null;
+    var allActivities = [];
+    try {
+      if (typeof DB !== "undefined" && DB.getAll) {
+        allActivities = await DB.getAll();
+        if (typeof Coach !== "undefined" && Coach.getAdvice) {
+          coachAdvice = Coach.getAdvice(allActivities, window.PLAN_FLAT);
+        }
+      }
+    } catch(e) { console.warn(TAG, "DB/Coach failed:", e); }
+    
+    var weeklyReport = getWeeklyReportData();
+    var weekScore = getWeekScore();
+    var acwr = calculateACWR(allActivities, today);
+    var canAdd = canAddTraining(acwr, weeklyReport, readiness, training, race);
+
     var payload = {
       today: today,
       health: {
@@ -907,12 +1154,29 @@ function getRaceContext(today, raceDate, raceTarget, training) {
       plan_today: planToday,
       race: race,
       recommendation: recommendation,
-      cross_insights: crossInsights
+      cross_insights: crossInsights,
+      // === SPRINT 20 additions ===
+      coach_advice: coachAdvice ? {
+        headline: coachAdvice.headline,
+        suggestion: coachAdvice.suggestion,
+        context: coachAdvice.context,
+        patterns: coachAdvice.patterns,
+        race_prediction: coachAdvice.race,
+        insights: coachAdvice.insights,
+        warnings: coachAdvice.warnings,
+        tips: coachAdvice.tips,
+        confidence: coachAdvice.confidence
+      } : null,
+      weekly_report: weeklyReport,
+      week_score: weekScore,
+      acwr: acwr,
+      can_add_training: canAdd
     };
 
     console.log(TAG, "Computed:", payload);
     return payload;
   }
+
 
   return { compute: compute, _internals: { getReadinessScore: getReadinessScore, detectAnomalies: detectAnomalies, getTrainingContext: getTrainingContext } };
 })();
