@@ -425,9 +425,11 @@ DB.init().then(function(){
     try {
       if (typeof WeatherHistory !== 'undefined' && WeatherHistory.enrichAll) {
         DB.getAll().then(function(acts) {
-          WeatherHistory.enrichAll(acts).then(function(enriched) {
-            console.log('[App] Weather enriched:', enriched, '/', acts.length);
-          }).catch(function(e) {
+         
+WeatherHistory.enrichAll(acts).then(function(enrichedActs) {
+  var count = enrichedActs ? enrichedActs.filter(function(a) { return a._weather; }).length : 0;
+  console.log('[App] Weather enriched:', count, '/', acts.length);
+}).catch(function(e) {
             console.warn('[App] Weather enrich failed:', e);
           });
         });
