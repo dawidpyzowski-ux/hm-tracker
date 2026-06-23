@@ -43,11 +43,26 @@ const HealthImport = (() => {
     const energy   = parseInt(p.get('energy'))   || 0;
     const soreness = parseInt(p.get('soreness')) || 0;
 
+  
+    // === SPRINT 22: nowe metryki ===
+    const wristTemp = parseFloat(p.get('wristTemp')) || null;
+    const respRate = parseFloat(p.get('respRate')) || null;
+    const weight = parseFloat(p.get('weight')) || null;
+    const bodyFat = parseFloat(p.get('bodyFat')) || null;
+    const runningPower = parseFloat(p.get('runningPower')) || null;
+    const gct = parseFloat(p.get('gct')) || null;
+    const stride = parseFloat(p.get('stride')) || null;
+    const vo = parseFloat(p.get('vo')) || null;
+
     const entry = {
       date, sleepMin, deepMin, remMin, coreMin,
       rhr, hrv, hrvRaw, energy, soreness,
+      // Sprint 22 additions
+      wristTemp, respRate, weight, bodyFat,
+      runningPower, gct, stride, vo,
       ts: Date.now()
     };
+
 
     save(entry);
     console.log('[Health] Saved', date, entry);
