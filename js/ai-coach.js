@@ -17,8 +17,10 @@ var AICoach = (function() {
       return { error: "DailyCoachEngine not loaded" };
     }
 
-    var engineData = DailyCoachEngine.compute();
+
+    var engineData = await DailyCoachEngine.compute();
     if (engineData.error) return { error: engineData.error };
+
 
     var payload = Object.assign({ mode: "daily-v2" }, engineData);
 
