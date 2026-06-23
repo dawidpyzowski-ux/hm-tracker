@@ -4,7 +4,7 @@
   "use strict";
 
   function render() {
-    var el = document.getElementById('view-bodyform');
+    var el = document.getElementById('s-bodyform') || document.getElementById('view-bodyform');
     if (!el) return;
 
     var html = '';
