@@ -3,15 +3,23 @@
 const HealthImport = (() => {
   const STORE_KEY = 'health_data';
 
-  function parseNum(v) {
-    const n = parseFloat(v);
-    return isNaN(n) ? 0 : n;
-  }
 
-  function parseList(v) {
-    if (!v) return [];
-    return v.split(',').map(Number).filter(n => !isNaN(n) && n > 0);
-  }
+function parseNum(v) {
+  if (v === null || v === undefined || v === '') return 0;
+  // Konwersja PL locale (74,2 → 74.2)
+  const normalized = String(v).replace(',', '.');
+  const n = parseFloat(normalized);
+  return isNaN(n) ? 0 : n;
+}
+
+
+
+function parseList(v) {
+  if (!v) return [];
+  // HRV format: "72.54,30.15,55.72" (kropki dziesiętne, przecinki separator)
+  return v.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n) && n > 0);
+}
+
 
   function avg(arr) {
     if (!arr.length) return 0;
@@ -44,15 +52,24 @@ const HealthImport = (() => {
     const soreness = parseInt(p.get('soreness')) || 0;
 
   
-    // === SPRINT 22: nowe metryki ===
-    const wristTemp = parseFloat(p.get('wristTemp')) || null;
-    const respRate = parseFloat(p.get('respRate')) || null;
-    const weight = parseFloat(p.get('weight')) || null;
-    const bodyFat = parseFloat(p.get('bodyFat')) || null;
-    const runningPower = parseFloat(p.get('runningPower')) || null;
-    const gct = parseFloat(p.get('gct')) || null;
-    const stride = parseFloat(p.get('stride')) || null;
-    const vo = parseFloat(p.get('vo')) || null;
+
+// === SPRINT 22: nowe metryki (z obsługą PL locale "74,2" → 74.2) ===
+function parseOptional(rawValue) {
+  if (rawValue === null || rawValue === undefined || rawValue === '') return null;
+  const normalized = String(rawValue).replace(',', '.');
+  const n = parseFloat(normalized);
+  return isNaN(n) || n === 0 ? null : n;
+}
+
+const wristTemp = parseOptional(p.get('wristTemp'));
+const respRate = parseOptional(p.get('respRate'));
+const weight = parseOptional(p.get('weight'));
+const bodyFat = parseOptional(p.get('bodyFat'));
+const runningPower = parseOptional(p.get('runningPower'));
+const gct = parseOptional(p.get('gct'));
+const stride = parseOptional(p.get('stride'));
+const vo = parseOptional(p.get('vo'));
+
 
     const entry = {
       date, sleepMin, deepMin, remMin, coreMin,
