@@ -882,42 +882,143 @@ function getRaceContext(today, raceDate, raceTarget, training) {
     } catch(e) { return null; }
   }
 
-  function getWeeklyReportData() {
-    if (typeof WeeklyReport === "undefined") return null;
-    try {
-      var current = WeeklyReport.getWeekActivities(0);
-      var previous = WeeklyReport.getWeekActivities(-1);
-      var plan = WeeklyReport.getWeekPlan(0);
-      var planPrev = WeeklyReport.getWeekPlan(-1);
-      
-      var statsCur = WeeklyReport.calcStats(current);
-      var statsPrev = WeeklyReport.calcStats(previous);
-      var adherence = WeeklyReport.calcAdherence(current, plan);
-      var grade = WeeklyReport.calcGrade(adherence, statsCur);
-      
-      return {
-        current: {
-          stats: statsCur,
-          plan: plan,
-          adherence: adherence,
-          grade: grade
-        },
-        previous: {
-          stats: statsPrev,
-          plan: planPrev
-        },
-        week_over_week: {
-          km_change: statsCur && statsPrev ? +(statsCur.km - statsPrev.km).toFixed(1) : null,
-          km_change_pct: statsCur && statsPrev && statsPrev.km > 0 ? 
-            Math.round((statsCur.km - statsPrev.km) / statsPrev.km * 100) : null,
-          sessions_change: statsCur && statsPrev ? statsCur.workouts - statsPrev.workouts : null
-        }
-      };
-    } catch(e) { 
-      console.warn(TAG, "WeeklyReport failed:", e);
-      return null; 
+
+  function getWeeklyReportData(today, allActivities) {
+    if (!allActivities || !allActivities.length) return null;
+    
+    var todayD = new Date(today);
+    
+    // ISO week: poniedziałek = początek tygodnia
+    function getMondayOf(date) {
+      var d = new Date(date);
+      var day = d.getDay();
+      // niedziela (0) → cofnij o 6, poniedziałek (1) → 0, wtorek (2) → -1 itd.
+      var diff = day === 0 ? -6 : 1 - day;
+      d.setDate(d.getDate() + diff);
+      d.setHours(0, 0, 0, 0);
+      return d;
     }
+    
+    var thisMonday = getMondayOf(todayD);
+    var thisSunday = new Date(thisMonday);
+    thisSunday.setDate(thisSunday.getDate() + 6);
+    thisSunday.setHours(23, 59, 59, 999);
+    
+    var lastMonday = new Date(thisMonday);
+    lastMonday.setDate(lastMonday.getDate() - 7);
+    var lastSunday = new Date(thisSunday);
+    lastSunday.setDate(lastSunday.getDate() - 7);
+    
+    function inRange(dateStr, start, end) {
+      var d = new Date(dateStr);
+      return d >= start && d <= end;
+    }
+    
+    function calcStats(acts) {
+      var km = 0, sessions = 0, totalPaceSecKm = 0, paceKm = 0, totalHR = 0, hrCount = 0;
+      acts.forEach(function(a) {
+        sessions++;
+        var aKm = parseFloat(a.km || 0);
+        km += aKm;
+        var ps = paceToSec(a.pace);
+        if (ps > 0 && aKm > 0) {
+          totalPaceSecKm += ps * aKm;
+          paceKm += aKm;
+        }
+        if (a.avg_hr) {
+          totalHR += parseFloat(a.avg_hr);
+          hrCount++;
+        }
+      });
+      return {
+        km: +km.toFixed(1),
+        workouts: sessions,
+        avgPace: paceKm > 0 ? secToPace(Math.round(totalPaceSecKm / paceKm)) : "-",
+        avgHR: hrCount > 0 ? Math.round(totalHR / hrCount) : 0
+      };
+    }
+    
+    var currentActs = allActivities.filter(function(a) {
+      return inRange(a.date, thisMonday, thisSunday);
+    });
+    var previousActs = allActivities.filter(function(a) {
+      return inRange(a.date, lastMonday, lastSunday);
+    });
+    
+    var statsCur = calcStats(currentActs);
+    var statsPrev = calcStats(previousActs);
+    
+    // Plan z PLAN_FLAT
+    var planKm = 0;
+    var planSessions = 0;
+    var planKmPrev = 0;
+    var planSessionsPrev = 0;
+    if (window.PLAN_FLAT) {
+      window.PLAN_FLAT.forEach(function(p) {
+        if (inRange(p.date, thisMonday, thisSunday)) {
+          planKm += parseFloat(p.km || 0);
+          planSessions++;
+        }
+        if (inRange(p.date, lastMonday, lastSunday)) {
+          planKmPrev += parseFloat(p.km || 0);
+          planSessionsPrev++;
+        }
+      });
+    }
+    
+    var adherence = {
+      km_pct: planKm > 0 ? Math.round(statsCur.km / planKm * 100) : 0,
+      sessions_pct: planSessions > 0 ? Math.round(statsCur.workouts / planSessions * 100) : 0,
+      km_done: statsCur.km,
+      km_planned: +planKm.toFixed(1),
+      km_remaining: +(planKm - statsCur.km).toFixed(1),
+      sessions_done: statsCur.workouts,
+      sessions_planned: planSessions,
+      sessions_remaining: Math.max(0, planSessions - statsCur.workouts)
+    };
+    
+    // Grade
+    var grade;
+    if (adherence.km_pct >= 95) grade = "A";
+    else if (adherence.km_pct >= 80) grade = "B";
+    else if (adherence.km_pct >= 60) grade = "C";
+    else if (adherence.km_pct >= 40) grade = "D";
+    else grade = "F";
+    
+    return {
+      current: {
+        stats: statsCur,
+        plan: {
+          km: +planKm.toFixed(1),
+          sessions: planSessions
+        },
+        adherence: adherence,
+        grade: grade,
+        date_range: {
+          monday: thisMonday.toISOString().slice(0, 10),
+          sunday: thisSunday.toISOString().slice(0, 10)
+        }
+      },
+      previous: {
+        stats: statsPrev,
+        plan: {
+          km: +planKmPrev.toFixed(1),
+          sessions: planSessionsPrev
+        },
+        date_range: {
+          monday: lastMonday.toISOString().slice(0, 10),
+          sunday: lastSunday.toISOString().slice(0, 10)
+        }
+      },
+      week_over_week: {
+        km_change: +(statsCur.km - statsPrev.km).toFixed(1),
+        km_change_pct: statsPrev.km > 0 ? Math.round((statsCur.km - statsPrev.km) / statsPrev.km * 100) : null,
+        sessions_change: statsCur.workouts - statsPrev.workouts,
+        avgHR_change: statsCur.avgHR && statsPrev.avgHR ? statsCur.avgHR - statsPrev.avgHR : null
+      }
+    };
   }
+
 
   function getWeekScore() {
     if (typeof TrainScore === "undefined" || !TrainScore.weekScore) return null;
@@ -1123,7 +1224,7 @@ function getRaceContext(today, raceDate, raceTarget, training) {
       }
     } catch(e) { console.warn(TAG, "DB/Coach failed:", e); }
     
-    var weeklyReport = getWeeklyReportData();
+    var weeklyReport = getWeeklyReportData(today, allActivities);
     var weekScore = getWeekScore();
     var acwr = calculateACWR(allActivities, today);
     var canAdd = canAddTraining(acwr, weeklyReport, readiness, training, race);
