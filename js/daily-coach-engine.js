@@ -245,6 +245,54 @@ var DailyCoachEngine = (function() {
       }
     }
 
+    // === SPRINT 22: Wrist Temp anomaly ===
+    if (health.wristTemp && history && history.length >= 5) {
+      var tempValues = history.map(function(h) { return h.wristTemp; }).filter(function(v) { return v > 0; });
+      if (tempValues.length >= 3) {
+        var tempBaseline = tempValues.reduce(function(a,b){return a+b;}, 0) / tempValues.length;
+        var tempDelta = health.wristTemp - tempBaseline;
+        if (tempDelta >= 0.6) {
+          anomalies.push({
+            type: "danger", metric: "Wrist Temp",
+            message: "Wrist temp +" + tempDelta.toFixed(1) + "°C vs baseline — wczesny sygnał choroby/infekcji",
+            severity: "high"
+          });
+        } else if (tempDelta >= 0.3) {
+          anomalies.push({
+            type: "warning", metric: "Wrist Temp",
+            message: "Wrist temp +" + tempDelta.toFixed(1) + "°C vs baseline — obserwuj objawy",
+            severity: "medium"
+          });
+        }
+      }
+    }
+
+    // === SPRINT 22: Respiratory Rate anomaly ===
+    if (health.respRate && history && history.length >= 5) {
+      var rrValues = history.map(function(h) { return h.respRate; }).filter(function(v) { return v > 0; });
+      if (rrValues.length >= 3) {
+        var rrBaseline = rrValues.reduce(function(a,b){return a+b;}, 0) / rrValues.length;
+        var rrDelta = health.respRate - rrBaseline;
+        if (rrDelta >= 3) {
+          anomalies.push({
+            type: "warning", metric: "Resp Rate",
+            message: "Oddechów/min +" + Math.round(rrDelta) + " vs baseline (" + Math.round(rrBaseline) + ") — pre-illness signal",
+            severity: "high"
+          });
+        }
+      }
+    }
+
+    // === SPRINT 22: Body anomalies (z BodyTracker) ===
+    if (typeof BodyTracker !== "undefined") {
+      try {
+        var bodyAnomalies = BodyTracker.detectAnomalies();
+        if (bodyAnomalies && bodyAnomalies.length) {
+          bodyAnomalies.forEach(function(a) { anomalies.push(a); });
+        }
+      } catch(e) {}
+    }
+
     return anomalies;
   }
 
@@ -1272,7 +1320,36 @@ function getRaceContext(today, raceDate, raceTarget, training) {
       week_score: weekScore,
       acwr: acwr,
       can_add_training: canAdd
+      
+      // === SPRINT 21+22 ===
+      power: powerData,
+      body: bodyData,
+      biomechanics: biomechData
+
     };
+
+    // === SPRINT 21+22 additions ===
+    var powerData = null;
+    var bodyData = null;
+    var biomechData = null;
+
+    try {
+      if (typeof PowerEngine !== "undefined" && allActivities.length > 0) {
+        powerData = await PowerEngine.compute(allActivities);
+      }
+    } catch(e) { console.warn(TAG, "PowerEngine failed:", e); }
+
+    try {
+      if (typeof BodyTracker !== "undefined") {
+        bodyData = BodyTracker.compute();
+      }
+    } catch(e) { console.warn(TAG, "BodyTracker failed:", e); }
+
+    try {
+      if (typeof BiomechanicsEngine !== "undefined") {
+        biomechData = BiomechanicsEngine.compute();
+      }
+    } catch(e) { console.warn(TAG, "BiomechanicsEngine failed:", e); }
 
     console.log(TAG, "Computed:", payload);
     return payload;
