@@ -1277,6 +1277,33 @@ function getRaceContext(today, raceDate, raceTarget, training) {
     var acwr = calculateACWR(allActivities, today);
     var canAdd = canAddTraining(acwr, weeklyReport, readiness, training, race);
 
+
+    // === SPRINT 21+22 additions ===
+    var powerData = null;
+    var bodyData = null;
+    var biomechData = null;
+
+    try {
+      if (typeof PowerEngine !== "undefined" && allActivities.length > 0) {
+        powerData = await PowerEngine.compute(allActivities);
+      }
+    } catch(e) { console.warn(TAG, "PowerEngine failed:", e); }
+
+    try {
+      if (typeof BodyTracker !== "undefined") {
+        bodyData = BodyTracker.compute();
+      }
+    } catch(e) { console.warn(TAG, "BodyTracker failed:", e); }
+
+    try {
+      if (typeof BiomechanicsEngine !== "undefined") {
+        biomechData = BiomechanicsEngine.compute();
+      }
+    } catch(e) { console.warn(TAG, "BiomechanicsEngine failed:", e); }
+
+    var payload = {
+
+    
     var payload = {
       today: today,
       health: {
@@ -1319,7 +1346,7 @@ function getRaceContext(today, raceDate, raceTarget, training) {
       weekly_report: weeklyReport,
       week_score: weekScore,
       acwr: acwr,
-      can_add_training: canAdd
+      can_add_training: canAdd,
       
       // === SPRINT 21+22 ===
       power: powerData,
@@ -1328,32 +1355,7 @@ function getRaceContext(today, raceDate, raceTarget, training) {
 
     };
 
-    // === SPRINT 21+22 additions ===
-    var powerData = null;
-    var bodyData = null;
-    var biomechData = null;
 
-    try {
-      if (typeof PowerEngine !== "undefined" && allActivities.length > 0) {
-        powerData = await PowerEngine.compute(allActivities);
-      }
-    } catch(e) { console.warn(TAG, "PowerEngine failed:", e); }
-
-    try {
-      if (typeof BodyTracker !== "undefined") {
-        bodyData = BodyTracker.compute();
-      }
-    } catch(e) { console.warn(TAG, "BodyTracker failed:", e); }
-
-    try {
-      if (typeof BiomechanicsEngine !== "undefined") {
-        biomechData = BiomechanicsEngine.compute();
-      }
-    } catch(e) { console.warn(TAG, "BiomechanicsEngine failed:", e); }
-
-    console.log(TAG, "Computed:", payload);
-    return payload;
-  }
 
 
   return { compute: compute, _internals: { getReadinessScore: getReadinessScore, detectAnomalies: detectAnomalies, getTrainingContext: getTrainingContext } };
