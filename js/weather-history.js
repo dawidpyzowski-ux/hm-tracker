@@ -239,20 +239,22 @@ const WeatherHistory = (() => {
   }
 
   // ===== BATCH enrichment =====
-  async function enrichAll(activities, onProgress) {
-    var enriched = 0;
+
+async function enrichAll(activities, onProgress) {
+    var enrichedCount = 0;
     for (var i = 0; i < activities.length; i++) {
       var a = activities[i];
       var w = await getForActivity(a);
       if (w) {
         a._weather = w;
-        enriched++;
+        enrichedCount++;
       }
       if (onProgress) onProgress(i + 1, activities.length);
     }
-    console.log(TAG, enriched + " activities enriched with weather");
-    return enriched;
+    console.log(TAG, enrichedCount + " activities enriched with weather");
+    return activities;  // ← zmienione: zwraca tablicę, nie liczbę
   }
+
 
   async function getForecast(lat, lng) {
     lat = lat || DEFAULT_LAT;
