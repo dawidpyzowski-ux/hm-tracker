@@ -483,6 +483,28 @@ if('serviceWorker' in navigator){
   function SmartNotifications_requestPerm(){if(typeof Notification!=='undefined'){Notification.requestPermission().then(function(r){alert('Powiadomienia: '+r)});}else{alert('Brak wsparcia Notification API');}}
 }
 
+
+// Sprint 24: Drawer "Więcej"
+function toggleMoreDrawer() {
+  var drawer = document.getElementById('more-drawer');
+  if (!drawer) return;
+  drawer.classList.toggle('open');
+}
+
+function navAndClose(s) {
+  nav(s);
+  var drawer = document.getElementById('more-drawer');
+  if (drawer) drawer.classList.remove('open');
+  
+  // Highlight "Więcej" jako active w bottom nav
+  document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('act'));
+  var more = document.getElementById('tab-more');
+  if (more) more.classList.add('act');
+}
+
+
+
+
 if (typeof HealthSync !== "undefined") {
   HealthSync.auto();
 }
