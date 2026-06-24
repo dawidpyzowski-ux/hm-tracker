@@ -1,15 +1,8 @@
 
-/* stats-tabs.js v1 — Sprint 24: Sub-tabs for Stats (Performance / Biomechanics / History) */
+/* stats-tabs.js v2 — Sprint 24: Sub-tabs Stats (Performance / Biomechanics / History) — bez duplikatów */
 (function() {
   "use strict";
   var currentTab = 'performance';
-
-  function paceToSec(p) {
-    if (!p) return 0;
-    var parts = p.toString().split(":");
-    if (parts.length !== 2) return 0;
-    return parseInt(parts[0]) * 60 + parseInt(parts[1]);
-  }
 
   function render() {
     var el = document.getElementById('s-stat');
@@ -20,23 +13,17 @@
     html += '<h2 style="color:#f9fafb;margin:8px 4px 4px;font-size:1.4em;">📊 Statystyki</h2>';
     html += '<p style="color:#9ca3af;margin:0 4px 16px;font-size:0.85em;">Postępy treningowe</p>';
 
-    // Sub-tabs nav
     html += '<div class="sub-tabs">';
     html += '<button class="sub-tab ' + (currentTab==='performance'?'act':'') + '" onclick="StatsTabs.setTab(\'performance\')">🏃 Performance</button>';
     html += '<button class="sub-tab ' + (currentTab==='biomechanics'?'act':'') + '" onclick="StatsTabs.setTab(\'biomechanics\')">📏 Biomechanics</button>';
     html += '<button class="sub-tab ' + (currentTab==='history'?'act':'') + '" onclick="StatsTabs.setTab(\'history\')">📚 History</button>';
     html += '</div>';
 
-    // Content area
-    html += '<div id="stats-content">';
-    html += '<p style="color:#9ca3af;text-align:center;padding:20px;">⏳ Ładowanie...</p>';
-    html += '</div>';
-
+    html += '<div id="stats-content"><p style="color:#9ca3af;text-align:center;padding:20px;">⏳ Ładowanie...</p></div>';
     html += '</div>';
 
     el.innerHTML = html;
 
-    // Render content po DOM ready
     setTimeout(function() {
       if (currentTab === 'performance') renderPerformance();
       else if (currentTab === 'biomechanics') renderBiomechanics();
@@ -49,30 +36,74 @@
     render();
   }
 
-  // === PERFORMANCE: VO2max, Power algorytmiczne, GAP, etc. ===
+  // === Filter Analytics HTML — zostaw tylko wybrane sekcje ===
+  function filterAnalyticsHtml(html, includeKeywords) {
+    if (!html) return '';
+    
+    // Wyciąga sekcje typu <div class="chart-section">...<h3>TYTUŁ</h3>...</div>
+    var sections = html.split(/<div class="chart-section">/);
+    var result = '';
+    
+    sections.forEach(function(section, idx) {
+      if (idx === 0) return; // przed pierwszą sekcją jest nagłówek
+      
+      var fullSection = '<div class="chart-section">' + section;
+      var match = fullSection.match(/<h3>([^<]+)<\/h3>/);
+      if (!match) return;
+      
+      var title = match[1];
+      var matches = includeKeywords.some(function(kw) {
+        return title.indexOf(kw) >= 0;
+      });
+      
+      if (matches) {
+        // Zakończ tagiem zamykającym tej sekcji
+        var endIdx = section.indexOf('</div>', section.indexOf('<canvas') > 0 ? section.indexOf('</canvas>') : 0);
+        if (endIdx > 0) {
+          result += '<div class="chart-section">' + section.substring(0, endIdx + 6);
+        } else {
+          result += fullSection;
+        }
+      }
+    });
+    
+    // Też dodaj table-section dla "Podsumowanie tygodniowe" jeśli na liście
+    if (includeKeywords.some(function(kw) { return kw === 'Podsumowanie'; })) {
+      var tableMatch = html.match(/<div class="table-section">[\s\S]*?<\/div>\s*<\/div>/);
+      if (tableMatch) result += tableMatch[0];
+    }
+    
+    // Też Personal Records ("Rekordy")
+    if (includeKeywords.some(function(kw) { return kw === 'Rekordy'; })) {
+      var prMatch = html.match(/<div class="chart-section"><h3>[^<]*Rekordy[^<]*<\/h3>[\s\S]*?<\/div>\s*<\/div>/);
+      if (prMatch && result.indexOf('Rekordy') < 0) result = prMatch[0] + result;
+    }
+    
+    return result;
+  }
+
+  // === PERFORMANCE ===
   function renderPerformance() {
     var container = document.getElementById('stats-content');
     if (!container) return;
 
-    // Wykorzystaj istniejący Analytics.render() ale tylko niektóre sekcje
     var h = '';
 
-    // Treningowy load
+    // Training Load + Prediction (z Charts)
     h += '<div class="chc"><div class="ch-t">❤️‍🔥 Training Load (CTL / ATL / TSB)</div><canvas id="ch-tl"></canvas></div>';
-    
-    // Prediction
     h += '<div class="chc"><div class="ch-t">🎯 Prognoza półmaratonu - trend</div><canvas id="ch-pred"></canvas></div>';
 
-    // VO2max, GAP, Power — z Analytics
+    // Analytics — tylko Performance-related
     if (typeof Analytics !== 'undefined') {
       try {
         var analyticsHtml = Analytics.render();
-        // Filtruj sekcje Performance
-        h += filterAnalyticsSections(analyticsHtml, ['vo2', 'pwr', 'gap', 'bestkm', 'consist', 'hr150']);
+        h += filterAnalyticsHtml(analyticsHtml, [
+          'VO', 'Trend mocy', 'GAP', 'Najszybszy', 'Rownomiernosc', 'HR'
+        ]);
       } catch(e) { console.warn('Analytics render failed:', e); }
     }
 
-    // Pace, feeling, monthly volume z Charts
+    // Charts dodatkowe
     h += '<div class="chc"><div class="ch-t">📊 Km tygodniowy (plan vs realizacja)</div><canvas id="ch1"></canvas></div>';
     h += '<div class="chc"><div class="ch-t">⏱️ Trend tempa</div><canvas id="ch2"></canvas></div>';
     h += '<div class="chc"><div class="ch-t">😊 Samopoczucie</div><canvas id="ch3"></canvas></div>';
@@ -80,12 +111,10 @@
 
     container.innerHTML = h;
 
-    // Render wszystkich wykresów
     setTimeout(function() {
       try {
         if (typeof Analytics !== 'undefined' && Analytics.drawCharts) Analytics.drawCharts();
-      } catch(e) { console.warn('Analytics.drawCharts failed:', e); }
-      
+      } catch(e) {}
       try {
         if (typeof Charts !== 'undefined') {
           if (Charts.weeklyKm) Charts.weeklyKm('ch1');
@@ -95,54 +124,48 @@
           if (Charts.trainingLoad) Charts.trainingLoad('ch-tl');
           if (Charts.predTrend) Charts.predTrend('ch-pred');
         }
-      } catch(e) { console.warn('Charts render failed:', e); }
+      } catch(e) {}
     }, 100);
   }
 
-  // === BIOMECHANICS: Power Apple Watch, GCT, Stride, VO, CP Trend ===
+  // === BIOMECHANICS ===
   function renderBiomechanics() {
     var container = document.getElementById('stats-content');
     if (!container) return;
 
     var h = '';
 
-    // Header
     h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
     h += '<h3 style="margin:0 0 4px;color:#f9fafb;font-size:1em;">🏃 Running Biomechanics (Apple Watch)</h3>';
     h += '<p style="color:#9ca3af;margin:0;font-size:0.75em;">Pomiar z Apple Watch Ultra 2 — wymaga aktywnych biegów</p>';
     h += '</div>';
 
-    // CP Trend (12 weeks)
     h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
     h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">⚡ Critical Power (12 tygodni)</h3>';
     h += '<div style="position:relative;height:240px;"><canvas id="st-cp-trend"></canvas></div>';
     h += '</div>';
 
-    // Running Power
     h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
     h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">⚡ Running Power</h3>';
     h += '<div style="position:relative;height:200px;"><canvas id="st-running-power"></canvas></div>';
     h += '</div>';
 
-    // GCT
     h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
     h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">👣 Ground Contact Time</h3>';
     h += '<div style="position:relative;height:200px;"><canvas id="st-gct"></canvas></div>';
     h += '</div>';
 
-    // Stride
     h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
     h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">📏 Stride Length</h3>';
     h += '<div style="position:relative;height:200px;"><canvas id="st-stride"></canvas></div>';
     h += '</div>';
 
-    // VO
     h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
     h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">⬆️⬇️ Vertical Oscillation</h3>';
     h += '<div style="position:relative;height:200px;"><canvas id="st-vo"></canvas></div>';
     h += '</div>';
 
-    // Form Score (jeśli > 0 punktów)
+    // Form Score
     if (typeof BiomechanicsEngine !== 'undefined') {
       try {
         var biomech = BiomechanicsEngine.compute();
@@ -162,7 +185,6 @@
 
     container.innerHTML = h;
 
-    // Render wykresów
     setTimeout(function() {
       if (typeof BodyFormCharts === 'undefined') return;
 
@@ -174,66 +196,50 @@
           .sort(function(a, b) { return a.date.localeCompare(b.date); });
       }
 
-      // CP Trend
-      if (BodyFormCharts.drawCPTrend) {
-        BodyFormCharts.drawCPTrend('st-cp-trend');
-      }
+      if (BodyFormCharts.drawCPTrend) BodyFormCharts.drawCPTrend('st-cp-trend');
 
-      // Running Power
-      var rp = getData('runningPower');
       if (BodyFormCharts.drawTrendChart) {
-        BodyFormCharts.drawTrendChart('st-running-power', rp, {
+        BodyFormCharts.drawTrendChart('st-running-power', getData('runningPower'), {
           label: 'Running Power', color: '#a855f7', unit: ' W', yLabel: 'Power (W)'
         });
+        BodyFormCharts.drawTrendChart('st-gct', getData('gct'), {
+          label: 'GCT', color: '#84cc16', unit: ' ms', yLabel: 'ms'
+        });
+        BodyFormCharts.drawTrendChart('st-stride', getData('stride'), {
+          label: 'Stride', color: '#eab308', unit: ' m', yLabel: 'm'
+        });
+        BodyFormCharts.drawTrendChart('st-vo', getData('vo'), {
+          label: 'VO', color: '#ec4899', unit: ' cm', yLabel: 'cm'
+        });
       }
-
-      // GCT
-      var gct = getData('gct');
-      BodyFormCharts.drawTrendChart('st-gct', gct, {
-        label: 'GCT', color: '#84cc16', unit: ' ms', yLabel: 'ms'
-      });
-
-      // Stride
-      var stride = getData('stride');
-      BodyFormCharts.drawTrendChart('st-stride', stride, {
-        label: 'Stride', color: '#eab308', unit: ' m', yLabel: 'm'
-      });
-
-      // VO
-      var vo = getData('vo');
-      BodyFormCharts.drawTrendChart('st-vo', vo, {
-        label: 'VO', color: '#ec4899', unit: ' cm', yLabel: 'cm'
-      });
     }, 100);
   }
 
-  // === HISTORY: Heatmap, PR, Lista treningów ===
+  // === HISTORY ===
   function renderHistory() {
     var container = document.getElementById('stats-content');
     if (!container) return;
 
     var h = '';
 
-    // Pomyśl o tym jako wrapperze: użyj istniejącego HTML z Analytics + heatmap z app.js rStat()
-    // Najprościej: wywołaj częściowo logikę rStat() ale wstrzyknij do naszego kontenera
-
-    // Heatmap (manual implementation, bo część rStat)
+    // Heatmap
     h += renderHeatmap();
 
-    // Personal Records z Analytics
+    // Analytics — tylko History-related sections
     if (typeof Analytics !== 'undefined') {
       try {
         var analyticsHtml = Analytics.render();
-        h += filterAnalyticsSections(analyticsHtml, ['Rekordy', 'tdist', 'cumdist', 'Podsumowanie tygodniowe']);
+        h += filterAnalyticsHtml(analyticsHtml, [
+          'Rekordy', 'Rozklad typow', 'Dystans narastajaco', 'Podsumowanie'
+        ]);
       } catch(e) {}
     }
 
-    // Historia treningów (wymaga rStat-style render)
+    // Historia treningów
     h += renderHistoryList();
 
     container.innerHTML = h;
 
-    // Drawing
     setTimeout(function() {
       try {
         if (typeof Analytics !== 'undefined' && Analytics.drawCharts) {
@@ -247,27 +253,6 @@
     if (typeof PLAN === 'undefined') return '';
     
     var t = todayStr();
-    
-    // Build shift map (z app.js logiki)
-    function getShiftMap() {
-      var shiftMap = {};
-      PLAN.forEach(function(w) {
-        var we = getDayDate(w.start, 6);
-        w.days.forEach(function(d) {
-          if (d.rest || d.km <= 0) return;
-          var dt = getDayDate(w.start, d.dow);
-          var log = S.getLog(dt);
-          if (log && log.distance) return;
-          if (typeof findShiftedLog === 'function') {
-            var sh = findShiftedLog(w.start, we, dt, d.km);
-            if (sh) shiftMap[sh.date] = true;
-          }
-        });
-      });
-      return shiftMap;
-    }
-
-    var shiftMap = getShiftMap();
     var dayH = ['Pn','Wt','Sr','Cz','Pt','Sb','Nd'];
     
     var h = '<div class="hmap"><div class="hmap-title">🟩 Mapa aktywności (13 tygodni)</div>';
@@ -322,20 +307,16 @@
     var EMO_LOCAL = ['','😫','😣','😕','😐','🙂','😊','😄','😃','🤩','🔥'];
     
     var logs = S.getAllLogs();
-    var sortedDates = Object.keys(logs)
-      .filter(function(d) { return logs[d].distance; })
-      .sort(function(a, b) { return b.localeCompare(a); });
+    var sortedDates = Object.keys(logs).filter(function(d) { return logs[d].distance; }).sort(function(a, b) { return b.localeCompare(a); });
     
     var totalKm = 0;
-    sortedDates.forEach(function(d) { 
-      if (logs[d].distance) totalKm += parseFloat(logs[d].distance); 
-    });
+    sortedDates.forEach(function(d) { if (logs[d].distance) totalKm += parseFloat(logs[d].distance); });
     
     var plannedDates = {};
     try {
       if (window.PLAN_FLAT) {
         window.PLAN_FLAT.forEach(function(pf) {
-          if (!plannedDates[pf.date]) plannedDates[pf.date] = { type: pf.type, km: pf.km, week: '—' };
+          if (!plannedDates[pf.date]) plannedDates[pf.date] = { type: pf.type, km: pf.km };
         });
       }
     } catch(e) {}
@@ -382,15 +363,5 @@
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   }
 
-  // Filter Analytics HTML by keywords
-  function filterAnalyticsSections(html, keywords) {
-    if (!html) return '';
-    // Po prostu zwróć cały HTML — Analytics ma wszystkie sekcje warunkowo
-    return html;
-  }
-
-  window.StatsTabs = {
-    render: render,
-    setTab: setTab
-  };
+  window.StatsTabs = { render: render, setTab: setTab };
 })();
