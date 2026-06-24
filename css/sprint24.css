@@ -269,21 +269,21 @@ canvas {
 
 
 /* ============================================ */
-/* === Sprint 24 polish: History readability == */
+/* === Sprint 24 v4 polish — tylko Stats === */
 /* ============================================ */
 
-/* ===== STAT GRID (Personal Records) ===== */
-.stat-grid {
+/* Personal Records — pełna szerokość kart */
+#s-stat .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 8px;
   margin: 12px 0;
 }
 
-.stat-grid .stat {
+#s-stat .stat-grid .stat {
   background: #1f2937;
   border-radius: 10px;
-  padding: 12px 10px;
+  padding: 14px 10px;
   text-align: center;
   border: 1px solid #374151;
   display: flex;
@@ -292,186 +292,81 @@ canvas {
   min-height: 70px;
 }
 
-.stat-grid .stat-label {
+#s-stat .stat-label {
   display: block;
   color: #9ca3af;
-  font-size: 0.75em;
+  font-size: 0.7em;
   margin-bottom: 4px;
-  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.stat-grid .stat-value {
+#s-stat .stat-value {
   display: block;
   color: #f9fafb;
   font-size: 1.1em;
   font-weight: 700;
-  line-height: 1.2;
 }
 
-/* ===== CHART SECTIONS — full width ===== */
-.chart-section {
+/* Charts w Stats — fit width */
+#s-stat .chart-section,
+#s-stat .chc {
   background: #1f2937;
   border-radius: 10px;
   padding: 12px;
   margin-bottom: 12px;
   overflow: hidden;
+  display: block;
 }
 
-.chart-section h3 {
+#s-stat .chart-section h3,
+#s-stat .ch-t {
+  color: #f9fafb;
+  font-size: 0.95em;
+  font-weight: 600;
   margin: 0 0 8px;
-  color: #f9fafb;
-  font-size: 0.95em;
-  font-weight: 600;
 }
 
-.chart-section canvas {
+#s-stat .chart-section canvas,
+#s-stat .chc canvas {
   max-width: 100% !important;
   width: 100% !important;
   height: 220px !important;
   display: block !important;
 }
 
-/* ===== Stats Charts (chc class) ===== */
-.chc {
-  background: #1f2937;
-  border-radius: 10px;
-  padding: 12px;
-  margin-bottom: 12px;
-  position: relative;
-  overflow: hidden;
-}
-
-.chc canvas {
-  max-width: 100% !important;
-  width: 100% !important;
-  height: 220px !important;
-  display: block !important;
-}
-
-.ch-t {
-  color: #f9fafb;
-  font-size: 0.95em;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-
-/* ===== TABLE SECTION (Podsumowanie tygodniowe) ===== */
-.table-section {
+/* Heatmap responsive */
+#s-stat .hmap {
   background: #1f2937;
   border-radius: 10px;
   padding: 12px;
   margin-bottom: 12px;
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
-.table-section h3 {
-  margin: 0 0 10px;
-  color: #f9fafb;
-  font-size: 0.95em;
-  font-weight: 600;
-}
-
-.table-section table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85em;
-  color: #d1d5db;
-}
-
-.table-section th,
-.table-section td {
-  padding: 8px 6px;
-  text-align: left;
-  border-bottom: 1px solid #374151;
-}
-
-.table-section th {
-  color: #9ca3af;
-  font-weight: 600;
-  background: #111827;
-}
-
-/* ===== HEATMAP responsive ===== */
-.hmap {
-  background: #1f2937;
-  border-radius: 10px;
-  padding: 12px;
-  margin-bottom: 12px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.hmap-title {
-  color: #f9fafb;
-  font-size: 0.95em;
-  margin-bottom: 10px;
-  font-weight: 600;
-}
-
-.hmap-days {
-  display: grid;
-  grid-template-columns: 40px repeat(7, 1fr);
-  gap: 3px;
-  margin-bottom: 4px;
-}
-
-.hmap-dh {
-  color: #9ca3af;
-  font-size: 0.7em;
-  text-align: center;
-}
-
-.hmap-grid {
+#s-stat .hmap-days,
+#s-stat .hmap-grid {
   display: grid;
   grid-template-columns: 40px repeat(7, 1fr);
   gap: 3px;
 }
 
-.hmap-wk {
-  color: #9ca3af;
-  font-size: 0.7em;
-  display: flex;
-  align-items: center;
-}
-
-.hm-cell {
+#s-stat .hm-cell {
   aspect-ratio: 1;
   border-radius: 3px;
-  background: #374151;
   min-height: 18px;
 }
 
-.hm-cell.done { background: #22c55e; }
-.hm-cell.skip { background: #ef4444; }
-.hm-cell.miss { background: #f59e0b; }
-.hm-cell.rest { background: #4b5563; opacity: 0.5; }
-.hm-cell.future { background: #374151; }
-.hm-cell.today-cell { border: 2px solid #3b82f6; }
-
-.hmap-leg {
+#s-stat .hmap-leg {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 6px 12px;
   margin-top: 10px;
   font-size: 0.75em;
-  color: #9ca3af;
 }
 
-.hmap-li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.hmap-lc {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-}
-
-/* ===== WORKOUT LOG ITEMS (Historia treningów) ===== */
-.wlog {
+/* Workout logs — historia */
+#s-stat .wlog {
   background: #1f2937;
   border-radius: 10px;
   padding: 12px;
@@ -481,11 +376,7 @@ canvas {
   border: 1px solid #374151;
 }
 
-.wlog.extra {
-  border-left: 3px solid #f59e0b;
-}
-
-.wlog-date {
+#s-stat .wlog-date {
   flex-shrink: 0;
   width: 50px;
   text-align: center;
@@ -493,194 +384,68 @@ canvas {
   padding-right: 10px;
 }
 
-.wlog-d {
-  color: #f9fafb;
-  font-weight: 600;
-  font-size: 1em;
-}
-
-.wlog-dow {
-  color: #9ca3af;
-  font-size: 0.7em;
-  margin-top: 2px;
-}
-
-.wlog-info {
+#s-stat .wlog-info {
   flex: 1;
   min-width: 0;
 }
 
-.wlog-top {
+#s-stat .wlog-top {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 10px;
   align-items: center;
-  color: #d1d5db;
   font-size: 0.85em;
 }
 
-.wlog-km {
-  color: #f9fafb;
-  font-weight: 600;
-  font-size: 0.95em;
-}
-
-.wlog-pace,
-.wlog-hr {
-  color: #9ca3af;
-}
-
-.wlog-feel {
-  font-size: 1.1em;
-}
-
-.wlog-match {
-  color: #22c55e;
-  font-size: 0.8em;
-}
-
-.wlog-tag {
-  color: #f59e0b;
-  font-size: 0.8em;
-}
-
-.wlog-expand-btn {
-  color: #60a5fa;
-  font-size: 0.75em;
-  margin-left: auto;
-}
-
-.wlog-note {
-  color: #9ca3af;
-  font-size: 0.8em;
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid #374151;
-}
-
-.wlog-detail {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #374151;
-}
-
-.wlog-detail:empty {
-  display: none;
-}
-
-.hist-head {
+#s-stat .hist-head {
   display: flex;
   justify-content: space-between;
   padding: 10px 12px;
   background: #111827;
   border-radius: 8px;
   margin-bottom: 10px;
-  color: #9ca3af;
   font-size: 0.85em;
 }
 
-.hist-count {
-  font-weight: 600;
-  color: #f9fafb;
+#s-stat .table-section {
+  background: #1f2937;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  overflow-x: auto;
 }
 
-.stit {
-  color: #f9fafb;
-  font-size: 1.05em;
-  font-weight: 600;
-  margin: 16px 0 8px;
-  padding: 0 4px;
+#s-stat .table-section table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
 }
 
-/* ===== iPhone 17 Pro Max specific (max 440px) ===== */
+/* Mobile (max 440px) */
 @media screen and (max-width: 440px) {
-  
-  .stat-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 6px;
+  #s-stat .stat-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
   
-  .stat-grid .stat {
-    padding: 10px 6px;
-    min-height: 60px;
-  }
-  
-  .stat-grid .stat-label {
-    font-size: 0.7em;
-  }
-  
-  .stat-grid .stat-value {
-    font-size: 1em;
-  }
-  
-  .chart-section,
-  .chc {
-    padding: 10px;
-    margin-left: -4px;
-    margin-right: -4px;
-  }
-  
-  .chart-section canvas,
-  .chc canvas {
+  #s-stat .chart-section canvas,
+  #s-stat .chc canvas {
     height: 200px !important;
   }
   
-  .hmap {
-    padding: 10px;
-    margin-left: -4px;
-    margin-right: -4px;
-  }
-  
-  .hmap-days,
-  .hmap-grid {
+  #s-stat .hmap-days,
+  #s-stat .hmap-grid {
     grid-template-columns: 28px repeat(7, 1fr);
     gap: 2px;
   }
   
-  .hmap-wk {
-    font-size: 0.65em;
-  }
-  
-  .wlog {
-    padding: 10px;
-    gap: 10px;
-  }
-  
-  .wlog-date {
+  #s-stat .wlog-date {
     width: 42px;
-    padding-right: 8px;
   }
   
-  .wlog-d {
-    font-size: 0.9em;
-  }
-  
-  .wlog-top {
+  #s-stat .wlog-top {
     font-size: 0.8em;
-    gap: 4px 8px;
-  }
-  
-  .wlog-km {
-    font-size: 0.9em;
-  }
-  
-  .wlog-expand-btn {
-    flex-basis: 100%;
-    text-align: right;
-    margin-top: 4px;
-  }
-  
-  .table-section {
-    padding: 8px;
-  }
-  
-  .table-section table {
-    font-size: 0.8em;
-  }
-  
-  .table-section th,
-  .table-section td {
-    padding: 6px 4px;
   }
 }
+
+
 
