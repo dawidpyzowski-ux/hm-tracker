@@ -760,6 +760,35 @@ var DailyCoachEngine = (function() {
       if (typeof BiomechanicsEngine !== "undefined") biomechData = BiomechanicsEngine.compute();
     } catch(e) { console.warn(TAG, "BiomechanicsEngine failed:", e); }
 
+
+    // === SPRINT 25: Recovery insights ===
+    var recoveryVelocity = null, sleepRecoveryScore = null, trainingDist = null, hrDrift = null;
+    
+    try {
+      if (typeof RecoveryVelocity !== "undefined") {
+        recoveryVelocity = RecoveryVelocity.compute();
+      }
+    } catch(e) { console.warn(TAG, "RecoveryVelocity failed:", e); }
+    
+    try {
+      if (typeof SleepRecoveryScore !== "undefined") {
+        sleepRecoveryScore = SleepRecoveryScore.compute();
+      }
+    } catch(e) { console.warn(TAG, "SleepRecoveryScore failed:", e); }
+    
+    try {
+      if (typeof TrainingDistribution !== "undefined") {
+        trainingDist = await TrainingDistribution.computeWeekly();
+      }
+    } catch(e) { console.warn(TAG, "TrainingDistribution failed:", e); }
+    
+    try {
+      if (typeof HRDriftIndex !== "undefined") {
+        hrDrift = await HRDriftIndex.computeLastHardWorkout();
+      }
+    } catch(e) { console.warn(TAG, "HRDriftIndex failed:", e); }
+
+    
     var payload = {
       today: today,
       health: {
@@ -768,7 +797,15 @@ var DailyCoachEngine = (function() {
         deep_min: effective.deepMin || 0, rem_min: effective.remMin || 0,
         rhr: effective.rhr, hrv: effective.hrv,
         wristTemp: effective.wristTemp || null,
-        respRate: effective.respRate || null
+        respRate: effective.respRate || null,
+        
+/ Sprint 25 additions
+        cardioRecovery: effective.cardioRecovery || null,
+        vo2maxApple: effective.vo2maxApple || null,
+        steps: effective.steps || null,
+        walkingHR: effective.walkingHR || null,
+        spo2: effective.spo2 || null
+
       },
       baselines: {
         sleep_h: +(baselines.sleepMin / 60).toFixed(1),
@@ -800,7 +837,14 @@ var DailyCoachEngine = (function() {
       can_add_training: canAdd,
       power: powerData,
       body: bodyData,
-      biomechanics: biomechData
+      biomechanics: biomechData,
+      
+      // Sprint 25 additions
+      recovery_velocity: recoveryVelocity,
+      sleep_recovery_score: sleepRecoveryScore,
+      training_distribution: trainingDist,
+      hr_drift_last_hard: hrDrift,
+
     };
 
     console.log(TAG, "Computed:", payload);
