@@ -71,14 +71,31 @@ const stride = parseOptional(p.get('stride'));
 const vo = parseOptional(p.get('vo'));
 
 
-    const entry = {
-      date, sleepMin, deepMin, remMin, coreMin,
-      rhr, hrv, hrvRaw, energy, soreness,
-      // Sprint 22 additions
-      wristTemp, respRate, weight, bodyFat,
-      runningPower, gct, stride, vo,
-      ts: Date.now()
-    };
+    // === SPRINT 25: nowe metryki Apple Health ===
+    function parseOptional2(rawValue) {
+      if (rawValue === null || rawValue === undefined || rawValue === '') return null;
+      var normalized = String(rawValue).replace(',', '.');
+      var n = parseFloat(normalized);
+      return isNaN(n) || n === 0 ? null : n;
+    }
+    
+    const cardioRecovery = parseOptional2(p.get('cardioRecovery'));
+    const vo2maxApple = parseOptional2(p.get('vo2maxApple'));
+    const steps = parseOptional2(p.get('steps'));
+    const walkingHR = parseOptional2(p.get('walkingHR'));
+    const spo2 = parseOptional2(p.get('spo2'));
+
+
+const entry = {
+  date, sleepMin, deepMin, remMin, coreMin,
+  rhr, hrv, hrvRaw, energy, soreness,
+  wristTemp, respRate, weight, bodyFat,
+  runningPower, gct, stride, vo,
+  // Sprint 25 additions
+  cardioRecovery, vo2maxApple, steps, walkingHR, spo2,
+  ts: Date.now()
+};
+
 
 
     save(entry);
