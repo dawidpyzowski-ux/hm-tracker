@@ -1,0 +1,268 @@
+
+/* Sprint 24: Responsive + Drawer + iPhone 17 Pro Max */
+
+/* === BOTTOM NAV — 5 tabów === */
+.tabs {
+  display: flex;
+  justify-content: space-around;
+  background: rgba(20, 20, 20, 0.95);
+  backdrop-filter: blur(20px);
+  border-top: 0.5px solid var(--bd, #333);
+  padding: 6px 0;
+  padding-bottom: calc(6px + env(safe-area-inset-bottom));
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+  cursor: pointer;
+  color: var(--fg2, #888);
+  font-size: 10px;
+  font-weight: 500;
+  min-height: 50px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tab .ti {
+  font-size: 22px;
+  margin-bottom: 2px;
+  line-height: 1;
+}
+
+.tab.act {
+  color: var(--accent, #0A84FF);
+}
+
+.tab:active {
+  opacity: 0.6;
+}
+
+/* === DRAWER "WIĘCEJ" === */
+.more-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.more-drawer.open {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.more-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+}
+
+.more-drawer-content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #1a1a1a;
+  border-radius: 20px 20px 0 0;
+  padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.more-drawer.open .more-drawer-content {
+  transform: translateY(0);
+}
+
+.more-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #333;
+}
+
+.more-drawer-header h3 {
+  margin: 0;
+  color: #f9fafb;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.more-drawer-close {
+  background: #333;
+  border: none;
+  color: #f9fafb;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.more-drawer-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.more-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: #f9fafb;
+  font-size: 16px;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s;
+}
+
+.more-item:hover,
+.more-item:active {
+  background: #2a2a2a;
+}
+
+.more-icon {
+  font-size: 22px;
+}
+
+/* === SUB-TABS (dla Body i Stats) === */
+.sub-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  padding: 4px 0;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sub-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.sub-tab {
+  padding: 8px 14px;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 20px;
+  color: #9ca3af;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.15s;
+}
+
+.sub-tab.act {
+  background: #0A84FF;
+  border-color: #0A84FF;
+  color: white;
+}
+
+.sub-tab:active {
+  transform: scale(0.95);
+}
+
+/* === RESPONSIVE — iPhone 17 Pro Max & inne === */
+body {
+  padding-bottom: calc(70px + env(safe-area-inset-bottom));
+}
+
+.scr {
+  padding: 16px;
+  padding-top: calc(16px + env(safe-area-inset-top));
+}
+
+/* === CHART CONTAINERS — fit width === */
+.chc, .chart-section,
+[id^="bf-"] {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+canvas {
+  max-width: 100%;
+  height: auto !important;
+}
+
+/* Body & Form responsive */
+#s-bodyform {
+  padding: 12px;
+  padding-bottom: 100px;
+}
+
+#s-bodyform .chc,
+#s-bodyform > div > div {
+  margin-bottom: 12px;
+}
+
+/* iPhone 17 Pro Max optimization */
+@media screen and (max-width: 440px) {
+  .tab .ti {
+    font-size: 20px;
+  }
+  
+  .tab {
+    font-size: 9px;
+  }
+  
+  .sub-tab {
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+  
+  .more-drawer-content {
+    border-radius: 16px 16px 0 0;
+  }
+  
+  /* Wykresy fit szerokość */
+  canvas {
+    max-height: 240px !important;
+  }
+  
+  #bf-weight-bf,
+  #bf-cp-trend {
+    max-height: 280px !important;
+  }
+  
+  #bf-wrist-temp,
+  #bf-resp-rate,
+  #bf-running-power,
+  #bf-gct,
+  #bf-stride,
+  #bf-vo {
+    max-height: 200px !important;
+  }
+}
+
+/* iPad / desktop */
+@media screen and (min-width: 768px) {
+  .scr {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  
+  #s-bodyform [id^="bf-"]:not(#bf-correlations) {
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
