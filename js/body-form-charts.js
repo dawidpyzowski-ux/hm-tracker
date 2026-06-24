@@ -531,9 +531,15 @@ var BodyFormCharts = (function() {
     renderCorrelations('bf-correlations', correlations);
   }
 
+  
   return {
     renderAll: renderAll,
     computeCorrelations: computeCorrelations,
-    pearson: pearson
+    pearson: pearson,
+    drawTrendChart: drawTrendChart,
+    drawDualAxisChart: drawDualAxisChart,
+    drawCPTrend: drawCPTrend,
+    renderCorrelations: renderCorrelations
   };
 })();
+
