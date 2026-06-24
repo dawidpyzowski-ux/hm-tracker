@@ -1,5 +1,5 @@
 
-/* body-form-tab.js v2 — Sprint 24: Sub-tabs Recovery / Composition / Coach / Insights */
+/* body-form-tab.js v6 — Sprint 24+25: Sub-tabs Recovery / Composition / Coach / Insights */
 (function() {
   "use strict";
   var currentTab = 'recovery';
@@ -20,25 +20,17 @@
     html += '<button class="sub-tab ' + (currentTab==='insights'?'act':'') + '" onclick="BodyFormTab.setTab(\'insights\')">🔗 Insights</button>';
     html += '</div>';
 
-    // Content area
     html += '<div id="bf-content">';
 
-    if (currentTab === 'recovery') {
-      html += renderRecovery();
-    } else if (currentTab === 'composition') {
-      html += renderComposition();
-    } else if (currentTab === 'coach') {
-      html += renderCoach();
-    } else if (currentTab === 'insights') {
-      html += renderInsights();
-    }
+    if (currentTab === 'recovery') html += renderRecovery();
+    else if (currentTab === 'composition') html += renderComposition();
+    else if (currentTab === 'coach') html += renderCoach();
+    else if (currentTab === 'insights') html += renderInsights();
 
-    html += '</div>';
-    html += '</div>';
+    html += '</div></div>';
 
     el.innerHTML = html;
 
-    // Render po wstrzyknięciu HTML
     setTimeout(function() {
       if (currentTab === 'recovery') renderRecoveryCharts();
       else if (currentTab === 'composition') renderCompositionCharts();
@@ -52,15 +44,74 @@
     render();
   }
 
-  // === RECOVERY: Sleep, HRV, RHR, WristTemp, RespRate ===
+  // ============================================
+  // RECOVERY: Sleep, HRV, RHR, WristTemp, RespRate + Sprint 25
+  // ============================================
   function renderRecovery() {
     var h = '';
-    
-    // Sleep
+
+    // Sleep stacked
     h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
     h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">😴 Sen (Deep / REM / Core)</h3>';
     h += '<div style="position:relative;height:200px;"><canvas id="bf-sleep-stacked"></canvas></div>';
     h += '</div>';
+
+    // Sleep Recovery Score card
+    if (typeof SleepRecoveryScore !== 'undefined') {
+      try {
+        var srs = SleepRecoveryScore.compute();
+        if (srs) {
+          var color = srs.score >= 85 ? '#22c55e' :
+                      srs.score >= 70 ? '#84cc16' :
+                      srs.score >= 55 ? '#f59e0b' : '#ef4444';
+
+          h += '<div style="background:#1f2937;border-radius:10px;padding:14px;margin-bottom:12px;">';
+          h += '<h3 style="margin:0 0 12px;color:#f9fafb;font-size:1em;">😴 Sleep Recovery Score</h3>';
+          h += '<div style="text-align:center;margin-bottom:12px;">';
+          h += '<div style="color:' + color + ';font-size:3em;font-weight:bold;line-height:1;">' + srs.score + '</div>';
+          h += '<div style="color:#9ca3af;font-size:1em;margin-top:4px;">' + srs.label + '</div>';
+          h += '</div>';
+
+          h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.85em;">';
+          h += '<div style="background:#374151;padding:8px;border-radius:6px;text-align:center;">';
+          h += '<div style="color:#9ca3af;font-size:0.8em;">Total</div>';
+          h += '<div style="color:#f9fafb;font-weight:600;">' + srs.components.total.value_h + 'h</div>';
+          h += '<div style="color:' + color + ';font-size:0.7em;">score ' + srs.components.total.score + '</div>';
+          h += '</div>';
+          h += '<div style="background:#374151;padding:8px;border-radius:6px;text-align:center;">';
+          h += '<div style="color:#9ca3af;font-size:0.8em;">Deep</div>';
+          h += '<div style="color:#f9fafb;font-weight:600;">' + srs.components.deep.ratio_pct + '%</div>';
+          h += '<div style="color:' + color + ';font-size:0.7em;">score ' + srs.components.deep.score + '</div>';
+          h += '</div>';
+          h += '<div style="background:#374151;padding:8px;border-radius:6px;text-align:center;">';
+          h += '<div style="color:#9ca3af;font-size:0.8em;">REM</div>';
+          h += '<div style="color:#f9fafb;font-weight:600;">' + srs.components.rem.ratio_pct + '%</div>';
+          h += '<div style="color:' + color + ';font-size:0.7em;">score ' + srs.components.rem.score + '</div>';
+          h += '</div>';
+          h += '<div style="background:#374151;padding:8px;border-radius:6px;text-align:center;">';
+          h += '<div style="color:#9ca3af;font-size:0.8em;">Consistency</div>';
+          h += '<div style="color:#f9fafb;font-weight:600;">' + srs.components.consistency.score + '/100</div>';
+          h += '</div>';
+          h += '</div>';
+
+          if (srs.insights && srs.insights.length) {
+            h += '<div style="margin-top:12px;">';
+            srs.insights.forEach(function(ins) {
+              var bg = ins.type === 'positive' ? '#052e16' :
+                       ins.type === 'danger' ? '#450a0a' :
+                       ins.type === 'warning' ? '#451a03' : '#1e3a8a';
+              var fg = ins.type === 'positive' ? '#86efac' :
+                       ins.type === 'danger' ? '#fca5a5' :
+                       ins.type === 'warning' ? '#fde68a' : '#a5b4fc';
+              h += '<div style="background:' + bg + ';color:' + fg + ';padding:8px 10px;border-radius:6px;margin-top:6px;font-size:0.85em;">' + ins.message + '</div>';
+            });
+            h += '</div>';
+          }
+
+          h += '</div>';
+        }
+      } catch(e) { console.warn('SleepRecoveryScore card failed:', e); }
+    }
 
     // HRV
     h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
@@ -86,8 +137,7 @@
     h += '<div style="position:relative;height:200px;"><canvas id="bf-resp-rate"></canvas></div>';
     h += '</div>';
 
-
-    // === SPRINT 25 NEW CHARTS ===
+    // === SPRINT 25 ===
     // Cardio Recovery
     h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
     h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">⚡ Cardio Recovery</h3>';
@@ -118,70 +168,6 @@
     h += '<div style="position:relative;height:200px;"><canvas id="bf-walking-hr"></canvas></div>';
     h += '</div>';
 
-
-    // Sleep Recovery Score card
-    if (typeof SleepRecoveryScore !== 'undefined') {
-      try {
-        var srs = SleepRecoveryScore.compute();
-        if (srs) {
-          var color = srs.score >= 85 ? '#22c55e' : 
-                      srs.score >= 70 ? '#84cc16' :
-                      srs.score >= 55 ? '#f59e0b' : '#ef4444';
-          
-          h += '<div style="background:#1f2937;border-radius:10px;padding:14px;margin-bottom:12px;">';
-          h += '<h3 style="margin:0 0 12px;color:#f9fafb;font-size:1em;">😴 Sleep Recovery Score</h3>';
-          h += '<div style="text-align:center;margin-bottom:12px;">';
-          h += '<div style="color:' + color + ';font-size:3em;font-weight:bold;line-height:1;">' + srs.score + '</div>';
-          h += '<div style="color:#9ca3af;font-size:1em;margin-top:4px;">' + srs.label + '</div>';
-          h += '</div>';
-          
-          h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.85em;">';
-          h += '<div style="background:#374151;padding:8px;border-radius:6px;text-align:center;">';
-          h += '<div style="color:#9ca3af;font-size:0.8em;">Total</div>';
-          h += '<div style="color:#f9fafb;font-weight:600;">' + srs.components.total.value_h + 'h</div>';
-          h += '<div style="color:' + color + ';font-size:0.7em;">score ' + srs.components.total.score + '</div>';
-          h += '</div>';
-          h += '<div style="background:#374151;padding:8px;border-radius:6px;text-align:center;">';
-          h += '<div style="color:#9ca3af;font-size:0.8em;">Deep</div>';
-          h += '<div style="color:#f9fafb;font-weight:600;">' + srs.components.deep.ratio_pct + '%</div>';
-          h += '<div style="color:' + color + ';font-size:0.7em;">score ' + srs.components.deep.score + '</div>';
-          h += '</div>';
-          h += '<div style="background:#374151;padding:8px;border-radius:6px;text-align:center;">';
-          h += '<div style="color:#9ca3af;font-size:0.8em;">REM</div>';
-          h += '<div style="color:#f9fafb;font-weight:600;">' + srs.components.rem.ratio_pct + '%</div>';
-          h += '<div style="color:' + color + ';font-size:0.7em;">score ' + srs.components.rem.score + '</div>';
-          h += '</div>';
-          h += '<div style="background:#374151;padding:8px;border-radius:6px;text-align:center;">';
-          h += '<div style="color:#9ca3af;font-size:0.8em;">Consistency</div>';
-          h += '<div style="color:#f9fafb;font-weight:600;">' + srs.components.consistency.score + '/100</div>';
-          h += '</div>';
-          h += '</div>';
-          
-          // Insights
-          if (srs.insights && srs.insights.length) {
-            h += '<div style="margin-top:12px;">';
-            srs.insights.forEach(function(ins) {
-              var bg = ins.type === 'positive' ? '#052e16' : 
-                       ins.type === 'danger' ? '#450a0a' :
-                       ins.type === 'warning' ? '#451a03' : '#1e3a8a';
-              var fg = ins.type === 'positive' ? '#86efac' :
-                       ins.type === 'danger' ? '#fca5a5' :
-                       ins.type === 'warning' ? '#fde68a' : '#a5b4fc';
-              h += '<div style="background:' + bg + ';color:' + fg + ';padding:8px 10px;border-radius:6px;margin-top:6px;font-size:0.85em;">' + ins.message + '</div>';
-            });
-            h += '</div>';
-          }
-          
-          h += '</div>';
-        }
-      } catch(e) { console.warn('SleepRecoveryScore card failed:', e); }
-    }
-
-    
-    return h;
-}
-
-    
     return h;
   }
 
@@ -201,71 +187,31 @@
       return arr.reduce(function(s,d){return s+d.value;}, 0) / arr.length;
     }
 
-
-    // === SPRINT 25 metrics ===
-    // Cardio Recovery
-    h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
-    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">⚡ Cardio Recovery</h3>';
-    h += '<div style="position:relative;height:200px;"><canvas id="bf-cardio-recovery"></canvas></div>';
-    h += '</div>';
-
-    // VO2 Max
-    h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
-    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">🏃 VO2 Max (Apple)</h3>';
-    h += '<div style="position:relative;height:200px;"><canvas id="bf-vo2max"></canvas></div>';
-    h += '</div>';
-
-    // SpO2
-    h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
-    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">🩺 Blood Oxygen (SpO2)</h3>';
-    h += '<div style="position:relative;height:200px;"><canvas id="bf-spo2"></canvas></div>';
-    h += '</div>';
-
-    // Daily Steps
-    h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
-    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">🚶 Daily Steps</h3>';
-    h += '<div style="position:relative;height:200px;"><canvas id="bf-steps"></canvas></div>';
-    h += '</div>';
-
-    // Walking HR
-    h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
-    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">❤️ Walking HR Avg</h3>';
-    h += '<div style="position:relative;height:200px;"><canvas id="bf-walking-hr"></canvas></div>';
-    h += '</div>';
-
-    
-    // Sleep stacked
     drawSleepStacked('bf-sleep-stacked');
 
-    // HRV
     var hrv = getData('hrv');
     BodyFormCharts.drawTrendChart && BodyFormCharts.drawTrendChart('bf-hrv', hrv, {
       label: 'HRV', color: '#22c55e', unit: ' ms', yLabel: 'ms',
       baseline: hrv.length >= 3 ? +avg(hrv).toFixed(1) : 0
     });
 
-    // RHR
     var rhr = getData('rhr');
     BodyFormCharts.drawTrendChart && BodyFormCharts.drawTrendChart('bf-rhr', rhr, {
       label: 'RHR', color: '#ef4444', unit: ' bpm', yLabel: 'bpm',
       baseline: rhr.length >= 3 ? Math.round(avg(rhr)) : 0
     });
 
-    // Wrist Temp
     var wt = getData('wristTemp');
     BodyFormCharts.drawTrendChart && BodyFormCharts.drawTrendChart('bf-wrist-temp', wt, {
       label: 'Wrist Temp', color: '#f97316', unit: '°C', yLabel: '°C',
       baseline: wt.length >= 3 ? +avg(wt).toFixed(2) : 0
     });
 
-    // Resp Rate
     var rr = getData('respRate');
     BodyFormCharts.drawTrendChart && BodyFormCharts.drawTrendChart('bf-resp-rate', rr, {
       label: 'Resp Rate', color: '#06b6d4', unit: '/min', yLabel: '/min',
       baseline: rr.length >= 3 ? +avg(rr).toFixed(1) : 0
     });
-
-
 
     // Sprint 25 charts
     var cr = getData('cardioRecovery');
@@ -276,7 +222,7 @@
     var vo2 = getData('vo2maxApple');
     BodyFormCharts.drawTrendChart && BodyFormCharts.drawTrendChart('bf-vo2max', vo2, {
       label: 'VO2 Max', color: '#10b981', unit: ' ml/kg/min', yLabel: 'ml/kg/min',
-      target: 56  // cel 4:59
+      target: 56
     });
 
     var spo2 = getData('spo2');
@@ -295,16 +241,16 @@
       label: 'Walking HR', color: '#ef4444', unit: ' bpm', yLabel: 'bpm'
     });
   }
-  
+
   function drawSleepStacked(canvasId) {
     var canvas = document.getElementById(canvasId);
     if (!canvas || typeof Chart === 'undefined') return;
-    
+
     if (typeof HealthImport === 'undefined') return;
     var data = HealthImport.getAll()
       .filter(function(d) { return d.sleepMin > 0; })
       .slice(-30);
-    
+
     if (!data.length) {
       var ctx = canvas.getContext('2d');
       ctx.fillStyle = '#9ca3af';
@@ -343,26 +289,26 @@
     });
   }
 
-  // === COMPOSITION: Weight + BF ===
+  // ============================================
+  // COMPOSITION: Weight + BF
+  // ============================================
   function renderComposition() {
     var h = '';
-    
-    // Body Composition dual axis
+
     h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
     h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">⚖️ Waga + Body Fat</h3>';
     h += '<div style="position:relative;height:280px;"><canvas id="bf-weight-bf"></canvas></div>';
     h += '</div>';
 
-    // Progress vs Goal
     if (typeof BodyTracker !== 'undefined') {
       var progress = BodyTracker.getProgressVsGoal();
       if (progress) {
-        var statusColor = progress.weight.status === 'on_track' ? '#22c55e' : 
+        var statusColor = progress.weight.status === 'on_track' ? '#22c55e' :
                           progress.weight.status === 'ahead' ? '#84cc16' : '#f59e0b';
-        var safetyEmoji = progress.weight.safety === 'healthy' ? '✅' : 
+        var safetyEmoji = progress.weight.safety === 'healthy' ? '✅' :
                           progress.weight.safety === 'slow' ? '🐢' :
                           progress.weight.safety === 'too_fast' ? '⚠️' : '⚪';
-        
+
         h += '<div style="background:#1f2937;border-radius:10px;padding:14px;margin-bottom:12px;">';
         h += '<h3 style="margin:0 0 12px;color:#f9fafb;font-size:1em;">🎯 Progress do HM (' + progress.days_remaining + ' dni)</h3>';
         h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">';
@@ -397,7 +343,7 @@
 
   function renderCompositionCharts() {
     if (typeof BodyFormCharts === 'undefined') return;
-    
+
     function getData(field) {
       if (typeof HealthImport === "undefined") return [];
       return HealthImport.getAll()
@@ -413,7 +359,9 @@
     }
   }
 
-  // === COACH AI ===
+  // ============================================
+  // COACH AI
+  // ============================================
   function renderCoach() {
     return '<div id="bf-ai-coach-container"><p style="color:#9ca3af;text-align:center;padding:30px;">⏳ AI Coach analizuje dane...</p></div>';
   }
@@ -421,17 +369,16 @@
   async function renderCoachContent() {
     var container = document.getElementById('bf-ai-coach-container');
     if (!container) return;
-
     if (typeof AICoach === 'undefined') {
       container.innerHTML = '<p style="color:#fca5a5;text-align:center;padding:30px;">AICoach nie załadowany</p>';
       return;
     }
-
-    // Użyj istniejącej AICoach.render() na nowym kontenerze
     AICoach.render('bf-ai-coach-container');
   }
 
-  // === INSIGHTS (korelacje) ===
+  // ============================================
+  // INSIGHTS (korelacje + CP trend)
+  // ============================================
   function renderInsights() {
     var h = '';
     h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
@@ -440,7 +387,6 @@
     h += '<div id="bf-correlations"></div>';
     h += '</div>';
 
-    // CP Trend (też ciekawy insight)
     h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
     h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">⚡ CP Trend (12 tygodni)</h3>';
     h += '<div style="position:relative;height:240px;"><canvas id="bf-cp-trend"></canvas></div>';
@@ -451,20 +397,20 @@
 
   async function renderInsightsContent() {
     if (typeof BodyFormCharts === 'undefined') return;
-    
+
     if (BodyFormCharts.computeCorrelations) {
       var corr = await BodyFormCharts.computeCorrelations();
       if (BodyFormCharts.renderCorrelations) {
         BodyFormCharts.renderCorrelations('bf-correlations', corr);
       }
     }
-    
+
     if (BodyFormCharts.drawCPTrend) {
       await BodyFormCharts.drawCPTrend('bf-cp-trend');
     }
   }
 
-  window.BodyFormTab = { 
+  window.BodyFormTab = {
     render: render,
     setTab: setTab
   };
