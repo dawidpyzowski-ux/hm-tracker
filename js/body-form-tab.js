@@ -168,7 +168,7 @@
       label: 'Resp Rate', color: '#06b6d4', unit: '/min', yLabel: '/min',
       baseline: rr.length >= 3 ? +avg(rr).toFixed(1) : 0
     });
-  }
+
 
 
     // Sprint 25 charts
@@ -198,7 +198,7 @@
     BodyFormCharts.drawTrendChart && BodyFormCharts.drawTrendChart('bf-walking-hr', wHR, {
       label: 'Walking HR', color: '#ef4444', unit: ' bpm', yLabel: 'bpm'
     });
-
+  }
   
   function drawSleepStacked(canvasId) {
     var canvas = document.getElementById(canvasId);
