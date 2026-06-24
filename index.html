@@ -44,20 +44,47 @@
 <!-- ====== /Sprint 11 ====== -->
 
   
+
 <nav class="tabs">
-<div class="tab act" data-s="dash"><span class="ti">🏠</span><span>Home</span></div>
-<div class="tab" data-s="plan"><span class="ti">📅</span><span>Plan</span></div>
-<div class="tab" data-s="nutr"><span class="ti">🍽️</span><span>Dieta</span></div>
-<div class="tab" data-s="stat"><span class="ti">📊</span><span>Stats</span></div>
-<div class="tab" data-s="bodyform"><span class="ti">💪</span><span>Body</span></div>
-  <!-- ====== Sprint 11: Nowe taby ====== -->
-<div class="tab" data-s="briefing"><span class="ti">🎯</span><span>Brief</span></div>
-<div class="tab" data-s="compare"><span class="ti">🔄</span><span>Porów.</span></div>
-<div class="tab" data-s="report"><span class="ti">📋</span><span>Raport</span></div>
-<div class="tab" data-s="efficiency"><span class="ti">⚡</span><span>EF</span></div>
-<!-- ====== /Sprint 11 ====== -->
-<div class="tab" data-s="sett"><span class="ti">⚙️</span><span>Ustaw.</span></div>
+  <div class="tab act" data-s="dash"><span class="ti">🏠</span><span>Home</span></div>
+  <div class="tab" data-s="plan"><span class="ti">📅</span><span>Plan</span></div>
+  <div class="tab" data-s="stat"><span class="ti">📊</span><span>Stats</span></div>
+  <div class="tab" data-s="bodyform"><span class="ti">💪</span><span>Body</span></div>
+  <div class="tab" id="tab-more" onclick="toggleMoreDrawer()"><span class="ti">⋯</span><span>Więcej</span></div>
 </nav>
+
+<!-- Drawer "Więcej" -->
+<div id="more-drawer" class="more-drawer">
+  <div class="more-drawer-backdrop" onclick="toggleMoreDrawer()"></div>
+  <div class="more-drawer-content">
+    <div class="more-drawer-header">
+      <h3>Więcej</h3>
+      <button class="more-drawer-close" onclick="toggleMoreDrawer()">✕</button>
+    </div>
+    <div class="more-drawer-items">
+      <div class="more-item" data-s="briefing" onclick="navAndClose('briefing')">
+        <span class="more-icon">🎯</span><span>Briefing</span>
+      </div>
+      <div class="more-item" data-s="nutr" onclick="navAndClose('nutr')">
+        <span class="more-icon">🍽️</span><span>Dieta</span>
+      </div>
+      <div class="more-item" data-s="compare" onclick="navAndClose('compare')">
+        <span class="more-icon">🔄</span><span>Porównanie</span>
+      </div>
+      <div class="more-item" data-s="report" onclick="navAndClose('report')">
+        <span class="more-icon">📋</span><span>Raport tygodniowy</span>
+      </div>
+      <div class="more-item" data-s="efficiency" onclick="navAndClose('efficiency')">
+        <span class="more-icon">⚡</span><span>Efficiency</span>
+      </div>
+      <div class="more-item" data-s="sett" onclick="navAndClose('sett')">
+        <span class="more-icon">⚙️</span><span>Ustawienia</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
