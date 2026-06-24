@@ -448,4 +448,72 @@ canvas {
 }
 
 
+/* === Sprint 24 v5: Activity Detail charts (wlog-detail) === */
+#s-stat .wlog-detail {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #374151;
+}
+
+#s-stat .wlog-detail:empty {
+  display: none;
+}
+
+/* Wszystkie canvas wewnątrz expanded detail */
+#s-stat .wlog-detail canvas {
+  max-width: 100% !important;
+  width: 100% !important;
+  height: 240px !important;
+  display: block !important;
+}
+
+/* Sekcje wewnątrz detail (Tetno, Moc, Tempo vs GAP, Strefy HR) */
+#s-stat .wlog-detail .chart-section,
+#s-stat .wlog-detail > div {
+  background: #111827;
+  border-radius: 8px;
+  padding: 10px;
+  margin: 8px 0;
+}
+
+#s-stat .wlog-detail h4,
+#s-stat .wlog-detail .ch-t {
+  color: #f9fafb;
+  font-size: 0.9em;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+/* Donut chart (Strefy HR) — mniejszy + środkowanie */
+#s-stat .wlog-detail canvas[id*="zone"],
+#s-stat .wlog-detail canvas[id*="hr"]:not([id*="km"]) {
+  max-height: 220px !important;
+  height: 220px !important;
+}
+
+/* Legenda HR zones — fix kontrast */
+#s-stat .wlog-detail [class*="legend"],
+#s-stat .wlog-detail [class*="zone-list"] {
+  color: #f9fafb;
+  font-size: 0.85em;
+}
+
+#s-stat .wlog-detail [class*="legend"] span,
+#s-stat .wlog-detail [class*="zone-list"] span {
+  color: #d1d5db;
+}
+
+/* Mobile (max 440px) */
+@media screen and (max-width: 440px) {
+  #s-stat .wlog-detail canvas {
+    height: 200px !important;
+  }
+  
+  #s-stat .wlog-detail .chart-section,
+  #s-stat .wlog-detail > div {
+    padding: 8px;
+    margin: 6px 0;
+  }
+}
+
 
