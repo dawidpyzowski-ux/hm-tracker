@@ -37,50 +37,42 @@
   }
 
   // === Filter Analytics HTML — zostaw tylko wybrane sekcje ===
-  function filterAnalyticsHtml(html, includeKeywords) {
-    if (!html) return '';
-    
-    // Wyciąga sekcje typu <div class="chart-section">...<h3>TYTUŁ</h3>...</div>
-    var sections = html.split(/<div class="chart-section">/);
-    var result = '';
-    
-    sections.forEach(function(section, idx) {
-      if (idx === 0) return; // przed pierwszą sekcją jest nagłówek
-      
-      var fullSection = '<div class="chart-section">' + section;
-      var match = fullSection.match(/<h3>([^<]+)<\/h3>/);
-      if (!match) return;
-      
-      var title = match[1];
-      var matches = includeKeywords.some(function(kw) {
-        return title.indexOf(kw) >= 0;
-      });
-      
-      if (matches) {
-        // Zakończ tagiem zamykającym tej sekcji
-        var endIdx = section.indexOf('</div>', section.indexOf('<canvas') > 0 ? section.indexOf('</canvas>') : 0);
-        if (endIdx > 0) {
-          result += '<div class="chart-section">' + section.substring(0, endIdx + 6);
-        } else {
-          result += fullSection;
-        }
-      }
+
+function filterAnalyticsHtml(html, includeKeywords) {
+  if (!html) return '';
+  
+  // Wstrzyknij całość Analytics, ale dodaj data-section atrybut
+  // do ukrywania przez CSS
+  var div = document.createElement('div');
+  div.innerHTML = html;
+  
+  var sections = div.querySelectorAll('.chart-section');
+  sections.forEach(function(sec) {
+    var h3 = sec.querySelector('h3');
+    if (!h3) return;
+    var title = h3.textContent;
+    var matches = includeKeywords.some(function(kw) {
+      return title.indexOf(kw) >= 0;
     });
-    
-    // Też dodaj table-section dla "Podsumowanie tygodniowe" jeśli na liście
-    if (includeKeywords.some(function(kw) { return kw === 'Podsumowanie'; })) {
-      var tableMatch = html.match(/<div class="table-section">[\s\S]*?<\/div>\s*<\/div>/);
-      if (tableMatch) result += tableMatch[0];
+    if (!matches) {
+      sec.style.display = 'none';
     }
-    
-    // Też Personal Records ("Rekordy")
-    if (includeKeywords.some(function(kw) { return kw === 'Rekordy'; })) {
-      var prMatch = html.match(/<div class="chart-section"><h3>[^<]*Rekordy[^<]*<\/h3>[\s\S]*?<\/div>\s*<\/div>/);
-      if (prMatch && result.indexOf('Rekordy') < 0) result = prMatch[0] + result;
+  });
+  
+  // Table section (Podsumowanie tygodniowe)
+  var tableSec = div.querySelector('.table-section');
+  if (tableSec) {
+    var tableMatches = includeKeywords.some(function(kw) {
+      return tableSec.textContent.indexOf(kw) >= 0;
+    });
+    if (!tableMatches) {
+      tableSec.style.display = 'none';
     }
-    
-    return result;
   }
+  
+  return div.innerHTML;
+}
+
 
   // === PERFORMANCE ===
   function renderPerformance() {
