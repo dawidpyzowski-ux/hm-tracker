@@ -86,6 +86,102 @@
     h += '<div style="position:relative;height:200px;"><canvas id="bf-resp-rate"></canvas></div>';
     h += '</div>';
 
+
+    // === SPRINT 25 NEW CHARTS ===
+    // Cardio Recovery
+    h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
+    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">⚡ Cardio Recovery</h3>';
+    h += '<div style="position:relative;height:200px;"><canvas id="bf-cardio-recovery"></canvas></div>';
+    h += '</div>';
+
+    // VO2 Max
+    h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
+    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">🏃 VO2 Max (Apple)</h3>';
+    h += '<div style="position:relative;height:200px;"><canvas id="bf-vo2max"></canvas></div>';
+    h += '</div>';
+
+    // SpO2
+    h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
+    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">🩺 Blood Oxygen (SpO2)</h3>';
+    h += '<div style="position:relative;height:200px;"><canvas id="bf-spo2"></canvas></div>';
+    h += '</div>';
+
+    // Daily Steps
+    h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
+    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">🚶 Daily Steps</h3>';
+    h += '<div style="position:relative;height:200px;"><canvas id="bf-steps"></canvas></div>';
+    h += '</div>';
+
+    // Walking HR
+    h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
+    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">❤️ Walking HR Avg</h3>';
+    h += '<div style="position:relative;height:200px;"><canvas id="bf-walking-hr"></canvas></div>';
+    h += '</div>';
+
+
+    // Sleep Recovery Score card
+    if (typeof SleepRecoveryScore !== 'undefined') {
+      try {
+        var srs = SleepRecoveryScore.compute();
+        if (srs) {
+          var color = srs.score >= 85 ? '#22c55e' : 
+                      srs.score >= 70 ? '#84cc16' :
+                      srs.score >= 55 ? '#f59e0b' : '#ef4444';
+          
+          h += '<div style="background:#1f2937;border-radius:10px;padding:14px;margin-bottom:12px;">';
+          h += '<h3 style="margin:0 0 12px;color:#f9fafb;font-size:1em;">😴 Sleep Recovery Score</h3>';
+          h += '<div style="text-align:center;margin-bottom:12px;">';
+          h += '<div style="color:' + color + ';font-size:3em;font-weight:bold;line-height:1;">' + srs.score + '</div>';
+          h += '<div style="color:#9ca3af;font-size:1em;margin-top:4px;">' + srs.label + '</div>';
+          h += '</div>';
+          
+          h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.85em;">';
+          h += '<div style="background:#374151;padding:8px;border-radius:6px;text-align:center;">';
+          h += '<div style="color:#9ca3af;font-size:0.8em;">Total</div>';
+          h += '<div style="color:#f9fafb;font-weight:600;">' + srs.components.total.value_h + 'h</div>';
+          h += '<div style="color:' + color + ';font-size:0.7em;">score ' + srs.components.total.score + '</div>';
+          h += '</div>';
+          h += '<div style="background:#374151;padding:8px;border-radius:6px;text-align:center;">';
+          h += '<div style="color:#9ca3af;font-size:0.8em;">Deep</div>';
+          h += '<div style="color:#f9fafb;font-weight:600;">' + srs.components.deep.ratio_pct + '%</div>';
+          h += '<div style="color:' + color + ';font-size:0.7em;">score ' + srs.components.deep.score + '</div>';
+          h += '</div>';
+          h += '<div style="background:#374151;padding:8px;border-radius:6px;text-align:center;">';
+          h += '<div style="color:#9ca3af;font-size:0.8em;">REM</div>';
+          h += '<div style="color:#f9fafb;font-weight:600;">' + srs.components.rem.ratio_pct + '%</div>';
+          h += '<div style="color:' + color + ';font-size:0.7em;">score ' + srs.components.rem.score + '</div>';
+          h += '</div>';
+          h += '<div style="background:#374151;padding:8px;border-radius:6px;text-align:center;">';
+          h += '<div style="color:#9ca3af;font-size:0.8em;">Consistency</div>';
+          h += '<div style="color:#f9fafb;font-weight:600;">' + srs.components.consistency.score + '/100</div>';
+          h += '</div>';
+          h += '</div>';
+          
+          // Insights
+          if (srs.insights && srs.insights.length) {
+            h += '<div style="margin-top:12px;">';
+            srs.insights.forEach(function(ins) {
+              var bg = ins.type === 'positive' ? '#052e16' : 
+                       ins.type === 'danger' ? '#450a0a' :
+                       ins.type === 'warning' ? '#451a03' : '#1e3a8a';
+              var fg = ins.type === 'positive' ? '#86efac' :
+                       ins.type === 'danger' ? '#fca5a5' :
+                       ins.type === 'warning' ? '#fde68a' : '#a5b4fc';
+              h += '<div style="background:' + bg + ';color:' + fg + ';padding:8px 10px;border-radius:6px;margin-top:6px;font-size:0.85em;">' + ins.message + '</div>';
+            });
+            h += '</div>';
+          }
+          
+          h += '</div>';
+        }
+      } catch(e) { console.warn('SleepRecoveryScore card failed:', e); }
+    }
+
+    
+    return h;
+}
+
+    
     return h;
   }
 
