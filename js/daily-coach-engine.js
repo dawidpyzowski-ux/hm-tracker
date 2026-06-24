@@ -799,7 +799,7 @@ var DailyCoachEngine = (function() {
         wristTemp: effective.wristTemp || null,
         respRate: effective.respRate || null,
         
-/ Sprint 25 additions
+// Sprint 25 additions
         cardioRecovery: effective.cardioRecovery || null,
         vo2maxApple: effective.vo2maxApple || null,
         steps: effective.steps || null,
