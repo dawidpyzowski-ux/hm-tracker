@@ -327,13 +327,51 @@ canvas {
   margin: 0 0 8px;
 }
 
-#s-stat .chart-section canvas,
-#s-stat .chc canvas {
+
+
+/* Container = stała wysokość, Chart.js wypełnia */
+#s-stat .chart-section,
+#s-stat .chc {
+  background: #1f2937;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  display: block;
+}
+
+/* Sekcja z canvasem — wrapper */
+#s-stat .chart-section > canvas,
+#s-stat .chc > canvas {
   max-width: 100% !important;
-  width: 100% !important;
-  height: 220px !important;
   display: block !important;
 }
+
+/* Line/bar charts — wider */
+#s-stat #an-cumdist,
+#s-stat #ch1,
+#s-stat #ch2,
+#s-stat #ch3,
+#s-stat #ch4,
+#s-stat #ch-tl,
+#s-stat #ch-pred,
+#s-stat #an-vo2,
+#s-stat #an-pwr,
+#s-stat #an-gap,
+#s-stat #an-bestkm,
+#s-stat #an-consist,
+#s-stat #an-hr150 {
+  max-height: 240px !important;
+}
+
+/* Donut/Pie charts — square */
+#s-stat #an-tdist {
+  max-height: 280px !important;
+  max-width: 380px !important;
+  margin: 0 auto !important;
+}
+
+
 
 /* Heatmap responsive */
 #s-stat .hmap {
