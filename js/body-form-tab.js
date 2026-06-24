@@ -105,6 +105,39 @@
       return arr.reduce(function(s,d){return s+d.value;}, 0) / arr.length;
     }
 
+
+    // === SPRINT 25 metrics ===
+    // Cardio Recovery
+    h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
+    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">⚡ Cardio Recovery</h3>';
+    h += '<div style="position:relative;height:200px;"><canvas id="bf-cardio-recovery"></canvas></div>';
+    h += '</div>';
+
+    // VO2 Max
+    h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
+    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">🏃 VO2 Max (Apple)</h3>';
+    h += '<div style="position:relative;height:200px;"><canvas id="bf-vo2max"></canvas></div>';
+    h += '</div>';
+
+    // SpO2
+    h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
+    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">🩺 Blood Oxygen (SpO2)</h3>';
+    h += '<div style="position:relative;height:200px;"><canvas id="bf-spo2"></canvas></div>';
+    h += '</div>';
+
+    // Daily Steps
+    h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
+    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">🚶 Daily Steps</h3>';
+    h += '<div style="position:relative;height:200px;"><canvas id="bf-steps"></canvas></div>';
+    h += '</div>';
+
+    // Walking HR
+    h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
+    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">❤️ Walking HR Avg</h3>';
+    h += '<div style="position:relative;height:200px;"><canvas id="bf-walking-hr"></canvas></div>';
+    h += '</div>';
+
+    
     // Sleep stacked
     drawSleepStacked('bf-sleep-stacked');
 
@@ -137,6 +170,36 @@
     });
   }
 
+
+    // Sprint 25 charts
+    var cr = getData('cardioRecovery');
+    BodyFormCharts.drawTrendChart && BodyFormCharts.drawTrendChart('bf-cardio-recovery', cr, {
+      label: 'Cardio Recovery', color: '#a855f7', unit: ' bpm', yLabel: 'bpm'
+    });
+
+    var vo2 = getData('vo2maxApple');
+    BodyFormCharts.drawTrendChart && BodyFormCharts.drawTrendChart('bf-vo2max', vo2, {
+      label: 'VO2 Max', color: '#10b981', unit: ' ml/kg/min', yLabel: 'ml/kg/min',
+      target: 56  // cel 4:59
+    });
+
+    var spo2 = getData('spo2');
+    BodyFormCharts.drawTrendChart && BodyFormCharts.drawTrendChart('bf-spo2', spo2, {
+      label: 'SpO2', color: '#06b6d4', unit: '%', yLabel: '%',
+      baseline: 95
+    });
+
+    var steps = getData('steps');
+    BodyFormCharts.drawTrendChart && BodyFormCharts.drawTrendChart('bf-steps', steps, {
+      label: 'Steps', color: '#f59e0b', unit: '', yLabel: 'kroki'
+    });
+
+    var wHR = getData('walkingHR');
+    BodyFormCharts.drawTrendChart && BodyFormCharts.drawTrendChart('bf-walking-hr', wHR, {
+      label: 'Walking HR', color: '#ef4444', unit: ' bpm', yLabel: 'bpm'
+    });
+
+  
   function drawSleepStacked(canvasId) {
     var canvas = document.getElementById(canvasId);
     if (!canvas || typeof Chart === 'undefined') return;
