@@ -87,4 +87,3 @@ var RecoveryVelocity = (function() {
 
   return { compute: compute };
 })();
-`
