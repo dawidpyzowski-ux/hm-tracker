@@ -113,6 +113,65 @@
       } catch(e) { console.warn('SleepRecoveryScore card failed:', e); }
     }
 
+
+
+    // === Training Distribution Card (Sprint 25) ===
+    if (typeof TrainingDistribution !== 'undefined') {
+      // Async wrapper — przygotujemy placeholder, wypełnimy async po render
+      h += '<div id="bf-training-dist-card" style="background:#1f2937;border-radius:10px;padding:14px;margin-bottom:12px;">';
+      h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">📊 Training Distribution (7 dni)</h3>';
+      h += '<p style="color:#9ca3af;text-align:center;padding:20px;margin:0;">⏳ Ładowanie...</p>';
+      h += '</div>';
+    }
+
+    // === Recovery Velocity Card (Sprint 25) ===
+    if (typeof RecoveryVelocity !== 'undefined') {
+      try {
+        var rv = RecoveryVelocity.compute();
+        if (rv) {
+          var trendColor = rv.trend === 'improving' ? '#22c55e' :
+                           rv.trend === 'stable' ? '#3b82f6' : '#f59e0b';
+          var trendEmoji = rv.trend === 'improving' ? '↗' :
+                           rv.trend === 'stable' ? '→' : '↘';
+          var trendLabel = rv.trend === 'improving' ? 'Forma rośnie' :
+                           rv.trend === 'stable' ? 'Stabilna' : 'Forma spada';
+          
+          h += '<div style="background:#1f2937;border-radius:10px;padding:14px;margin-bottom:12px;">';
+          h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">🔄 Recovery Velocity</h3>';
+          h += '<p style="color:#9ca3af;margin:0 0 12px;font-size:0.75em;">Ile dni HRV wraca do baseline po hard workout</p>';
+          
+          h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
+          h += '<div style="background:#374151;padding:10px;border-radius:8px;text-align:center;">';
+          h += '<div style="color:#9ca3af;font-size:0.75em;">Średnia</div>';
+          h += '<div style="color:#f9fafb;font-size:1.5em;font-weight:bold;">' + rv.avg_recovery_days + ' dni</div>';
+          h += '</div>';
+          h += '<div style="background:#374151;padding:10px;border-radius:8px;text-align:center;">';
+          h += '<div style="color:#9ca3af;font-size:0.75em;">Ostatnie 3</div>';
+          h += '<div style="color:' + trendColor + ';font-size:1.5em;font-weight:bold;">' + rv.avg_recent_3 + ' dni</div>';
+          h += '</div>';
+          h += '</div>';
+          
+          h += '<div style="background:' + trendColor + '20;border:1px solid ' + trendColor + ';padding:8px 12px;border-radius:6px;text-align:center;">';
+          h += '<span style="color:' + trendColor + ';font-weight:600;">' + trendEmoji + ' ' + trendLabel + '</span>';
+          h += '<span style="color:#9ca3af;font-size:0.8em;margin-left:8px;">(n=' + rv.sample_size + ' hard workouts)</span>';
+          h += '</div>';
+          h += '</div>';
+        }
+      } catch(e) { console.warn('RecoveryVelocity card failed:', e); }
+    }
+
+    // === HR Drift Card (Sprint 25) ===
+    if (typeof HRDriftIndex !== 'undefined') {
+      h += '<div id="bf-hr-drift-card" style="background:#1f2937;border-radius:10px;padding:14px;margin-bottom:12px;">';
+      h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">❤️ HR Drift (ostatni hard)</h3>';
+      h += '<p style="color:#9ca3af;text-align:center;padding:20px;margin:0;">⏳ Ładowanie...</p>';
+      h += '</div>';
+    }
+
+
+
+
+    
     // HRV
     h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:12px;">';
     h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">💓 HRV</h3>';
@@ -242,6 +301,126 @@
     });
   }
 
+
+    // === Async cards (Training Distribution + HR Drift) ===
+    if (typeof TrainingDistribution !== 'undefined') {
+      TrainingDistribution.computeWeekly().then(function(td) {
+        var card = document.getElementById('bf-training-dist-card');
+        if (!card || !td) return;
+        
+        var verdictColor = td.verdict === 'polarized' ? '#22c55e' :
+                           td.verdict === 'balanced' ? '#3b82f6' :
+                           td.verdict === 'gray_zone' ? '#f59e0b' :
+                           td.verdict === 'too_easy' ? '#a855f7' : '#ef4444';
+        
+        var verdictLabel = td.verdict === 'polarized' ? '✅ Polaryzowane (80/20)' :
+                           td.verdict === 'balanced' ? '🟢 Zbalansowane' :
+                           td.verdict === 'gray_zone' ? '⚠️ Gray zone' :
+                           td.verdict === 'too_easy' ? '🟣 Za dużo easy' :
+                           '🔴 Za dużo hard';
+        
+        var h = '';
+        h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">📊 Training Distribution (7 dni)</h3>';
+        h += '<p style="color:#9ca3af;margin:0 0 12px;font-size:0.75em;">Norweski model: 80% easy + 20% hard, minimalnie Z3</p>';
+        
+        // Bar chart visual
+        var totalMin = td.total_minutes;
+        h += '<div style="background:#374151;padding:12px;border-radius:8px;margin-bottom:10px;">';
+        h += '<div style="display:flex;height:30px;border-radius:6px;overflow:hidden;margin-bottom:8px;">';
+        h += '<div style="width:' + td.easy_pct + '%;background:#22c55e;display:flex;align-items:center;justify-content:center;color:white;font-size:0.75em;font-weight:600;" title="Easy">';
+        if (td.easy_pct > 10) h += td.easy_pct.toFixed(0) + '%';
+        h += '</div>';
+        h += '<div style="width:' + td.gray_pct + '%;background:#f59e0b;display:flex;align-items:center;justify-content:center;color:white;font-size:0.75em;font-weight:600;" title="Gray">';
+        if (td.gray_pct > 8) h += td.gray_pct.toFixed(0) + '%';
+        h += '</div>';
+        h += '<div style="width:' + td.hard_pct + '%;background:#ef4444;display:flex;align-items:center;justify-content:center;color:white;font-size:0.75em;font-weight:600;" title="Hard">';
+        if (td.hard_pct > 8) h += td.hard_pct.toFixed(0) + '%';
+        h += '</div>';
+        h += '</div>';
+        
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:0.75em;text-align:center;">';
+        h += '<div><span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:2px;"></span> <span style="color:#9ca3af;">Easy (Z1-Z2)</span><br><b style="color:#22c55e;">' + td.easy_pct.toFixed(1) + '%</b></div>';
+        h += '<div><span style="display:inline-block;width:10px;height:10px;background:#f59e0b;border-radius:2px;"></span> <span style="color:#9ca3af;">Gray (Z3)</span><br><b style="color:#f59e0b;">' + td.gray_pct.toFixed(1) + '%</b></div>';
+        h += '<div><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px;"></span> <span style="color:#9ca3af;">Hard (Z4-Z5)</span><br><b style="color:#ef4444;">' + td.hard_pct.toFixed(1) + '%</b></div>';
+        h += '</div>';
+        h += '</div>';
+        
+        // Verdict
+        h += '<div style="background:' + verdictColor + '20;border:1px solid ' + verdictColor + ';padding:10px 12px;border-radius:6px;">';
+        h += '<div style="color:' + verdictColor + ';font-weight:600;margin-bottom:4px;">' + verdictLabel + '</div>';
+        h += '<div style="color:#d1d5db;font-size:0.85em;">' + td.recommendation + '</div>';
+        h += '</div>';
+        
+        h += '<div style="color:#6b7280;font-size:0.7em;margin-top:8px;text-align:right;">Łącznie: ' + Math.round(td.total_minutes) + ' min czasu treningu</div>';
+        
+        card.innerHTML = h;
+      }).catch(function(e) {
+        console.warn('TrainingDistribution failed:', e);
+      });
+    }
+
+    if (typeof HRDriftIndex !== 'undefined') {
+      HRDriftIndex.computeLastHardWorkout().then(function(drift) {
+        var card = document.getElementById('bf-hr-drift-card');
+        if (!card) return;
+        
+        if (!drift) {
+          card.innerHTML = '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">❤️ HR Drift</h3>' +
+                           '<p style="color:#9ca3af;text-align:center;padding:10px;">Brak danych</p>';
+          return;
+        }
+        
+        var verdictColor = drift.verdict === 'excellent' ? '#22c55e' :
+                           drift.verdict === 'good' ? '#84cc16' :
+                           drift.verdict === 'acceptable' ? '#f59e0b' : '#ef4444';
+        
+        var verdictLabel = drift.verdict === 'excellent' ? '✅ Excellent aerobic base' :
+                           drift.verdict === 'good' ? '🟢 Good aerobic base' :
+                           drift.verdict === 'acceptable' ? '⚠️ Acceptable' :
+                           '🔴 Poor aerobic base';
+        
+        var h = '';
+        h += '<h3 style="margin:0 0 4px;color:#f9fafb;font-size:1em;">❤️ HR Drift (ostatni hard)</h3>';
+        h += '<p style="color:#9ca3af;margin:0 0 12px;font-size:0.75em;">' + drift.workout_date + ' • ' + drift.workout_km + 'km</p>';
+        
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
+        h += '<div style="background:#374151;padding:8px;border-radius:6px;text-align:center;">';
+        h += '<div style="color:#9ca3af;font-size:0.75em;">HR 1. połowa</div>';
+        h += '<div style="color:#3b82f6;font-size:1.3em;font-weight:bold;">' + drift.avg_hr_first_half + '</div>';
+        h += '</div>';
+        h += '<div style="background:#374151;padding:8px;border-radius:6px;text-align:center;">';
+        h += '<div style="color:#9ca3af;font-size:0.75em;">HR 2. połowa</div>';
+        h += '<div style="color:#ef4444;font-size:1.3em;font-weight:bold;">' + drift.avg_hr_second_half + '</div>';
+        h += '</div>';
+        h += '</div>';
+        
+        h += '<div style="background:#374151;padding:10px;border-radius:6px;margin-bottom:10px;">';
+        h += '<div style="display:flex;justify-content:space-between;color:#d1d5db;font-size:0.85em;margin-bottom:4px;">';
+        h += '<span>Drift raw</span><span><b>+' + drift.drift_bpm + ' bpm (' + drift.drift_pct + '%)</b></span>';
+        h += '</div>';
+        if (drift.heat_adjustment > 0) {
+          h += '<div style="display:flex;justify-content:space-between;color:#9ca3af;font-size:0.8em;">';
+          h += '<span>Heat adj. (' + drift.weather_temp + '°C)</span><span>-' + drift.heat_adjustment + ' bpm</span>';
+          h += '</div>';
+        }
+        h += '<div style="display:flex;justify-content:space-between;color:' + verdictColor + ';font-size:0.9em;font-weight:600;margin-top:4px;">';
+        h += '<span>Real drift</span><span>' + drift.drift_real_pct + '%</span>';
+        h += '</div>';
+        h += '</div>';
+        
+        h += '<div style="background:' + verdictColor + '20;border:1px solid ' + verdictColor + ';padding:8px 12px;border-radius:6px;">';
+        h += '<span style="color:' + verdictColor + ';font-weight:600;">' + verdictLabel + '</span>';
+        h += '</div>';
+        
+        card.innerHTML = h;
+      }).catch(function(e) {
+        console.warn('HRDriftIndex failed:', e);
+      });
+    }
+
+
+
+  
   function drawSleepStacked(canvasId) {
     var canvas = document.getElementById(canvasId);
     if (!canvas || typeof Chart === 'undefined') return;
