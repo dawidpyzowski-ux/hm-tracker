@@ -100,31 +100,31 @@ var NutritionSearch = (function() {
   // ============================================
   // SEARCH BY NAME
   // ============================================
+
   async function search(query, options) {
     if (!query || query.length < 2) return [];
     options = options || {};
     var pageSize = options.limit || 20;
     
-    // Cache hit?
     var cacheKey = 'q_' + query.toLowerCase();
     var cached = getCached(cacheKey);
-    if (cached) {
-      return cached;
-    }
+    if (cached) return cached;
     
     try {
-      var url = 'https://world.openfoodfacts.org/cgi/search.pl?' +
+      // API v2 — wspiera CORS
+      var url = 'https://world.openfoodfacts.org/api/v2/search?' +
         'search_terms=' + encodeURIComponent(query) +
-        '&search_simple=1' +
-        '&action=process' +
-        '&json=1' +
         '&page_size=' + pageSize +
         '&lc=pl' +
-        '&sort_by=popularity_key' +
         '&fields=code,product_name,product_name_pl,brands,quantity,image_thumb_url,nutriments,serving_size';
       
-      var resp = await fetch(url);
-      if (!resp.ok) return [];
+      var resp = await fetch(url, {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!resp.ok) {
+        console.warn(TAG, 'Search API returned:', resp.status);
+        return [];
+      }
       var data = await resp.json();
       
       var products = (data.products || [])
@@ -133,15 +133,14 @@ var NutritionSearch = (function() {
           return p && p.per_100g.calories !== null && p.name !== 'Produkt bez nazwy';
         });
       
-      // Cache results
       setCache(cacheKey, products);
-      
       return products;
     } catch(e) {
       console.warn(TAG, 'Search error:', e);
       return [];
     }
   }
+
 
   // ============================================
   // CALCULATE for portion
