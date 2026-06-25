@@ -788,6 +788,101 @@ var DailyCoachEngine = (function() {
       }
     } catch(e) { console.warn(TAG, "HRDriftIndex failed:", e); }
 
+
+
+    // === SPRINT 26: Nutrition data ===
+    var nutritionData = null;
+    try {
+      if (typeof NutritionEngine !== "undefined") {
+        var nutrToday = NutritionEngine.compute(today);
+        
+        // Yesterday for comparison
+        var yesterdayD = new Date(today);
+        yesterdayD.setDate(yesterdayD.getDate() - 1);
+        var yesterdayStr = yesterdayD.toISOString().slice(0, 10);
+        var nutrYesterday = NutritionEngine.compute(yesterdayStr);
+        
+        // 7-day stats
+        var weekTotals = { calories: 0, protein: 0, carbs: 0, fat: 0, days_logged: 0 };
+        for (var i = 0; i < 7; i++) {
+          var d = new Date(today);
+          d.setDate(d.getDate() - i);
+          var dStr = d.toISOString().slice(0, 10);
+          var dTotals = NutritionEngine.getTotalsForDate(dStr);
+          if (dTotals.calories > 0) {
+            weekTotals.calories += dTotals.calories;
+            weekTotals.protein += dTotals.protein;
+            weekTotals.carbs += dTotals.carbs;
+            weekTotals.fat += dTotals.fat;
+            weekTotals.days_logged++;
+          }
+        }
+        
+        var avgDay = weekTotals.days_logged > 0 ? {
+          calories: Math.round(weekTotals.calories / weekTotals.days_logged),
+          protein: Math.round(weekTotals.protein / weekTotals.days_logged),
+          carbs: Math.round(weekTotals.carbs / weekTotals.days_logged),
+          fat: Math.round(weekTotals.fat / weekTotals.days_logged)
+        } : null;
+        
+        // Status
+        var todayStatus = "no_data";
+        if (nutrToday.totals.calories > 0) {
+          var pct = nutrToday.percentages.calories;
+          if (pct >= 95 && pct <= 105) todayStatus = "on_target";
+          else if (pct < 95) todayStatus = "deficit_too_big";
+          else if (pct <= 120) todayStatus = "slight_overshoot";
+          else todayStatus = "way_over";
+        }
+        
+        // Weekly average vs target
+        var weekStatus = "no_data";
+        if (avgDay && nutrToday.budget.target_calories > 0) {
+          var weekPct = (avgDay.calories / nutrToday.budget.target_calories) * 100;
+          if (weekPct >= 95 && weekPct <= 105) weekStatus = "on_target";
+          else if (weekPct < 90) weekStatus = "under_eating";
+          else if (weekPct < 95) weekStatus = "slightly_under";
+          else if (weekPct <= 110) weekStatus = "slightly_over";
+          else weekStatus = "over_eating";
+        }
+        
+        nutritionData = {
+          today: {
+            calories: Math.round(nutrToday.totals.calories),
+            protein: Math.round(nutrToday.totals.protein),
+            carbs: Math.round(nutrToday.totals.carbs),
+            fat: Math.round(nutrToday.totals.fat),
+            meal_count: nutrToday.totals.meal_count,
+            status: todayStatus,
+            pct_calories: nutrToday.percentages.calories,
+            pct_protein: nutrToday.percentages.protein,
+            remaining_calories: Math.round(nutrToday.remaining.calories)
+          },
+          yesterday: {
+            calories: Math.round(nutrYesterday.totals.calories),
+            protein: Math.round(nutrYesterday.totals.protein),
+            meal_count: nutrYesterday.totals.meal_count
+          },
+          week_avg: avgDay,
+          week_status: weekStatus,
+          days_logged_7d: weekTotals.days_logged,
+          budget: {
+            tdee: nutrToday.budget.tdee,
+            target_calories: nutrToday.budget.target_calories,
+            target_protein_g: nutrToday.budget.target_protein_g,
+            target_carbs_g: nutrToday.budget.target_carbs_g,
+            target_fat_g: nutrToday.budget.target_fat_g,
+            deficit: nutrToday.budget.deficit,
+            auto_correction: nutrToday.budget.auto_correction
+          }
+        };
+      }
+    } catch(e) { console.warn(TAG, "Nutrition failed:", e); }
+
+
+
+
+
     
     var payload = {
       today: today,
@@ -798,6 +893,13 @@ var DailyCoachEngine = (function() {
         rhr: effective.rhr, hrv: effective.hrv,
         wristTemp: effective.wristTemp || null,
         respRate: effective.respRate || null,
+        // Sprint 26 addition
+        nutrition: nutritionData,
+
+
+
+
+
         
 // Sprint 25 additions
         cardioRecovery: effective.cardioRecovery || null,
