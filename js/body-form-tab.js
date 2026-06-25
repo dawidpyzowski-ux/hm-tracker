@@ -299,7 +299,7 @@
     BodyFormCharts.drawTrendChart && BodyFormCharts.drawTrendChart('bf-walking-hr', wHR, {
       label: 'Walking HR', color: '#ef4444', unit: ' bpm', yLabel: 'bpm'
     });
-  }
+
 
 
     // === Async cards (Training Distribution + HR Drift) ===
@@ -417,8 +417,7 @@
         console.warn('HRDriftIndex failed:', e);
       });
     }
-
-
+  }
 
   
   function drawSleepStacked(canvasId) {
