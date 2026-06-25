@@ -92,16 +92,22 @@ const vo = parseOptional(p.get('vo'));
     const walkingHR = parseOptional2(p.get('walkingHR'));
     const spo2 = parseOptional2(p.get('spo2'));
 
+    // Sprint 26: Energy for TDEE
+    const activeEnergy = parseOptional2(p.get('activeEnergy'));
+    const basalEnergy = parseOptional2(p.get('basalEnergy'));
+
+
 
 const entry = {
   date, sleepMin, deepMin, remMin, coreMin,
   rhr, hrv, hrvRaw, energy, soreness,
   wristTemp, respRate, weight, bodyFat,
   runningPower, gct, stride, vo,
-  // Sprint 25 additions
   cardioRecovery, vo2maxApple, steps, walkingHR, spo2,
+  activeEnergy, basalEnergy,
   ts: Date.now()
 };
+
 
 
 
