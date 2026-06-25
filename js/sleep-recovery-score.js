@@ -8,8 +8,14 @@ var SleepRecoveryScore = (function() {
     var data = HealthImport.getAll().filter(function(d) { return d.sleepMin > 0; });
     if (!data.length) return null;
 
-    var today = HealthImport.getLatest();
-    if (!today || !today.sleepMin) return null;
+
+// Bierz LATEST wpis z prawidłowymi danymi snu (sleepMin > 0)
+var allData = HealthImport.getAll().filter(function(d) {
+  return d.sleepMin > 0 && /^\d{4}-\d{2}-\d{2}$/.test(d.date);
+});
+var today = allData.length > 0 ? allData[allData.length - 1] : null;
+if (!today || !today.sleepMin) return null;
+
 
     var totalMin = today.sleepMin;
     var deepMin = today.deepMin || 0;
