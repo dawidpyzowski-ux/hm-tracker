@@ -2,14 +2,16 @@
 /* nutrition-tab.js v1 — Sprint 26: Full UI tab */
 var NutritionTab = (function() {
   "use strict";
-  var currentTab = 'today';
-  var currentDate = null;
 
-  function localToday() {
-    var d = new Date();
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-      .toISOString().slice(0, 10);
-  }
+var currentTab = 'today';
+var currentDate = null;
+
+function localToday() {
+  var d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+    .toISOString().slice(0, 10);
+}
+
 
   function render() {
     var el = document.getElementById('s-nutr');
@@ -23,23 +25,32 @@ var NutritionTab = (function() {
     
     // Sub-tabs
     html += '<div class="sub-tabs">';
-    html += '<button class="sub-tab ' + (currentTab==='today'?'act':'') + '" onclick="NutritionTab.setTab(\'today\')">📊 Dzisiaj</button>';
-    html += '<button class="sub-tab ' + (currentTab==='week'?'act':'') + '" onclick="NutritionTab.setTab(\'week\')">📅 Tydzień</button>';
-    html += '<button class="sub-tab ' + (currentTab==='ai'?'act':'') + '" onclick="NutritionTab.setTab(\'ai\')">🤖 AI</button>';
-    html += '<button class="sub-tab ' + (currentTab==='plan'?'act':'') + '" onclick="NutritionTab.setTab(\'plan\')">📋 Plan</button>';
+    
+html += '<button class="sub-tab ' + (currentTab==='today'?'act':'') + '" onclick="NutritionTab.setTab(\'today\')">📊 Dzisiaj</button>';
+html += '<button class="sub-tab ' + (currentTab==='week'?'act':'') + '" onclick="NutritionTab.setTab(\'week\')">📅 Tydzień</button>';
+html += '<button class="sub-tab ' + (currentTab==='analytics'?'act':'') + '" onclick="NutritionTab.setTab(\'analytics\')">📈 Analytics</button>';
+html += '<button class="sub-tab ' + (currentTab==='ai'?'act':'') + '" onclick="NutritionTab.setTab(\'ai\')">🤖 AI</button>';
+html += '<button class="sub-tab ' + (currentTab==='plan'?'act':'') + '" onclick="NutritionTab.setTab(\'plan\')">📋 Plan</button>';
+
     html += '</div>';
     
     html += '<div id="nutr-content">';
-    if (currentTab === 'today') html += renderToday();
-    else if (currentTab === 'week') html += renderWeek();
-    else if (currentTab === 'ai') html += renderAIPlaceholder();
-    else if (currentTab === 'plan') html += renderPlan();
+
+if (currentTab === 'today') html += renderToday();
+else if (currentTab === 'week') html += renderWeek();
+else if (currentTab === 'analytics') html += renderAnalyticsPlaceholder();
+else if (currentTab === 'ai') html += renderAIPlaceholder();
+else if (currentTab === 'plan') html += renderPlan();
+
     html += '</div>';
     
     html += '</div>';
     el.innerHTML = html;
     
-    if (currentTab === 'ai') setTimeout(renderAI, 100);
+  
+if (currentTab === 'ai') setTimeout(renderAI, 100);
+if (currentTab === 'analytics') setTimeout(renderAnalytics, 100);
+
   }
 
   function setTab(tab) {
@@ -50,13 +61,31 @@ var NutritionTab = (function() {
   // ============================================
   // TODAY — bilans + meals + add
   // ============================================
-  function renderToday() {
-    if (typeof NutritionEngine === 'undefined') {
-      return '<p style="color:#fca5a5;text-align:center;padding:30px;">NutritionEngine not loaded</p>';
-    }
-    
-    var data = NutritionEngine.compute(currentDate);
-    var h = '';
+
+function renderToday() {
+  if (typeof NutritionEngine === 'undefined') {
+    return '<p style="color:#fca5a5;text-align:center;padding:30px;">NutritionEngine not loaded</p>';
+  }
+  
+  var data = NutritionEngine.compute(currentDate);
+  var h = '';
+  
+  // Date Navigator
+  var today = localToday();
+  var isToday = currentDate === today;
+  var displayDate = currentDate;
+  var d = new Date(currentDate);
+  var dayName = ['Nd','Pn','Wt','Śr','Cz','Pt','Sb'][d.getDay()];
+  
+  h += '<div style="background:#1f2937;border-radius:10px;padding:10px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">';
+  h += '<button onclick="NutritionTab.navDate(-1)" style="background:#374151;border:none;color:#f9fafb;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:1em;">← Wczoraj</button>';
+  h += '<div style="text-align:center;">';
+  h += '<div style="color:#f9fafb;font-weight:600;font-size:1em;">' + dayName + ', ' + displayDate.slice(8) + '.' + displayDate.slice(5,7) + (isToday ? ' (dziś)' : '') + '</div>';
+  h += '<input type="date" id="date-picker" value="' + currentDate + '" onchange="NutritionTab.jumpToDate(this.value)" style="background:#1f2937;border:1px solid #374151;color:#9ca3af;padding:2px 6px;border-radius:4px;font-size:0.8em;margin-top:4px;">';
+  h += '</div>';
+  h += '<button onclick="NutritionTab.navDate(1)"' + (isToday ? ' disabled' : '') + ' style="background:' + (isToday ? '#1f2937' : '#374151') + ';border:none;color:#f9fafb;padding:8px 14px;border-radius:8px;cursor:' + (isToday ? 'not-allowed' : 'pointer') + ';font-size:1em;opacity:' + (isToday ? '0.4' : '1') + ';">Jutro →</button>';
+  h += '</div>';
+
     
     // === Bilans card ===
     var calPct = data.percentages.calories;
@@ -543,6 +572,206 @@ var NutritionTab = (function() {
     if (typeof NutritionScanner !== 'undefined') NutritionScanner.stop();
   }
 
+
+  // ============================================
+  // DATE NAVIGATION
+  // ============================================
+  function navDate(deltaDays) {
+    var d = new Date(currentDate);
+    d.setDate(d.getDate() + deltaDays);
+    currentDate = d.toISOString().slice(0, 10);
+    render();
+  }
+
+  function jumpToDate(dateStr) {
+    if (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      currentDate = dateStr;
+      render();
+    }
+  }
+
+  // ============================================
+  // ANALYTICS sub-tab
+  // ============================================
+  function renderAnalyticsPlaceholder() {
+    return '<div id="nutr-analytics-container"><p style="color:#9ca3af;text-align:center;padding:30px;">⏳ Ładowanie analytics...</p></div>';
+  }
+
+  function renderAnalytics() {
+    var container = document.getElementById('nutr-analytics-container');
+    if (!container || typeof NutritionAnalytics === 'undefined') return;
+    
+    var summary = NutritionAnalytics.getSummary7d();
+    var balance30 = NutritionAnalytics.getCalorieBalance30d();
+    var correlations = NutritionAnalytics.computeCorrelations();
+    var streak = NutritionAnalytics.getProteinStreak();
+    var timing = NutritionAnalytics.getMealTimingStats();
+    
+    var h = '';
+    
+    // Days logged status
+    var daysLogged = balance30.length;
+    h += '<div style="background:' + (daysLogged < 7 ? '#451a03' : '#052e16') + ';border:1px solid ' + (daysLogged < 7 ? '#f59e0b' : '#22c55e') + ';color:' + (daysLogged < 7 ? '#fde68a' : '#86efac') + ';padding:10px 14px;border-radius:8px;margin-bottom:12px;text-align:center;font-size:0.85em;">';
+    if (daysLogged < 7) {
+      h += '⏳ Zbieram dane: <b>' + daysLogged + '/7 dni</b>. Wykresy będą pełniejsze gdy zalogujesz więcej.';
+    } else {
+      h += '✅ Dane gotowe! ' + daysLogged + ' dni zalogowane. Analytics w pełni operacyjna.';
+    }
+    h += '</div>';
+    
+    // CALORIE BALANCE
+    h += '<div style="background:#1f2937;border-radius:10px;padding:14px;margin-bottom:12px;">';
+    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">📊 Bilans kaloryczny (' + daysLogged + ' dni)</h3>';
+    if (daysLogged >= 1) {
+      h += '<div style="position:relative;height:240px;"><canvas id="na-balance"></canvas></div>';
+    } else {
+      h += '<p style="color:#9ca3af;text-align:center;padding:30px;">Brak danych — dodaj pierwszy posiłek</p>';
+    }
+    h += '</div>';
+    
+    // PROTEIN STREAK
+    h += '<div style="background:#1f2937;border-radius:10px;padding:14px;margin-bottom:12px;">';
+    h += '<h3 style="margin:0 0 8px;color:#f9fafb;font-size:1em;">🥩 Protein Streak</h3>';
+    if (streak.total >= 1) {
+      h += '<div style="text-align:center;margin-bottom:10px;">';
+      h += '<div style="color:#22c55e;font-size:2em;font-weight:bold;">' + streak.streak + '</div>';
+      h += '<div style="color:#9ca3af;font-size:0.85em;">dni z rzędu ≥' + Math.round(NutritionEngine.PROFILE.protein_per_kg * 75) + 'g białka</div>';
+      h += '</div>';
+      h += '<div style="color:#9ca3af;font-size:0.85em;text-align:center;">Łącznie hit: ' + streak.hits + '/' + streak.total + ' dni</div>';
+      
+      // Calendar visual
+      h += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:12px;justify-content:center;">';
+      streak.days.slice(-30).forEach(function(d) {
+        var color = d.hit ? '#22c55e' : '#ef4444';
+        var dd = d.date.slice(8);
+        h += '<div style="width:32px;height:32px;background:' + color + ';border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:0.7em;font-weight:600;" title="' + d.date + ': ' + d.protein + 'g">' + dd + '</div>';
+      });
+      h += '</div>';
+    } else {
+      h += '<p style="color:#9ca3af;text-align:center;padding:20px;">Loguj posiłki, żeby zacząć streak</p>';
+    }
+    h += '</div>';
+    
+    // MEAL TIMING
+    if (timing && Object.values(timing.calories).some(function(v) { return v > 0; })) {
+      h += '<div style="background:#1f2937;border-radius:10px;padding:14px;margin-bottom:12px;">';
+      h += '<h3 style="margin:0 0 12px;color:#f9fafb;font-size:1em;">🍽️ Meal Timing</h3>';
+      var slots = ['5-9', '9-12', '12-15', '15-18', '18-21', '21-24'];
+      var labels = ['Rano', 'Przedpoł.', 'Lunch', 'Popoł.', 'Wieczór', 'Późno'];
+      var maxKcal = Math.max.apply(null, slots.map(function(s) { return timing.calories[s]; }));
+      
+      slots.forEach(function(s, i) {
+        var kcal = Math.round(timing.calories[s]);
+        var pct = maxKcal > 0 ? (kcal / maxKcal * 100) : 0;
+        var color = i === 4 || i === 5 ? '#f59e0b' : '#3b82f6';
+        
+        h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">';
+        h += '<div style="width:80px;color:#9ca3af;font-size:0.8em;">' + labels[i] + ' (' + s + ')</div>';
+        h += '<div style="flex:1;background:#374151;border-radius:4px;height:20px;overflow:hidden;">';
+        h += '<div style="background:' + color + ';height:100%;width:' + pct + '%;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;color:white;font-size:0.7em;font-weight:600;">';
+        if (kcal > 100) h += kcal + ' kcal';
+        h += '</div>';
+        h += '</div>';
+        h += '</div>';
+      });
+      h += '<p style="color:#9ca3af;font-size:0.75em;margin-top:8px;">⚠️ Posiłki po 21:00 mogą gorzej wpływać na sen</p>';
+      h += '</div>';
+    }
+    
+    // CORRELATIONS
+    if (correlations) {
+      var anyCorr = Object.values(correlations).some(function(c) { return c.r !== null; });
+      h += '<div style="background:#1f2937;border-radius:10px;padding:14px;margin-bottom:12px;">';
+      h += '<h3 style="margin:0 0 4px;color:#f9fafb;font-size:1em;">🔗 Korelacje (Pearson)</h3>';
+      h += '<p style="color:#9ca3af;margin:0 0 12px;font-size:0.75em;">r od -1 do +1. Bliżej ±1 = silniejsza zależność</p>';
+      
+      if (!anyCorr) {
+        h += '<p style="color:#fbbf24;text-align:center;padding:20px;font-size:0.85em;">⏳ Za mało danych. Korelacje pojawią się po 3+ dniach.</p>';
+      } else {
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+        Object.keys(correlations).forEach(function(key) {
+          var c = correlations[key];
+          var rStr = c.r !== null ? c.r.toFixed(2) : 'n/a';
+          var color = c.r === null ? '#6b7280' :
+                      Math.abs(c.r) >= 0.5 ? (c.r > 0 ? '#22c55e' : '#ef4444') :
+                      Math.abs(c.r) >= 0.3 ? '#f59e0b' : '#9ca3af';
+          
+          h += '<div style="background:#374151;padding:10px;border-radius:8px;border-left:3px solid ' + color + ';">';
+          h += '<div style="color:#9ca3af;font-size:0.7em;">' + c.title + '</div>';
+          h += '<div style="color:' + color + ';font-size:1.2em;font-weight:bold;">r = ' + rStr + '</div>';
+          h += '<div style="color:#6b7280;font-size:0.7em;">n=' + c.n + ' par</div>';
+          h += '</div>';
+        });
+        h += '</div>';
+      }
+      h += '</div>';
+    }
+    
+    container.innerHTML = h;
+    
+    // Render canvas chart
+    if (daysLogged >= 1 && typeof Chart !== 'undefined') {
+      setTimeout(function() {
+        drawBalanceChart(balance30);
+      }, 50);
+    }
+  }
+
+  function drawBalanceChart(data) {
+    var canvas = document.getElementById('na-balance');
+    if (!canvas) return;
+    
+    var labels = data.map(function(d) { return d.date.slice(5); });
+    var tdee = data.map(function(d) { return d.tdee; });
+    var intake = data.map(function(d) { return d.intake; });
+    var target = data.map(function(d) { return d.target_calories; });
+    
+    new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Spalono (TDEE)',
+            data: tdee,
+            backgroundColor: 'rgba(239, 68, 68, 0.7)',
+            borderColor: '#ef4444',
+            borderWidth: 1
+          },
+          {
+            label: 'Spożyto',
+            data: intake,
+            backgroundColor: 'rgba(34, 197, 94, 0.7)',
+            borderColor: '#22c55e',
+            borderWidth: 1
+          },
+          {
+            label: 'Cel intake',
+            data: target,
+            type: 'line',
+            borderColor: '#f59e0b',
+            borderWidth: 2,
+            borderDash: [5, 5],
+            pointRadius: 0,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#d1d5db', font: { size: 11 } } }
+        },
+        scales: {
+          x: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: '#374151' } },
+          y: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: '#374151' }, title: { display: true, text: 'kcal', color: '#9ca3af' } }
+        }
+      }
+    });
+  }
+
+  
   window.NutritionTab = {
     render: render,
     setTab: setTab,
@@ -553,7 +782,11 @@ var NutritionTab = (function() {
     selectProduct: selectProduct,
     saveAIMeal: saveAIMeal,
     deleteMeal: deleteMeal,
-    closeAllModals: closeAllModals
+    closeAllModals: closeAllModals,
+    
+  navDate: navDate,
+  jumpToDate: jumpToDate
+
   };
 
   return window.NutritionTab;
