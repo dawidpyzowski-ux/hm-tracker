@@ -215,21 +215,15 @@ function saveLog(wi,di){const w=PLAN[wi],d=w.days[di],dt=getDayDate(w.start,d.do
 
 // --- NUTRITION ---
 let nutrTab='today';
-function rNutr(){
-  const el=document.getElementById('s-nutr');
-  let h=`<h1>Plan zywieniowy</h1><p class="sub">Dostosowany do polmaratonu sub 1:45</p>`;
-  h+=`<div class="ts"><button class="tb${nutrTab==='today'?' act':''}" onclick="nutrTab='today';rNutr()">Dzisiaj</button><button class="tb${nutrTab==='hydration'?' act':''}" onclick="nutrTab='hydration';rNutr()">Nawodnienie</button><button class="tb${nutrTab==='suppl'?' act':''}" onclick="nutrTab='suppl';rNutr()">Suplementy</button><button class="tb${nutrTab==='zones'?' act':''}" onclick="nutrTab='zones';rNutr()">Strefy</button><button class="tb${nutrTab==='carb'?' act':''}" onclick="nutrTab='carb';rNutr()">Carb Loading</button><button class="tb${nutrTab==='race'?' act':''}" onclick="nutrTab='race';rNutr()">Dzien wyscigu</button><button class="tb${nutrTab==='check'?' act':''}" onclick="nutrTab='check';rNutr()">Checklista</button><button class="tb${nutrTab==='rules'?' act':''}" onclick="nutrTab='rules';rNutr()">Zasady</button></div>`;
-  if(nutrTab==='today'){const t=today();let isT=false;for(const w of PLAN){for(const d of w.days){if(getDayDate(w.start,d.dow)===t&&!d.rest){isT=true;break}}}const meals=isT?NUTR.training:NUTR.rest;const wt=S.getSettings().weight||75;h+=`<div class="ndl">${isT?'🏃 Dzien treningowy':'🛋️ Dzien wolny'}</div>`;h+=`<div class="ms"><div class="mi"><span class="mv">${Math.round(wt*(isT?6:4.5))}</span><span class="mu">g wegl.</span></div><div class="mi"><span class="mv">${Math.round(wt*1.6)}</span><span class="mu">g bialka</span></div><div class="mi"><span class="mv">${Math.round(wt*1.1)}</span><span class="mu">g tluszczu</span></div></div>`;meals.forEach(m=>{h+=`<div class="mc"><div class="mc-t">${m.time}</div><div class="mc-n">${m.name}</div><div class="mc-d">${m.desc}</div><div class="mc-e">${m.examples}</div><div class="mc-m">${m.macro}</div></div>`})}
-  if(nutrTab==='hydration'){h+=`<div class="ndl">💧 Nawodnienie</div>`;NUTR.hydration.forEach(x=>{h+=`<div class="hc"><div class="hc-t">${x.type}</div><div class="hc-r"><span class="hc-l">Przed: </span>${x.before}</div><div class="hc-r"><span class="hc-l">W trakcie: </span>${x.during}</div><div class="hc-r"><span class="hc-l">Po: </span>${x.after}</div></div>`})}
-  if(nutrTab==='suppl'){h+=`<div class="ndl">💊 Suplementacja</div>`;NUTR.supplements.forEach(x=>{h+=`<div class="sc"><div class="sc-n">${x.name}</div><div class="sc-d">${x.dose}</div><div class="sc-w">Kiedy: ${x.when}</div><div class="sc-y">${x.why}</div></div>`})}
-  if(nutrTab==='zones'){h+=`<div class="ndl">🎯 Strefy treningowe</div>`;ZONES.forEach(z=>{h+=`<div class="zcard"><span class="z-s">${z.sym}</span><span class="z-n">${z.name}</span><span class="z-p">${z.pace}</span><span class="z-u">${z.usage}</span></div>`})}
-  if(nutrTab==='carb'){h+=`<div class="ndl">🍝 Carb Loading</div>`;NUTR.carbLoading.forEach((x,i)=>{h+=`<div class="cbday${i>=3?' hl':''}"><div class="cb-dn">${x.day}</div><div class="cb-c">${x.carbs}</div><div class="cb-f">Blonnik: ${x.fiber}</div><div class="cb-n">${x.notes}</div></div>`})}
-  if(nutrTab==='race'){h+=`<div class="ndl">🏁 Harmonogram dnia wyscigu</div>`;NUTR.raceDay.forEach((x,i)=>{h+=`<div class="tli${i===6||i===9?' big':''}"><span class="tl-t">${x.time}</span><div><div class="tl-w">${x.what}</div><div class="tl-d">${x.details}</div></div></div>`})}
-  if(nutrTab==='check'){h+=`<div class="ndl">✅ Checklista</div>`;const cl=S.getChecklist();NUTR.checklist.forEach((x,i)=>{h+=`<label class="chi"><input type="checkbox" ${cl[i]?'checked':''} onchange="toggleCheck(${i},this.checked)"><span>${x}</span></label>`})}
-  if(nutrTab==='rules'){h+=`<div class="ndl">📋 Zasady</div><div class="rl">`;NUTR.rules.forEach(r=>{h+=`<div class="ri">${r}</div>`});h+=`</div>`}
-  el.innerHTML=h;
+
+function rNutr() {
+  if (typeof NutritionTab !== 'undefined' && NutritionTab.render) {
+    NutritionTab.render();
+  } else {
+    document.getElementById('s-nutr').innerHTML = '<p style="color:#fca5a5;text-align:center;padding:40px;">NutritionTab nie załadowany</p>';
+  }
 }
-function toggleCheck(i,v){const cl=S.getChecklist();cl[i]=v;S.setChecklist(cl)}
+
 
 // --- STATS (with shift-aware heatmap + history + detail expand + PR) ---
 
