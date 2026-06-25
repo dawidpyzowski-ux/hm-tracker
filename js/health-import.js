@@ -32,11 +32,18 @@ function parseList(v) {
       .toISOString().slice(0, 10);
   }
 
-  function init() {
+
+function init() {
     const p = new URLSearchParams(window.location.search);
     if (p.get('health') !== '1') return null;
     const date = p.get('date');
-    if (!date) return null;
+    
+    // Strict validation: only YYYY-MM-DD format
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      console.warn('[HealthImport] Invalid date, ignoring:', date);
+      return null;
+    }
+
 
     const deepMin  = Math.round(parseNum(p.get('deep')));
     const remMin   = Math.round(parseNum(p.get('rem')));
