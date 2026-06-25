@@ -153,10 +153,13 @@ function renderToday() {
     h += '<h3 style="margin:0 0 12px;color:#f9fafb;font-size:1em;">➕ Dodaj posiłek</h3>';
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
     
-    h += '<button onclick="NutritionTab.openScanner()" style="background:#3b82f6;color:white;border:none;border-radius:8px;padding:14px;font-size:0.9em;font-weight:600;cursor:pointer;">📷 Skanuj kod</button>';
-    h += '<button onclick="NutritionTab.openSearch()" style="background:#22c55e;color:white;border:none;border-radius:8px;padding:14px;font-size:0.9em;font-weight:600;cursor:pointer;">🔍 Szukaj produkt</button>';
-    h += '<button onclick="NutritionTab.openAIEstimate()" style="background:#a855f7;color:white;border:none;border-radius:8px;padding:14px;font-size:0.9em;font-weight:600;cursor:pointer;">✍️ AI Quick</button>';
-    h += '<button onclick="NutritionTab.openManual()" style="background:#6b7280;color:white;border:none;border-radius:8px;padding:14px;font-size:0.9em;font-weight:600;cursor:pointer;">➕ Wpisz ręcznie</button>';
+  
+    h += '<button onclick="NutritionTab.openScanner()" style="background:#3b82f6;color:white;border:none;border-radius:8px;padding:14px;font-size:0.85em;font-weight:600;cursor:pointer;">📷 Skanuj kod</button>';
+    h += '<button onclick="NutritionTab.openLabelScanner()" style="background:#a855f7;color:white;border:none;border-radius:8px;padding:14px;font-size:0.85em;font-weight:600;cursor:pointer;">📸 Skanuj etykietę</button>';
+    h += '<button onclick="NutritionTab.openSearch()" style="background:#22c55e;color:white;border:none;border-radius:8px;padding:14px;font-size:0.85em;font-weight:600;cursor:pointer;">🔍 Szukaj produkt</button>';
+    h += '<button onclick="NutritionTab.openAIEstimate()" style="background:#f59e0b;color:white;border:none;border-radius:8px;padding:14px;font-size:0.85em;font-weight:600;cursor:pointer;">✍️ AI Quick</button>';
+    h += '<button onclick="NutritionTab.openManual()" style="grid-column:span 2;background:#6b7280;color:white;border:none;border-radius:8px;padding:12px;font-size:0.85em;font-weight:600;cursor:pointer;">➕ Wpisz ręcznie</button>';
+
     h += '</div>';
     h += '</div>';
     
@@ -456,9 +459,11 @@ function renderToday() {
     modal.onClose = function() { NutritionScanner.stop(); };
   }
 
+ 
   function openSearch() {
     var modal = createModal('🔍 Szukaj produkt');
-    modal.body.innerHTML = '<input type="text" id="srch-input" placeholder="np. mleko, skyr, kurczak..." style="width:100%;padding:12px;border-radius:8px;border:1px solid #374151;background:#1f2937;color:white;font-size:1em;">' +
+    modal.body.innerHTML = 
+      '<input type="text" id="srch-input" placeholder="np. mleko, skyr, kurczak..." style="width:100%;padding:12px;border-radius:8px;border:1px solid #374151;background:#1f2937;color:white;font-size:1em;">' +
       '<div id="srch-results" style="margin-top:12px;max-height:60vh;overflow-y:auto;"></div>';
     
     var input = document.getElementById('srch-input');
@@ -470,24 +475,77 @@ function renderToday() {
       clearTimeout(timer);
       var q = input.value.trim();
       if (q.length < 2) { results.innerHTML = ''; return; }
-      results.innerHTML = '<p style="color:#9ca3af;text-align:center;padding:20px;">⏳ Szukam...</p>';
+      results.innerHTML = '<p style="color:#9ca3af;text-align:center;padding:20px;">⏳ Szukam w 3 bazach...</p>';
+      
       timer = setTimeout(async function() {
-        var products = await NutritionSearch.search(q, { limit: 20 });
-        if (!products.length) {
-          results.innerHTML = '<p style="color:#fbbf24;text-align:center;padding:20px;">Brak wyników. Spróbuj inaczej lub wpisz ręcznie.</p>';
+        if (typeof MultiSourceSearch === 'undefined') {
+          results.innerHTML = '<p style="color:#fca5a5;text-align:center;">MultiSourceSearch not loaded</p>';
           return;
         }
+        
+        var data = await MultiSourceSearch.search(q, { limit: 8 });
         var h = '';
-        products.forEach(function(p) {
-          h += '<div onclick="NutritionTab.selectProduct(' + JSON.stringify(p).replace(/"/g, '&quot;') + ')" style="background:#374151;padding:10px;border-radius:8px;margin-bottom:6px;cursor:pointer;">';
-          h += '<div style="color:#f9fafb;font-weight:600;font-size:0.9em;">' + p.name + '</div>';
-          if (p.brand) h += '<div style="color:#9ca3af;font-size:0.75em;">' + p.brand + '</div>';
-          h += '<div style="color:#6b7280;font-size:0.75em;margin-top:4px;">' + Math.round(p.per_100g.calories) + ' kcal/100g · B:' + (p.per_100g.protein || 0) + 'g · W:' + (p.per_100g.carbs || 0) + 'g · T:' + (p.per_100g.fat || 0) + 'g</div>';
+        
+        // Sekcja: Moje produkty (ulubione + recent)
+        var personal = [].concat(data.favorites || [], data.recent || []);
+        if (personal.length) {
+          var seen = {};
+          var uniqPersonal = personal.filter(function(p) {
+            var k = (p.name || '') + '_' + (p.barcode || '');
+            if (seen[k]) return false;
+            seen[k] = true;
+            return true;
+          });
+          h += renderSourceSection('⭐ MOJE PRODUKTY', uniqPersonal.slice(0, 5), '#fbbf24');
+        }
+        
+        // Sekcja: USDA (lab-tested)
+        if (data.usda && data.usda.length) {
+          h += renderSourceSection('🇺🇸 USDA (whole foods)', data.usda.slice(0, 6), '#10b981');
+        }
+        
+        // Sekcja: Open Food Facts
+        if (data.openfoodfacts && data.openfoodfacts.length) {
+          h += renderSourceSection('🌍 Open Food Facts', data.openfoodfacts.slice(0, 8), '#3b82f6');
+        }
+        
+        // Total count
+        if (!data.total && !personal.length) {
+          h += '<p style="color:#fbbf24;text-align:center;padding:20px;">Brak wyników. Spróbuj:</p>';
+          h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">';
+          h += '<button onclick="NutritionTab.closeAllModals();NutritionTab.openLabelScanner();" style="padding:12px;background:#3b82f6;color:white;border:none;border-radius:8px;font-weight:600;">📸 Skanuj etykietę</button>';
+          h += '<button onclick="NutritionTab.closeAllModals();NutritionTab.openAIEstimate();" style="padding:12px;background:#a855f7;color:white;border:none;border-radius:8px;font-weight:600;">🤖 AI Quick</button>';
           h += '</div>';
-        });
+        }
+        
         results.innerHTML = h;
       }, 400);
     });
+  }
+  
+  function renderSourceSection(title, products, accentColor) {
+    if (!products || !products.length) return '';
+    
+    var h = '<div style="margin-bottom:14px;">';
+    h += '<div style="color:' + accentColor + ';font-size:0.75em;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;padding:6px 0;border-bottom:1px solid #374151;margin-bottom:6px;">' + title + '</div>';
+    
+    products.forEach(function(p) {
+      var pJson = JSON.stringify(p).replace(/"/g, '&quot;');
+      h += '<div onclick="NutritionTab.selectProduct(' + pJson + ')" style="background:#374151;padding:10px;border-radius:8px;margin-bottom:5px;cursor:pointer;border-left:3px solid ' + accentColor + ';">';
+      h += '<div style="color:#f9fafb;font-weight:600;font-size:0.9em;">' + (p.name || 'Bez nazwy') + '</div>';
+      if (p.brand) h += '<div style="color:#9ca3af;font-size:0.75em;">' + p.brand + '</div>';
+      var per100 = p.per_100g || {};
+      h += '<div style="color:#6b7280;font-size:0.75em;margin-top:4px;">' + 
+        Math.round(per100.calories || 0) + ' kcal/100g · ' +
+        'B:' + (per100.protein || 0) + 'g · ' +
+        'W:' + (per100.carbs || 0) + 'g · ' +
+        'T:' + (per100.fat || 0) + 'g' +
+        '</div>';
+      h += '</div>';
+    });
+    
+    h += '</div>';
+    return h;
   }
 
   function selectProduct(product) {
@@ -569,6 +627,88 @@ function renderToday() {
     });
   }
 
+
+  function openLabelScanner() {
+    if (typeof OCRLabelScanner === 'undefined' || !OCRLabelScanner.isSupported()) {
+      alert('Skaner etykiety niedostępny');
+      return;
+    }
+    
+    var modal = createModal('📸 Skanuj etykietę');
+    modal.body.innerHTML = 
+      '<video id="ocr-video" style="width:100%;max-height:50vh;border-radius:8px;background:#000;" playsinline></video>' +
+      '<p id="ocr-status" style="color:#9ca3af;text-align:center;margin:10px 0;font-size:0.9em;">Skieruj kamerę na etykietę<br><small>Tabela wartości odżywczych powinna być wyraźnie widoczna</small></p>' +
+      '<button id="ocr-capture" style="width:100%;padding:14px;background:#a855f7;color:white;border:none;border-radius:8px;font-weight:600;font-size:1em;cursor:pointer;">📸 Zrób zdjęcie i analizuj</button>' +
+      '<div id="ocr-result" style="margin-top:12px;"></div>';
+    
+    var video = document.getElementById('ocr-video');
+    var status = document.getElementById('ocr-status');
+    var captureBtn = document.getElementById('ocr-capture');
+    var resultEl = document.getElementById('ocr-result');
+    
+    OCRLabelScanner.startCamera(video).catch(function(e) {
+      status.textContent = '❌ Brak dostępu do kamery: ' + e.message;
+      captureBtn.disabled = true;
+    });
+    
+    captureBtn.addEventListener('click', async function() {
+      captureBtn.disabled = true;
+      status.textContent = '⏳ AI analizuje etykietę (15-30 sek)...';
+      resultEl.innerHTML = '';
+      
+      try {
+        var canvas = OCRLabelScanner.captureFrame(video);
+        var blob = await OCRLabelScanner.canvasToBlob(canvas);
+        var ocrResult = await OCRLabelScanner.analyzeImage(blob);
+        
+        OCRLabelScanner.stopCamera();
+        
+        if (!ocrResult || !ocrResult.per_100g.calories) {
+          resultEl.innerHTML = '<div style="background:#451a03;border:1px solid #f59e0b;color:#fde68a;padding:12px;border-radius:8px;">' +
+            '⚠️ Nie udało się odczytać. Spróbuj:<br>' +
+            '• Lepsze oświetlenie<br>' +
+            '• Wyraźniejsza tabela makro<br>' +
+            '• Mniejsza odległość od etykiety' +
+            '<div style="margin-top:10px;font-size:0.75em;opacity:0.7;">Raw: ' + (ocrResult?.raw_text || 'no response').substring(0, 200) + '</div>' +
+            '</div>';
+          status.textContent = '';
+          captureBtn.disabled = false;
+          captureBtn.textContent = '🔁 Spróbuj ponownie';
+          OCRLabelScanner.startCamera(video);
+          return;
+        }
+        
+        // Pokaz wynik
+        var product = OCRLabelScanner.toProduct(ocrResult);
+        var n = product.per_100g;
+        
+        resultEl.innerHTML = '<div style="background:#052e16;border:1px solid #22c55e;color:#86efac;padding:14px;border-radius:8px;">' +
+          '<div style="color:#f9fafb;font-weight:600;margin-bottom:8px;">✅ Odczytano etykietę</div>' +
+          '<div style="color:#f9fafb;font-size:1em;margin-bottom:8px;">' + (product.name || 'Produkt') + '</div>' +
+          '<div style="color:#d1d5db;font-size:0.85em;">' +
+            'Per 100g: <b>' + n.calories + ' kcal</b><br>' +
+            'B: ' + (n.protein || 0) + 'g · W: ' + (n.carbs || 0) + 'g · T: ' + (n.fat || 0) + 'g' +
+          '</div>' +
+          '<button onclick="NutritionTab.confirmOCRProduct(' + JSON.stringify(product).replace(/"/g, '&quot;') + ')" style="width:100%;padding:10px;background:#22c55e;color:white;border:none;border-radius:6px;font-weight:600;margin-top:10px;cursor:pointer;">✅ Użyj tego produktu</button>' +
+          '</div>';
+        status.textContent = '';
+      } catch(e) {
+        resultEl.innerHTML = '<div style="background:#450a0a;border:1px solid #ef4444;color:#fca5a5;padding:12px;border-radius:8px;">❌ Błąd: ' + e.message + '</div>';
+        status.textContent = '';
+        captureBtn.disabled = false;
+        OCRLabelScanner.startCamera(video);
+      }
+    });
+    
+    modal.onClose = function() { OCRLabelScanner.stopCamera(); };
+  }
+  
+  function confirmOCRProduct(product) {
+    closeAllModals();
+    openAddMeal(product);
+  }
+
+  
   function openAIEstimate() {
     var modal = createModal('✍️ AI Quick Estimate');
     modal.body.innerHTML = 
@@ -889,7 +1029,11 @@ function renderToday() {
     refreshAI: refreshAI,
     
   navDate: navDate,
-  jumpToDate: jumpToDate
+  jumpToDate: jumpToDate,   
+openLabelScanner: openLabelScanner,
+confirmOCRProduct: confirmOCRProduct,
+renderSourceSection: renderSourceSection
+
 
   };
 
