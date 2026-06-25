@@ -269,14 +269,117 @@ function renderToday() {
     return '<div id="nutr-ai-container"><p style="color:#9ca3af;text-align:center;padding:30px;">⏳ AI Coach analizuje dane...</p></div>';
   }
 
+
   async function renderAI() {
     var c = document.getElementById('nutr-ai-container');
     if (!c) return;
+    
     c.innerHTML = '<div style="background:#1f2937;border-radius:10px;padding:14px;">' +
       '<h3 style="margin:0 0 8px;color:#f9fafb;">🤖 AI Nutrition Coach</h3>' +
-      '<p style="color:#9ca3af;font-size:0.85em;">Nutrition insights w AI Coach Daily Coach. Wkrótce dedykowany endpoint.</p>' +
+      '<p style="color:#9ca3af;text-align:center;padding:30px;">⏳ AI analizuje Twoje dane...</p>' +
       '</div>';
+    
+    try {
+      // Build rich payload
+      var payload = buildNutritionPayload();
+      
+      var res = await fetch('https://hm-tracker-ai.dawid-pyzowski.workers.dev', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.assign({ mode: 'nutrition-coach' }, payload))
+      });
+      
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var data = await res.json();
+      
+      if (data.error) throw new Error(data.error);
+      
+      var analysis = (data.analysis || '')
+        .replace(/\n\n/g, '<br><br>')
+        .replace(/\n/g, '<br>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      
+      var html = '<div style="background:linear-gradient(135deg,#1e3a8a 0%,#1f2937 100%);border-radius:12px;padding:16px;border:2px solid #a855f7;">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #374151;">';
+      html += '<h3 style="margin:0;color:#f9fafb;font-size:1em;">🤖 AI Nutrition Coach</h3>';
+      html += '<button onclick="NutritionTab.refreshAI()" style="background:#374151;border:none;color:#a855f7;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8em;">🔄 Odśwież</button>';
+      html += '</div>';
+      html += '<div style="color:#e5e7eb;font-size:0.9em;line-height:1.55;">' + analysis + '</div>';
+      html += '<div style="margin-top:8px;color:#6b7280;font-size:0.7em;text-align:right;">' + new Date(data.timestamp).toLocaleString() + ' | ' + (data.model || 'AI') + '</div>';
+      html += '</div>';
+      
+      c.innerHTML = html;
+      
+    } catch(e) {
+      c.innerHTML = '<div style="background:#1f2937;border-radius:10px;padding:14px;">' +
+        '<h3 style="margin:0 0 8px;color:#f9fafb;">🤖 AI Nutrition Coach</h3>' +
+        '<p style="color:#fca5a5;text-align:center;padding:20px;">❌ ' + e.message + '</p>' +
+        '<button onclick="NutritionTab.refreshAI()" style="background:#374151;border:none;color:#a855f7;padding:8px 16px;border-radius:6px;cursor:pointer;width:100%;">🔄 Spróbuj ponownie</button>' +
+        '</div>';
+    }
   }
+
+  function buildNutritionPayload() {
+    var payload = {
+      today: localToday(),
+      profile: NutritionEngine.PROFILE,
+      budget: NutritionEngine.calculateBudget(),
+      today_data: NutritionEngine.compute(localToday())
+    };
+    
+    // Analytics
+    if (typeof NutritionAnalytics !== 'undefined') {
+      payload.analytics = NutritionAnalytics.getSummary7d();
+      payload.calorie_balance_30d = NutritionAnalytics.getCalorieBalance30d();
+      payload.meal_timing = NutritionAnalytics.getMealTimingStats();
+    }
+    
+    // Health context
+    if (typeof HealthImport !== 'undefined') {
+      var latest = HealthImport.getLatest();
+      var baselines = HealthImport.getBaselines();
+      payload.health = {
+        latest: latest,
+        baselines: baselines,
+        history_7d: HealthImport.getHistory(7)
+      };
+    }
+    
+    // Body & weight trend
+    if (typeof BodyTracker !== 'undefined') {
+      payload.body = {
+        progress: BodyTracker.getProgressVsGoal(),
+        trend_7d: BodyTracker.getTrend(7)
+      };
+    }
+    
+    // Recent training context
+    if (typeof DB !== 'undefined' && DB.getAll) {
+      try {
+        DB.getAll().then(function(acts) {
+          // We can't async here in build, but we can pass it
+        });
+      } catch(e) {}
+    }
+    
+    // Plan today (training)
+    if (window.PLAN_FLAT) {
+      payload.plan_today = window.PLAN_FLAT.find(function(p) { return p.date === localToday(); }) || null;
+      
+      // Plan jutro (dla pre-workout meal planning)
+      var tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      var tomorrowStr = tomorrow.toISOString().slice(0, 10);
+      payload.plan_tomorrow = window.PLAN_FLAT.find(function(p) { return p.date === tomorrowStr; }) || null;
+    }
+    
+    return payload;
+  }
+
+  function refreshAI() {
+    renderAI();
+  }
+
 
   // ============================================
   // PLAN — static dietary info (z NUTR)
@@ -783,6 +886,7 @@ function renderToday() {
     saveAIMeal: saveAIMeal,
     deleteMeal: deleteMeal,
     closeAllModals: closeAllModals,
+    refreshAI: refreshAI,
     
   navDate: navDate,
   jumpToDate: jumpToDate
