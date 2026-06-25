@@ -1,10 +1,11 @@
 
-/* ocr-label-scanner.js v1 — Sprint 26.6: Cloudflare AI Vision OCR */
+/* ocr-label-scanner.js v2 — Sprint 26.6: Tesseract.js + AI Parse */
 var OCRLabelScanner = (function() {
   "use strict";
   var TAG = "[OCR]";
   var WORKER_URL = "https://hm-tracker-ai.dawid-pyzowski.workers.dev";
   var stream = null;
+  var tesseractWorker = null;
   
   function isSupported() {
     return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
@@ -16,8 +17,8 @@ var OCRLabelScanner = (function() {
     stream = await navigator.mediaDevices.getUserMedia({
       video: { 
         facingMode: 'environment',
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
       }
     });
     
@@ -39,110 +40,183 @@ var OCRLabelScanner = (function() {
     canvas.height = videoElement.videoHeight;
     var ctx = canvas.getContext('2d');
     ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+    
+    // Preprocess: zwiększ kontrast dla lepszego OCR
+    var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    var data = imgData.data;
+    for (var i = 0; i < data.length; i += 4) {
+      var avg = (data[i] + data[i+1] + data[i+2]) / 3;
+      // Threshold dla black/white (lepiej dla OCR tabel)
+      var bw = avg > 140 ? 255 : (avg < 80 ? 0 : avg);
+      data[i] = bw;
+      data[i+1] = bw;
+      data[i+2] = bw;
+    }
+    ctx.putImageData(imgData, 0, 0);
+    
     return canvas;
   }
   
-  function canvasToBlob(canvas) {
-    return new Promise(function(resolve) {
-      canvas.toBlob(function(blob) { resolve(blob); }, 'image/jpeg', 0.85);
+  // ============================================
+  // TESSERACT.JS OCR (offline)
+  // ============================================
+  async function initTesseract(onProgress) {
+    if (tesseractWorker) return tesseractWorker;
+    if (typeof Tesseract === 'undefined') {
+      throw new Error('Tesseract.js not loaded');
+    }
+    
+    onProgress && onProgress('⏳ Pobieram model OCR (jednorazowo, ~3MB)...');
+    
+    tesseractWorker = await Tesseract.createWorker('pol', 1, {
+      logger: function(m) {
+        if (m.status === 'recognizing text' && onProgress) {
+          onProgress('🔍 Czytam tekst... ' + Math.round(m.progress * 100) + '%');
+        }
+      }
     });
+    
+    return tesseractWorker;
   }
   
-  async function blobToBase64(blob) {
-    return new Promise(function(resolve) {
-      var reader = new FileReader();
-      reader.onloadend = function() {
-        var base64 = reader.result.split(',')[1];
-        resolve(base64);
-      };
-      reader.readAsDataURL(blob);
-    });
+  async function extractTextFromImage(canvas, onProgress) {
+    var worker = await initTesseract(onProgress);
+    var result = await worker.recognize(canvas);
+    return result.data.text;
   }
   
   // ============================================
-  // ANALYZE LABEL via Cloudflare Llama Vision
+  // AI PARSE — Cloudflare Llama 3.3 70B
   // ============================================
-  async function analyzeImage(blob) {
+  async function parseTextWithAI(rawText) {
     try {
-      var base64 = await blobToBase64(blob);
-      
       var resp = await fetch(WORKER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mode: 'label-ocr',
-          image_base64: base64
+          mode: 'nutrition-parse-text',
+          text: rawText
         })
       });
       
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       var data = await resp.json();
-      
       if (data.error) throw new Error(data.error);
       
-      return parseAIResponse(data.analysis);
+      return parseAIResponse(data.analysis, rawText);
     } catch(e) {
-      console.error(TAG, 'Analyze error:', e);
-      throw e;
+      console.warn(TAG, 'AI parse error:', e);
+      // Fallback: regex
+      return parseRawTextWithRegex(rawText);
     }
   }
   
-  // Parsuj odpowiedź AI na strukturalne dane
-  function parseAIResponse(text) {
-    if (!text) return null;
-    
+  function parseAIResponse(text, originalText) {
     var result = {
       name: null,
       brand: null,
-      per_100g: {
-        calories: null,
-        protein: null,
-        carbs: null,
-        fat: null,
-        fiber: null,
-        sugar: null,
-        salt: null
-      },
-      raw_text: text
+      per_100g: { calories: null, protein: null, carbs: null, fat: null, fiber: null, sugar: null, salt: null },
+      raw_text: originalText || text
     };
     
-    // Próbuj wyciągnąć JSON
-    var jsonMatch = text.match(/\{[\s\S]*\}/);
+    var jsonMatch = text.match(/\{[\s\S]*?\}/);
     if (jsonMatch) {
       try {
         var parsed = JSON.parse(jsonMatch[0]);
         if (parsed.name) result.name = parsed.name;
         if (parsed.brand) result.brand = parsed.brand;
-        if (parsed.calories !== undefined) result.per_100g.calories = parseFloat(parsed.calories);
-        if (parsed.protein !== undefined) result.per_100g.protein = parseFloat(parsed.protein);
-        if (parsed.carbs !== undefined) result.per_100g.carbs = parseFloat(parsed.carbs);
-        if (parsed.fat !== undefined) result.per_100g.fat = parseFloat(parsed.fat);
-        if (parsed.fiber !== undefined) result.per_100g.fiber = parseFloat(parsed.fiber);
-        if (parsed.sugar !== undefined) result.per_100g.sugar = parseFloat(parsed.sugar);
-        if (parsed.salt !== undefined) result.per_100g.salt = parseFloat(parsed.salt);
+        ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sugar', 'salt'].forEach(function(key) {
+          if (parsed[key] !== undefined && parsed[key] !== null) {
+            var v = parseFloat(parsed[key]);
+            if (!isNaN(v)) result.per_100g[key] = v;
+          }
+        });
         return result;
-      } catch(e) {
-        console.warn(TAG, 'JSON parse failed, trying text patterns');
-      }
+      } catch(e) {}
     }
     
-    // Fallback: regex patterns dla polskich etykiet
+    // Fallback regex
+    return parseRawTextWithRegex(originalText || text);
+  }
+  
+  // ============================================
+  // REGEX fallback (jeśli AI nie zwróci JSON)
+  // ============================================
+  function parseRawTextWithRegex(text) {
+    if (!text) return null;
+    
+    var result = {
+      name: null,
+      brand: null,
+      per_100g: { calories: null, protein: null, carbs: null, fat: null, fiber: null, sugar: null, salt: null },
+      raw_text: text
+    };
+    
+    // Czyść tekst
+    var cleaned = text.replace(/\s+/g, ' ').trim();
+    
+    // Patterns dla polskich etykiet
     var patterns = {
-      calories: /(?:kalor[a-z]+|energi[a-z]+|wartość energetyczna)[:\s]*(\d+(?:[.,]\d+)?)\s*kcal/i,
-      protein: /białko[:\s]*(\d+(?:[.,]\d+)?)\s*g/i,
-      carbs: /(?:węglowodany|cukier ogółem)[:\s]*(\d+(?:[.,]\d+)?)\s*g/i,
-      fat: /(?:tłuszcze?|tłuszcz)[:\s]*(\d+(?:[.,]\d+)?)\s*g/i,
-      fiber: /błonnik[:\s]*(\d+(?:[.,]\d+)?)\s*g/i,
-      sugar: /(?:cukier[y]?|cukier proste)[:\s]*(\d+(?:[.,]\d+)?)\s*g/i,
-      salt: /(?:sól|so[ld])[:\s]*(\d+(?:[.,]\d+)?)\s*g/i
+      calories: [
+        /(?:wartość energetyczna|energia)[\s:]*(?:[\d.,]+\s*kJ?\s*\/?\s*)?(\d+(?:[.,]\d+)?)\s*kcal/i,
+        /(\d+(?:[.,]\d+)?)\s*kcal/i,
+        /energia[\s:]*(\d+(?:[.,]\d+)?)/i
+      ],
+      protein: [
+        /białko[\s:]*(\d+(?:[.,]\d+)?)\s*g/i,
+        /białka[\s:]*(\d+(?:[.,]\d+)?)\s*g/i,
+        /protein[\s:]*(\d+(?:[.,]\d+)?)/i
+      ],
+      carbs: [
+        /węglowodany[\s:]*(?:ogółem)?[\s:]*(\d+(?:[.,]\d+)?)\s*g/i,
+        /(?:carbohydrate|carbs)[\s:]*(\d+(?:[.,]\d+)?)/i
+      ],
+      fat: [
+        /tłuszcz[\s:]*(?:ogółem)?[\s:]*(\d+(?:[.,]\d+)?)\s*g/i,
+        /tłuszcze[\s:]*(\d+(?:[.,]\d+)?)\s*g/i,
+        /fat[\s:]*(\d+(?:[.,]\d+)?)/i
+      ],
+      fiber: [
+        /błonnik[\s:]*(?:pokarmowy)?[\s:]*(\d+(?:[.,]\d+)?)\s*g/i,
+        /fiber[\s:]*(\d+(?:[.,]\d+)?)/i
+      ],
+      sugar: [
+        /w tym cukry[\s:]*(\d+(?:[.,]\d+)?)\s*g/i,
+        /cukry[\s:]*(\d+(?:[.,]\d+)?)\s*g/i
+      ],
+      salt: [
+        /sól[\s:]*(\d+(?:[.,]\d+)?)\s*g/i
+      ]
     };
     
     Object.keys(patterns).forEach(function(key) {
-      var match = text.match(patterns[key]);
-      if (match) {
-        result.per_100g[key] = parseFloat(match[1].replace(',', '.'));
+      for (var i = 0; i < patterns[key].length; i++) {
+        var match = cleaned.match(patterns[key][i]);
+        if (match) {
+          result.per_100g[key] = parseFloat(match[1].replace(',', '.'));
+          break;
+        }
       }
     });
+    
+    return result;
+  }
+  
+  // ============================================
+  // MAIN: analyze image (2-step pipeline)
+  // ============================================
+  async function analyzeImage(canvas, onProgress) {
+    onProgress && onProgress('🔍 Czytam etykietę...');
+    
+    var rawText = await extractTextFromImage(canvas, onProgress);
+    console.log(TAG, 'OCR raw text:', rawText.substring(0, 300));
+    
+    if (!rawText || rawText.length < 20) {
+      throw new Error('Nie udało się odczytać tekstu z etykiety. Spróbuj lepszego oświetlenia.');
+    }
+    
+    onProgress && onProgress('🤖 AI analizuje wartości odżywcze...');
+    var result = await parseTextWithAI(rawText);
     
     return result;
   }
@@ -170,15 +244,22 @@ var OCRLabelScanner = (function() {
     };
   }
   
+  function cleanupTesseract() {
+    if (tesseractWorker) {
+      try { tesseractWorker.terminate(); } catch(e) {}
+      tesseractWorker = null;
+    }
+  }
+  
   return {
     isSupported: isSupported,
     startCamera: startCamera,
     stopCamera: stopCamera,
     captureFrame: captureFrame,
-    canvasToBlob: canvasToBlob,
     analyzeImage: analyzeImage,
-    parseAIResponse: parseAIResponse,
     toProduct: toProduct,
-    calculatePortion: calculatePortion
+    calculatePortion: calculatePortion,
+    cleanupTesseract: cleanupTesseract,
+    parseRawTextWithRegex: parseRawTextWithRegex
   };
 })();
