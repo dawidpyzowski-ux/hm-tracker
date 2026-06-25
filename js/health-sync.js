@@ -1,21 +1,47 @@
 
-/* health-sync.js v2 — Sprint 14: Cloud Sync via JSONBin */
+/* health-sync.js v3 — Sprint 26: Health + Nutrition Cloud Sync via JSONBin */
 var HealthSync = (function() {
   "use strict";
 
   var BIN_ID = "6a32eeddf5f4af5e2903de81";
-  var API_KEY = "$2a$10$6NbODl6x2IbzQwZ4TV9OieTf5BG9zhHT54SibqBhcT/cUTUWsLxBS"; // <-- TYLKO TO PODMIEN!
-
+  var API_KEY = "$2a$10$6NbODl6x2IbzQwZ4TV9OieTf5BG9zhHT54SibqBhcT/cUTUWsLxBS";
   var BASE_URL = "https://api.jsonbin.io/v3/b/" + BIN_ID;
+
+  function getNutritionLogs() {
+    try {
+      return JSON.parse(localStorage.getItem('nutrition_logs') || '{}');
+    } catch(e) { return {}; }
+  }
+
+  function getNutritionSettings() {
+    try {
+      return JSON.parse(localStorage.getItem('nutrition_settings') || 'null');
+    } catch(e) { return null; }
+  }
+
+  function getNutritionFavorites() {
+    try {
+      return JSON.parse(localStorage.getItem('nutrition_favorites') || '[]');
+    } catch(e) { return []; }
+  }
 
   async function push() {
     try {
       var healthData = HealthImport.getAll();
+      var nutritionLogs = getNutritionLogs();
+      var nutritionSettings = getNutritionSettings();
+      var nutritionFavorites = getNutritionFavorites();
+      
       var payload = {
         health: healthData,
+        nutrition: {
+          logs: nutritionLogs,
+          settings: nutritionSettings,
+          favorites: nutritionFavorites
+        },
         meta: {
           updated: new Date().toISOString(),
-          version: 1,
+          version: 3,
           device: navigator.userAgent.includes("iPhone") ? "iphone" : "desktop"
         }
       };
@@ -35,7 +61,8 @@ var HealthSync = (function() {
         return false;
       }
 
-      console.log("[Sync] ✅ PUSH OK", healthData.length, "records");
+      var nutritionDays = Object.keys(nutritionLogs).length;
+      console.log("[Sync] ✅ PUSH OK", healthData.length, "health records,", nutritionDays, "nutrition days");
       return true;
     } catch (e) {
       console.error("[Sync] ❌ PUSH ERROR", e);
@@ -56,14 +83,40 @@ var HealthSync = (function() {
 
       var json = await res.json();
       var record = json.record || {};
-      var cloudData = Array.isArray(record.health) ? record.health : [];
+      var cloudHealth = Array.isArray(record.health) ? record.health : [];
+      var cloudNutrition = record.nutrition || {};
 
-      // MERGE: lokalne + chmura (po dacie, najnowsze wygrywają)
-      var localData = HealthImport.getAll();
-      var merged = mergeByDate(localData, cloudData);
+      // === HEALTH MERGE ===
+      var localHealth = HealthImport.getAll();
+      var mergedHealth = mergeByDate(localHealth, cloudHealth);
+      localStorage.setItem("health_data", JSON.stringify(mergedHealth));
 
-      localStorage.setItem("health_data", JSON.stringify(merged));
-      console.log("[Sync] ✅ PULL OK — cloud:", cloudData.length, "| local:", localData.length, "| merged:", merged.length);
+      // === NUTRITION MERGE ===
+      var nutritionDaysMerged = 0;
+      if (cloudNutrition.logs && typeof cloudNutrition.logs === 'object') {
+        var localLogs = getNutritionLogs();
+        var mergedLogs = mergeNutritionLogs(localLogs, cloudNutrition.logs);
+        localStorage.setItem("nutrition_logs", JSON.stringify(mergedLogs));
+        nutritionDaysMerged = Object.keys(mergedLogs).length;
+      }
+
+      // Settings (cloud override if exists)
+      if (cloudNutrition.settings) {
+        var localSettings = getNutritionSettings();
+        if (!localSettings) {
+          // Tylko jeśli lokalne brak — bierz z chmury
+          localStorage.setItem("nutrition_settings", JSON.stringify(cloudNutrition.settings));
+        }
+      }
+
+      // Favorites merge (unikalne po nazwie+barcode)
+      if (Array.isArray(cloudNutrition.favorites)) {
+        var localFavs = getNutritionFavorites();
+        var mergedFavs = mergeFavorites(localFavs, cloudNutrition.favorites);
+        localStorage.setItem("nutrition_favorites", JSON.stringify(mergedFavs));
+      }
+
+      console.log("[Sync] ✅ PULL OK — health:", cloudHealth.length, "| local:", localHealth.length, "| merged:", mergedHealth.length, "| nutrition days:", nutritionDaysMerged);
       return true;
     } catch (e) {
       console.error("[Sync] ❌ PULL ERROR", e);
@@ -76,12 +129,59 @@ var HealthSync = (function() {
     cloud.forEach(function(e) { if (e.date) map[e.date] = e; });
     local.forEach(function(e) {
       if (!e.date) return;
-      // Jesli lokalny ma nowszy timestamp, ma pierwszenstwo
       if (!map[e.date] || (e.ts && map[e.date].ts && e.ts > map[e.date].ts)) {
         map[e.date] = e;
       }
     });
     return Object.values(map).sort(function(a, b) { return a.date.localeCompare(b.date); });
+  }
+
+  // Merge nutrition logs (po dacie + meal id, najnowsze wygrywają)
+  function mergeNutritionLogs(local, cloud) {
+    var merged = {};
+    
+    // Wszystkie unikalne daty
+    var allDates = new Set([].concat(Object.keys(local), Object.keys(cloud)));
+    
+    allDates.forEach(function(date) {
+      var localDay = local[date] || { meals: [], date: date };
+      var cloudDay = cloud[date] || { meals: [], date: date };
+      
+      // Merge meals — unikalne po id, najnowsze wygrywają
+      var mealMap = {};
+      cloudDay.meals.forEach(function(m) {
+        if (m.id) mealMap[m.id] = m;
+      });
+      localDay.meals.forEach(function(m) {
+        if (!m.id) return;
+        if (!mealMap[m.id] || (m.ts && mealMap[m.id].ts && m.ts > mealMap[m.id].ts)) {
+          mealMap[m.id] = m;
+        }
+      });
+      
+      merged[date] = {
+        date: date,
+        meals: Object.values(mealMap).sort(function(a, b) {
+          return (a.time || '00:00').localeCompare(b.time || '00:00');
+        })
+      };
+    });
+    
+    return merged;
+  }
+
+  function mergeFavorites(local, cloud) {
+    var map = {};
+    cloud.forEach(function(f) {
+      var key = (f.barcode || '') + '_' + (f.name || '');
+      map[key] = f;
+    });
+    local.forEach(function(f) {
+      var key = (f.barcode || '') + '_' + (f.name || '');
+      if (!map[key]) map[key] = f;
+    });
+    var arr = Object.values(map);
+    return arr.slice(0, 50);
   }
 
   async function sync() {
@@ -93,5 +193,16 @@ var HealthSync = (function() {
     setTimeout(sync, 1500);
   }
 
-  return { push: push, pull: pull, sync: sync, auto: auto };
+  // Public method dla nutrition-engine.js żeby wywoływał auto-sync po zmianie
+  function pushNutrition() {
+    return push();
+  }
+
+  return { 
+    push: push, 
+    pull: pull, 
+    sync: sync, 
+    auto: auto,
+    pushNutrition: pushNutrition
+  };
 })();
