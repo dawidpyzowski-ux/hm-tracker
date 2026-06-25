@@ -651,15 +651,18 @@ function renderToday() {
       captureBtn.disabled = true;
     });
     
+
     captureBtn.addEventListener('click', async function() {
       captureBtn.disabled = true;
-      status.textContent = '⏳ AI analizuje etykietę (15-30 sek)...';
       resultEl.innerHTML = '';
       
       try {
         var canvas = OCRLabelScanner.captureFrame(video);
-        var blob = await OCRLabelScanner.canvasToBlob(canvas);
-        var ocrResult = await OCRLabelScanner.analyzeImage(blob);
+        
+        // 2-step pipeline z progress
+        var ocrResult = await OCRLabelScanner.analyzeImage(canvas, function(msg) {
+          status.textContent = msg;
+        });
         
         OCRLabelScanner.stopCamera();
         
@@ -668,8 +671,10 @@ function renderToday() {
             '⚠️ Nie udało się odczytać. Spróbuj:<br>' +
             '• Lepsze oświetlenie<br>' +
             '• Wyraźniejsza tabela makro<br>' +
-            '• Mniejsza odległość od etykiety' +
-            '<div style="margin-top:10px;font-size:0.75em;opacity:0.7;">Raw: ' + (ocrResult?.raw_text || 'no response').substring(0, 200) + '</div>' +
+            '• Bliżej etykiety' +
+            '<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:0.75em;">Raw OCR text</summary>' +
+            '<div style="margin-top:6px;font-size:0.7em;opacity:0.7;max-height:120px;overflow-y:auto;background:#000;padding:6px;border-radius:4px;">' + 
+            (ocrResult?.raw_text || 'no text').substring(0, 500) + '</div></details>' +
             '</div>';
           status.textContent = '';
           captureBtn.disabled = false;
@@ -678,7 +683,6 @@ function renderToday() {
           return;
         }
         
-        // Pokaz wynik
         var product = OCRLabelScanner.toProduct(ocrResult);
         var n = product.per_100g;
         
@@ -688,8 +692,13 @@ function renderToday() {
           '<div style="color:#d1d5db;font-size:0.85em;">' +
             'Per 100g: <b>' + n.calories + ' kcal</b><br>' +
             'B: ' + (n.protein || 0) + 'g · W: ' + (n.carbs || 0) + 'g · T: ' + (n.fat || 0) + 'g' +
+            (n.fiber ? ' · Błonnik: ' + n.fiber + 'g' : '') +
+            (n.sugar ? ' · Cukry: ' + n.sugar + 'g' : '') +
           '</div>' +
           '<button onclick="NutritionTab.confirmOCRProduct(' + JSON.stringify(product).replace(/"/g, '&quot;') + ')" style="width:100%;padding:10px;background:#22c55e;color:white;border:none;border-radius:6px;font-weight:600;margin-top:10px;cursor:pointer;">✅ Użyj tego produktu</button>' +
+          '<details style="margin-top:8px;"><summary style="cursor:pointer;color:#86efac;font-size:0.75em;">Pokaż raw text</summary>' +
+          '<div style="margin-top:6px;font-size:0.7em;opacity:0.7;max-height:120px;overflow-y:auto;background:#000;padding:6px;border-radius:4px;color:#d1d5db;">' + 
+          (ocrResult.raw_text || '').substring(0, 500) + '</div></details>' +
           '</div>';
         status.textContent = '';
       } catch(e) {
@@ -699,6 +708,7 @@ function renderToday() {
         OCRLabelScanner.startCamera(video);
       }
     });
+
     
     modal.onClose = function() { OCRLabelScanner.stopCamera(); };
   }
