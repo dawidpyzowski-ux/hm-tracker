@@ -864,6 +864,7 @@ function renderToday() {
     };
   }
 
+
   function toggleVoice() {
     var statusEl = document.getElementById('vi-status');
     var transcriptEl = document.getElementById('vi-transcript');
@@ -880,6 +881,9 @@ function renderToday() {
     transcriptEl.textContent = '';
     resultEl.innerHTML = '';
     
+    // Track transcript locally (fix race condition)
+    var latestTranscript = '';
+    
     VoiceInput.start({
       onStart: function() {
         statusEl.textContent = '🎤 Słucham... Mów wyraźnie';
@@ -893,10 +897,14 @@ function renderToday() {
       onInterim: function(text) {
         transcriptEl.style.display = 'block';
         transcriptEl.innerHTML = '<span style="color:#9ca3af;font-style:italic;">' + text + '</span>';
+        // Update interim też do latest
+        if (text) latestTranscript = text;
       },
       onFinal: function(text) {
         transcriptEl.style.display = 'block';
         transcriptEl.innerHTML = '<span style="color:#f9fafb;">' + text + '</span>';
+        latestTranscript = text;
+        console.log('[Voice] onFinal:', text);
       },
       onEnd: async function(finalTranscript) {
         statusEl.textContent = '';
@@ -906,21 +914,35 @@ function renderToday() {
         micWrap.style.boxShadow = 'none';
         micWrap.style.animation = 'none';
         
-        if (!finalTranscript || finalTranscript.trim().length < 3) {
-          statusEl.textContent = '⚠️ Nie rozpoznano. Spróbuj jeszcze raz.';
+        // PREFER latest transcript (z onFinal), fallback to onEnd param
+        var transcript = latestTranscript || finalTranscript || '';
+        console.log('[Voice] onEnd transcript:', transcript);
+        
+        // Also try to read from UI (last resort)
+        if (!transcript || transcript.length < 3) {
+          var uiText = transcriptEl.textContent || '';
+          if (uiText.length > 3) {
+            transcript = uiText;
+            console.log('[Voice] Using UI text:', transcript);
+          }
+        }
+        
+        if (!transcript || transcript.trim().length < 3) {
+          statusEl.textContent = '⚠️ Nie rozpoznano. Tap mikrofon i spróbuj jeszcze raz.';
           statusEl.style.color = '#f59e0b';
           return;
         }
         
         // AI Parse
-        statusEl.textContent = '⏳ AI analizuje...';
+        statusEl.textContent = '⏳ AI analizuje: "' + transcript.substring(0, 50) + '..."';
         statusEl.style.color = '#3b82f6';
         
         try {
-          var parsed = await VoiceInput.parseTranscript(finalTranscript);
+          var parsed = await VoiceInput.parseTranscript(transcript);
           if (!parsed || !parsed.items.length) {
             resultEl.innerHTML = '<div style="background:#451a03;border:1px solid #f59e0b;color:#fde68a;padding:12px;border-radius:8px;">' +
-              '⚠️ AI nie rozpoznał składników. Spróbuj jeszcze raz lub użyj ✍️ AI Quick.' +
+              '⚠️ AI nie rozpoznał składników. Próbka: "' + transcript.substring(0, 80) + '"<br>' +
+              'Spróbuj bardziej precyzyjnie (np. "200g kurczak, 100g ryż") lub użyj ✍️ AI Quick.' +
               '</div>';
             statusEl.textContent = '';
             return;
@@ -931,7 +953,7 @@ function renderToday() {
           statusEl.style.color = '#22c55e';
         } catch(e) {
           resultEl.innerHTML = '<div style="background:#450a0a;border:1px solid #ef4444;color:#fca5a5;padding:12px;border-radius:8px;">' +
-            '❌ Błąd AI: ' + e.message + '</div>';
+            '❌ Błąd AI: ' + e.message + '<br>Transcript: "' + transcript.substring(0, 80) + '"</div>';
           statusEl.textContent = '';
         }
       },
@@ -946,6 +968,7 @@ function renderToday() {
       }
     });
   }
+
 
   function renderVoiceResult(parsed) {
     var resultEl = document.getElementById('vi-result');
