@@ -1,5 +1,5 @@
 
-/* multi-source-search.js v1 — Sprint 26.6: Orchestrate USDA + OFF + AI */
+/* multi-source-search.js v2 — Sprint 26.7: Orchestrate FatSecret + USDA + OFF + AI */
 var MultiSourceSearch = (function() {
   "use strict";
   var TAG = "[MultiSearch]";
@@ -28,7 +28,6 @@ var MultiSourceSearch = (function() {
   }
   
   // Multi-source search (równolegle)
- 
   async function search(query, options) {
     options = options || {};
     var perSource = options.limit || 10;
@@ -47,15 +46,17 @@ var MultiSourceSearch = (function() {
     var queryLower = query.toLowerCase().trim();
     
     var promises = [
+      // Open Food Facts
       typeof NutritionSearch !== 'undefined' ? 
         NutritionSearch.search(query, { limit: perSource }).catch(function() { return []; }) :
         Promise.resolve([]),
       
+      // USDA
       typeof USDASearch !== 'undefined' ?
         USDASearch.search(query, { limit: perSource }).catch(function() { return []; }) :
         Promise.resolve([]),
       
-      // FatSecret
+      // FatSecret (jeśli configured)
       typeof FatSecretSearch !== 'undefined' && FatSecretSearch.isConfigured() ?
         FatSecretSearch.search(query, { limit: perSource }).catch(function() { return []; }) :
         Promise.resolve([])
@@ -73,35 +74,6 @@ var MultiSourceSearch = (function() {
       usda: usda,
       openfoodfacts: off,
       total: off.length + usda.length + fatsecret.length
-    };
-  }
-
-    
-    var queryLower = query.toLowerCase().trim();
-    
-    // Run searches in parallel
-    var promises = [
-      // Open Food Facts
-      typeof NutritionSearch !== 'undefined' ? 
-        NutritionSearch.search(query, { limit: perSource }).catch(function() { return []; }) :
-        Promise.resolve([]),
-      
-      // USDA
-      typeof USDASearch !== 'undefined' ?
-        USDASearch.search(query, { limit: perSource }).catch(function() { return []; }) :
-        Promise.resolve([])
-    ];
-    
-    var results = await Promise.all(promises);
-    var off = results[0];
-    var usda = results[1];
-    
-    return {
-      favorites: getFavorites(query),
-      recent: getRecent(query, 3),
-      usda: usda,
-      openfoodfacts: off,
-      total: off.length + usda.length
     };
   }
   
