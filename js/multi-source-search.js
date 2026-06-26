@@ -28,6 +28,7 @@ var MultiSourceSearch = (function() {
   }
   
   // Multi-source search (równolegle)
+ 
   async function search(query, options) {
     options = options || {};
     var perSource = options.limit || 10;
@@ -36,11 +37,45 @@ var MultiSourceSearch = (function() {
       return {
         favorites: getFavorites(),
         recent: getRecent(null, 5),
+        fatsecret: [],
         usda: [],
         openfoodfacts: [],
         total: 0
       };
     }
+    
+    var queryLower = query.toLowerCase().trim();
+    
+    var promises = [
+      typeof NutritionSearch !== 'undefined' ? 
+        NutritionSearch.search(query, { limit: perSource }).catch(function() { return []; }) :
+        Promise.resolve([]),
+      
+      typeof USDASearch !== 'undefined' ?
+        USDASearch.search(query, { limit: perSource }).catch(function() { return []; }) :
+        Promise.resolve([]),
+      
+      // FatSecret
+      typeof FatSecretSearch !== 'undefined' && FatSecretSearch.isConfigured() ?
+        FatSecretSearch.search(query, { limit: perSource }).catch(function() { return []; }) :
+        Promise.resolve([])
+    ];
+    
+    var results = await Promise.all(promises);
+    var off = results[0];
+    var usda = results[1];
+    var fatsecret = results[2];
+    
+    return {
+      favorites: getFavorites(query),
+      recent: getRecent(query, 3),
+      fatsecret: fatsecret,
+      usda: usda,
+      openfoodfacts: off,
+      total: off.length + usda.length + fatsecret.length
+    };
+  }
+
     
     var queryLower = query.toLowerCase().trim();
     
