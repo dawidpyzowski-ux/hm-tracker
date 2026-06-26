@@ -500,6 +500,15 @@ function renderToday() {
           });
           h += renderSourceSection('⭐ MOJE PRODUKTY', uniqPersonal.slice(0, 5), '#fbbf24');
         }
+
+
+
+        // Sekcja: FatSecret PL (najlepsze polskie dane)
+        if (data.fatsecret && data.fatsecret.length) {
+          h += renderSourceSection('🇵🇱 FatSecret PL (1.9M)', data.fatsecret.slice(0, 8), '#fbbf24');
+        }
+
+
         
         // Sekcja: USDA (lab-tested)
         if (data.usda && data.usda.length) {
