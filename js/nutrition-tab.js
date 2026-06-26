@@ -154,11 +154,13 @@ function renderToday() {
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
     
   
+    
+    h += '<button onclick="NutritionTab.openVoiceInput()" style="background:#a855f7;color:white;border:none;border-radius:8px;padding:14px;font-size:0.85em;font-weight:600;cursor:pointer;">🎤 Voice Input</button>';
     h += '<button onclick="NutritionTab.openScanner()" style="background:#3b82f6;color:white;border:none;border-radius:8px;padding:14px;font-size:0.85em;font-weight:600;cursor:pointer;">📷 Skanuj kod</button>';
-    h += '<button onclick="NutritionTab.openLabelScanner()" style="background:#a855f7;color:white;border:none;border-radius:8px;padding:14px;font-size:0.85em;font-weight:600;cursor:pointer;">📸 Skanuj etykietę</button>';
     h += '<button onclick="NutritionTab.openSearch()" style="background:#22c55e;color:white;border:none;border-radius:8px;padding:14px;font-size:0.85em;font-weight:600;cursor:pointer;">🔍 Szukaj produkt</button>';
     h += '<button onclick="NutritionTab.openAIEstimate()" style="background:#f59e0b;color:white;border:none;border-radius:8px;padding:14px;font-size:0.85em;font-weight:600;cursor:pointer;">✍️ AI Quick</button>';
-    h += '<button onclick="NutritionTab.openManual()" style="grid-column:span 2;background:#6b7280;color:white;border:none;border-radius:8px;padding:12px;font-size:0.85em;font-weight:600;cursor:pointer;">➕ Wpisz ręcznie</button>';
+    h += '<button onclick="NutritionTab.openLabelScanner()" style="background:#06b6d4;color:white;border:none;border-radius:8px;padding:14px;font-size:0.85em;font-weight:600;cursor:pointer;">📸 Etykieta</button>';
+    h += '<button onclick="NutritionTab.openManual()" style="background:#6b7280;color:white;border:none;border-radius:8px;padding:14px;font-size:0.85em;font-weight:600;cursor:pointer;">➕ Manual</button>';
 
     h += '</div>';
     h += '</div>';
@@ -785,6 +787,15 @@ function renderToday() {
   // MODAL helpers
   // ============================================
   function createModal(title) {
+    
+    // Add pulse animation if not exists
+    if (!document.getElementById('vi-pulse-style')) {
+      var style = document.createElement('style');
+      style.id = 'vi-pulse-style';
+      style.innerHTML = '@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }';
+      document.head.appendChild(style);
+    }
+
     var overlay = document.createElement('div');
     overlay.className = 'nutr-modal-overlay';
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
@@ -818,6 +829,180 @@ function renderToday() {
     }
   }
 
+
+  function openVoiceInput() {
+    if (typeof VoiceInput === 'undefined' || !VoiceInput.isSupported()) {
+      alert('Voice Input niedostępny. Twoja przeglądarka nie wspiera Web Speech API.\n\nUżyj Safari na iPhone lub Chrome na desktop.');
+      return;
+    }
+    
+    var modal = createModal('🎤 Voice Input');
+    modal.body.innerHTML = 
+      '<div style="text-align:center;padding:10px;">' +
+        '<p style="color:#9ca3af;font-size:0.85em;margin:0 0 16px;">Mów wyraźnie po polsku.<br>Np: "300g ryżu, 150g kurczaka, łyżka oliwy"</p>' +
+        '<div id="vi-mic-wrap" style="margin:20px auto;width:100px;height:100px;border-radius:50%;background:#374151;display:flex;align-items:center;justify-content:center;font-size:3em;cursor:pointer;transition:all 0.3s;">🎤</div>' +
+        '<p id="vi-status" style="color:#9ca3af;font-size:0.9em;margin:10px 0;">Tap mikrofon żeby zacząć</p>' +
+        '<div id="vi-transcript" style="background:#1f2937;border-radius:8px;padding:12px;margin:12px 0;min-height:60px;color:#d1d5db;font-size:0.9em;text-align:left;display:none;"></div>' +
+        '<button id="vi-mic-btn" onclick="NutritionTab.toggleVoice()" style="background:#a855f7;color:white;border:none;border-radius:10px;padding:14px 30px;font-size:1em;font-weight:600;cursor:pointer;width:100%;">🎤 Zacznij nagrywanie</button>' +
+        '<div id="vi-result" style="margin-top:14px;"></div>' +
+      '</div>';
+    
+    var statusEl = document.getElementById('vi-status');
+    statusEl.textContent = 'Tap mikrofon i mów po polsku';
+    
+    modal.onClose = function() {
+      VoiceInput.stop();
+    };
+  }
+
+  function toggleVoice() {
+    var statusEl = document.getElementById('vi-status');
+    var transcriptEl = document.getElementById('vi-transcript');
+    var btn = document.getElementById('vi-mic-btn');
+    var micWrap = document.getElementById('vi-mic-wrap');
+    var resultEl = document.getElementById('vi-result');
+    
+    if (VoiceInput.isListening()) {
+      VoiceInput.stop();
+      return;
+    }
+    
+    transcriptEl.style.display = 'none';
+    transcriptEl.textContent = '';
+    resultEl.innerHTML = '';
+    
+    VoiceInput.start({
+      onStart: function() {
+        statusEl.textContent = '🎤 Słucham... Mów wyraźnie';
+        statusEl.style.color = '#a855f7';
+        btn.textContent = '⏹️ Stop nagrywania';
+        btn.style.background = '#ef4444';
+        micWrap.style.background = '#a855f7';
+        micWrap.style.boxShadow = '0 0 30px #a855f7';
+        micWrap.style.animation = 'pulse 1s infinite';
+      },
+      onInterim: function(text) {
+        transcriptEl.style.display = 'block';
+        transcriptEl.innerHTML = '<span style="color:#9ca3af;font-style:italic;">' + text + '</span>';
+      },
+      onFinal: function(text) {
+        transcriptEl.style.display = 'block';
+        transcriptEl.innerHTML = '<span style="color:#f9fafb;">' + text + '</span>';
+      },
+      onEnd: async function(finalTranscript) {
+        statusEl.textContent = '';
+        btn.textContent = '🎤 Zacznij ponownie';
+        btn.style.background = '#a855f7';
+        micWrap.style.background = '#374151';
+        micWrap.style.boxShadow = 'none';
+        micWrap.style.animation = 'none';
+        
+        if (!finalTranscript || finalTranscript.trim().length < 3) {
+          statusEl.textContent = '⚠️ Nie rozpoznano. Spróbuj jeszcze raz.';
+          statusEl.style.color = '#f59e0b';
+          return;
+        }
+        
+        // AI Parse
+        statusEl.textContent = '⏳ AI analizuje...';
+        statusEl.style.color = '#3b82f6';
+        
+        try {
+          var parsed = await VoiceInput.parseTranscript(finalTranscript);
+          if (!parsed || !parsed.items.length) {
+            resultEl.innerHTML = '<div style="background:#451a03;border:1px solid #f59e0b;color:#fde68a;padding:12px;border-radius:8px;">' +
+              '⚠️ AI nie rozpoznał składników. Spróbuj jeszcze raz lub użyj ✍️ AI Quick.' +
+              '</div>';
+            statusEl.textContent = '';
+            return;
+          }
+          
+          renderVoiceResult(parsed);
+          statusEl.textContent = '✅ Gotowe! Sprawdź wyniki niżej.';
+          statusEl.style.color = '#22c55e';
+        } catch(e) {
+          resultEl.innerHTML = '<div style="background:#450a0a;border:1px solid #ef4444;color:#fca5a5;padding:12px;border-radius:8px;">' +
+            '❌ Błąd AI: ' + e.message + '</div>';
+          statusEl.textContent = '';
+        }
+      },
+      onError: function(error) {
+        statusEl.textContent = '❌ ' + error;
+        statusEl.style.color = '#ef4444';
+        btn.textContent = '🎤 Spróbuj ponownie';
+        btn.style.background = '#a855f7';
+        micWrap.style.background = '#374151';
+        micWrap.style.boxShadow = 'none';
+        micWrap.style.animation = 'none';
+      }
+    });
+  }
+
+  function renderVoiceResult(parsed) {
+    var resultEl = document.getElementById('vi-result');
+    var h = '';
+    
+    h += '<div style="background:#052e16;border:1px solid #22c55e;padding:14px;border-radius:8px;">';
+    h += '<h4 style="margin:0 0 10px;color:#f9fafb;">✅ Rozpoznano składniki</h4>';
+    
+    parsed.items.forEach(function(item, i) {
+      h += '<div style="background:#1f2937;padding:8px 12px;border-radius:6px;margin-bottom:6px;">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+      h += '<div style="color:#f9fafb;font-size:0.9em;flex:1;min-width:0;">';
+      h += '<div style="font-weight:600;">' + item.name + '</div>';
+      h += '<div style="color:#9ca3af;font-size:0.75em;">' + item.quantity_g + 'g · ' + Math.round(item.calories) + ' kcal · B:' + item.protein + 'g · W:' + item.carbs + 'g · T:' + item.fat + 'g</div>';
+      h += '</div>';
+      h += '</div></div>';
+    });
+    
+    h += '<div style="margin-top:12px;padding:10px;background:#1f2937;border-radius:6px;border:1px solid #22c55e;">';
+    h += '<div style="color:#86efac;font-weight:600;font-size:0.9em;margin-bottom:6px;">📊 SUMA POSIŁKU</div>';
+    h += '<div style="color:#f9fafb;font-size:1.3em;font-weight:bold;">' + Math.round(parsed.total.calories) + ' kcal</div>';
+    h += '<div style="color:#d1d5db;font-size:0.85em;">B: ' + parsed.total.protein + 'g · W: ' + parsed.total.carbs + 'g · T: ' + parsed.total.fat + 'g</div>';
+    h += '</div>';
+    
+    var saveData = JSON.stringify(parsed).replace(/"/g, '&quot;');
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">';
+    h += '<button onclick="NutritionTab.saveVoiceAsSeparate(' + saveData + ')" style="padding:10px;background:#374151;color:white;border:none;border-radius:6px;font-weight:600;font-size:0.85em;cursor:pointer;">Osobno (' + parsed.items.length + ')</button>';
+    h += '<button onclick="NutritionTab.saveVoiceAsCombined(' + saveData + ')" style="padding:10px;background:#22c55e;color:white;border:none;border-radius:6px;font-weight:600;font-size:0.85em;cursor:pointer;">Jako 1 posiłek</button>';
+    h += '</div>';
+    h += '</div>';
+    
+    resultEl.innerHTML = h;
+  }
+
+  function saveVoiceAsSeparate(parsed) {
+    parsed.items.forEach(function(item) {
+      NutritionEngine.addMeal(currentDate, {
+        name: item.name,
+        quantity_g: item.quantity_g,
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fat: item.fat,
+        source: 'voice_input'
+      });
+    });
+    closeAllModals();
+    render();
+  }
+
+  function saveVoiceAsCombined(parsed) {
+    var mealName = parsed.meal_name || parsed.items.map(function(i) { return i.name; }).join(' + ');
+    NutritionEngine.addMeal(currentDate, {
+      name: mealName,
+      calories: parsed.total.calories,
+      protein: parsed.total.protein,
+      carbs: parsed.total.carbs,
+      fat: parsed.total.fat,
+      source: 'voice_input',
+      voice_transcript: parsed.transcript
+    });
+    closeAllModals();
+    render();
+  }
+
+  
   function closeAllModals() {
     document.querySelectorAll('.nutr-modal-overlay').forEach(function(el) {
       if (el.parentNode) el.parentNode.removeChild(el);
@@ -1042,7 +1227,13 @@ function renderToday() {
   jumpToDate: jumpToDate,   
 openLabelScanner: openLabelScanner,
 confirmOCRProduct: confirmOCRProduct,
-renderSourceSection: renderSourceSection
+renderSourceSection: renderSourceSection,
+    
+openVoiceInput: openVoiceInput,
+toggleVoice: toggleVoice,
+saveVoiceAsSeparate: saveVoiceAsSeparate,
+saveVoiceAsCombined: saveVoiceAsCombined
+
 
 
   };
