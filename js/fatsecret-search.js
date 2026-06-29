@@ -1,20 +1,15 @@
 
-/* fatsecret-search.js v1 — Sprint 26.7 Workaround: Client-side OAuth */
+/* fatsecret-search.js v2 — Sprint 26.7 PART 2: Worker proxy (SECURE) */
 var FatSecretSearch = (function() {
   "use strict";
   var TAG = "[FatSecret]";
-  
-  // ⚠️ TEMPORARY — Replace with your keys
-  // Po Premier-Free → przeniesione do Cloudflare Worker
-  var CONSUMER_KEY = window.FATSECRET_KEY || "";
-  var CONSUMER_SECRET = window.FATSECRET_SECRET || "";
-  
-  var API_URL = "https://platform.fatsecret.com/rest/server.api";
+  var WORKER_URL = "https://hm-tracker-ai.dawid-pyzowski.workers.dev";
   var CACHE_KEY = "fatsecret_cache";
   var CACHE_TTL = 7 * 86400000;
   
   function isConfigured() {
-    return !!(CONSUMER_KEY && CONSUMER_SECRET);
+    // No longer needs client config - Worker has keys
+    return true;
   }
   
   function getCache() {
@@ -41,102 +36,12 @@ var FatSecretSearch = (function() {
     return null;
   }
   
-  // ============================================
-  // OAuth 1.0 Signature (HMAC-SHA1)
-  // ============================================
-  function generateNonce(length) {
-    length = length || 32;
-    var chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    var result = '';
-    for (var i = 0; i < length; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-  }
-  
-  function percentEncode(str) {
-    return encodeURIComponent(str)
-      .replace(/!/g, '%21')
-      .replace(/\*/g, '%2A')
-      .replace(/'/g, '%27')
-      .replace(/\(/g, '%28')
-      .replace(/\)/g, '%29');
-  }
-  
-  // HMAC-SHA1 implementation (browser native via SubtleCrypto)
-  async function hmacSha1(key, data) {
-    var enc = new TextEncoder();
-    var keyData = enc.encode(key);
-    var msgData = enc.encode(data);
-    
-    var cryptoKey = await crypto.subtle.importKey(
-      "raw",
-      keyData,
-      { name: "HMAC", hash: "SHA-1" },
-      false,
-      ["sign"]
-    );
-    
-    var signature = await crypto.subtle.sign("HMAC", cryptoKey, msgData);
-    
-    // Convert to base64
-    var bytes = new Uint8Array(signature);
-    var binary = '';
-    for (var i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  }
-  
-  async function signRequest(method, url, params) {
-    var oauthParams = {
-      oauth_consumer_key: CONSUMER_KEY,
-      oauth_nonce: generateNonce(),
-      oauth_signature_method: 'HMAC-SHA1',
-      oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
-      oauth_version: '1.0'
-    };
-    
-    // Combine all params for signature
-    var allParams = Object.assign({}, params, oauthParams);
-    
-    // Sort and encode params
-    var sortedKeys = Object.keys(allParams).sort();
-    var paramString = sortedKeys.map(function(k) {
-      return percentEncode(k) + '=' + percentEncode(allParams[k]);
-    }).join('&');
-    
-    // Build signature base string
-    var baseString = method.toUpperCase() + '&' + 
-      percentEncode(url) + '&' + 
-      percentEncode(paramString);
-    
-    // Signing key
-    var signingKey = percentEncode(CONSUMER_SECRET) + '&';
-    
-    // HMAC-SHA1
-    var signature = await hmacSha1(signingKey, baseString);
-    
-    // Add signature to oauth params
-    oauthParams.oauth_signature = signature;
-    
-    return oauthParams;
-  }
-  
-  // ============================================
-  // PARSE PRODUCT
-  // ============================================
   function parseFood(food) {
     if (!food) return null;
     
     var description = food.food_description || '';
-    
-    // Description format: "Per 100g - Calories: 165kcal | Fat: 4g | Carbs: 0g | Protein: 31g"
-    // Albo per serving
-    
     var per100g = { calories: null, protein: null, carbs: null, fat: null };
     
-    // Try per 100g first
     var per100Match = description.match(/per 100g[^|]*calories[:\s]*(\d+(?:\.\d+)?)[^|]*?\|[^|]*?fat[:\s]*(\d+(?:\.\d+)?)[^|]*?\|[^|]*?carbs[:\s]*(\d+(?:\.\d+)?)[^|]*?\|[^|]*?protein[:\s]*(\d+(?:\.\d+)?)/i);
     
     if (per100Match) {
@@ -145,7 +50,6 @@ var FatSecretSearch = (function() {
       per100g.carbs = parseFloat(per100Match[3]);
       per100g.protein = parseFloat(per100Match[4]);
     } else {
-      // Try generic format
       var calMatch = description.match(/calories[:\s]*(\d+(?:\.\d+)?)/i);
       var protMatch = description.match(/protein[:\s]*(\d+(?:\.\d+)?)/i);
       var carbMatch = description.match(/carbs[:\s]*(\d+(?:\.\d+)?)/i);
@@ -175,15 +79,7 @@ var FatSecretSearch = (function() {
     };
   }
   
-  // ============================================
-  // SEARCH
-  // ============================================
   async function search(query, options) {
-    if (!isConfigured()) {
-      console.warn(TAG, 'Not configured');
-      return [];
-    }
-    
     if (!query || query.length < 2) return [];
     options = options || {};
     var limit = options.limit || 15;
@@ -193,26 +89,19 @@ var FatSecretSearch = (function() {
     if (cached) return cached;
     
     try {
-      var params = {
-        method: 'foods.search',
-        search_expression: query,
-        max_results: limit.toString(),
-        format: 'json'
-      };
+      var resp = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'fatsecret-search',
+          query: query,
+          limit: limit
+        })
+      });
       
-      var oauthParams = await signRequest('GET', API_URL, params);
-      
-      // Build URL with all params
-      var allParams = Object.assign({}, params, oauthParams);
-      var queryString = Object.keys(allParams).map(function(k) {
-        return percentEncode(k) + '=' + percentEncode(allParams[k]);
-      }).join('&');
-      
-      var url = API_URL + '?' + queryString;
-      
-      var resp = await fetch(url);
       if (!resp.ok) {
-        console.warn(TAG, 'HTTP error:', resp.status);
+        var errData = await resp.json().catch(function() { return {}; });
+        console.warn(TAG, 'HTTP error:', resp.status, errData);
         return [];
       }
       
@@ -226,7 +115,6 @@ var FatSecretSearch = (function() {
       var foods = data.foods?.food;
       if (!foods) return [];
       
-      // foods can be array or single object
       var foodArray = Array.isArray(foods) ? foods : [foods];
       
       var products = foodArray.map(parseFood).filter(function(p) {
@@ -253,26 +141,16 @@ var FatSecretSearch = (function() {
     };
   }
   
-  function setConfig(key, secret) {
-    CONSUMER_KEY = key;
-    CONSUMER_SECRET = secret;
-    try {
-      localStorage.setItem('fatsecret_config', JSON.stringify({ key: key, secret: secret }));
-    } catch(e) {}
-  }
-  
-  // Load saved config
+  // Cleanup old client-side config (security)
   try {
-    var saved = JSON.parse(localStorage.getItem('fatsecret_config') || 'null');
-    if (saved) {
-      CONSUMER_KEY = saved.key;
-      CONSUMER_SECRET = saved.secret;
+    if (localStorage.getItem('fatsecret_config')) {
+      localStorage.removeItem('fatsecret_config');
+      console.log(TAG, 'Cleaned old client-side config (now using Worker)');
     }
   } catch(e) {}
   
   return {
     isConfigured: isConfigured,
-    setConfig: setConfig,
     search: search,
     calculatePortion: calculatePortion
   };
