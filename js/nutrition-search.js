@@ -142,10 +142,13 @@ var NutritionSearch = (function() {
       
       setCache(cacheKey, products);
       return products;
-    } catch(e) {
+
+  } catch(e) {
       console.warn(TAG, 'Search error:', e);
       return [];
     }
+  }
+
 
 
 
