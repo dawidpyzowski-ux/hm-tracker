@@ -110,22 +110,29 @@ var NutritionSearch = (function() {
     var cached = getCached(cacheKey);
     if (cached) return cached;
     
+    
     try {
-      // API v2 — wspiera CORS
-      var url = 'https://world.openfoodfacts.org/api/v2/search?' +
-        'search_terms=' + encodeURIComponent(query) +
-        '&page_size=' + pageSize +
-        '&lc=pl' +
-        '&fields=code,product_name,product_name_pl,brands,quantity,image_thumb_url,nutriments,serving_size';
-      
-      var resp = await fetch(url, {
-        headers: { 'Accept': 'application/json' }
+      // Przez Cloudflare Worker proxy (bypass CORS)
+      var resp = await fetch('https://hm-tracker-ai.dawid-pyzowski.workers.dev', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'off-search',
+          query: query,
+          limit: pageSize
+        })
       });
+      
       if (!resp.ok) {
         console.warn(TAG, 'Search API returned:', resp.status);
         return [];
       }
       var data = await resp.json();
+      
+      if (data.error) {
+        console.warn(TAG, 'Search error:', data.error);
+        return [];
+      }
       
       var products = (data.products || [])
         .map(parseProduct)
@@ -139,7 +146,7 @@ var NutritionSearch = (function() {
       console.warn(TAG, 'Search error:', e);
       return [];
     }
-  }
+
 
 
   // ============================================
