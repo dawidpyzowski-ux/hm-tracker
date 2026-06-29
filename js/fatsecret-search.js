@@ -1,5 +1,5 @@
 
-/* fatsecret-search.js v2 — Sprint 26.7 PART 2: Worker proxy (SECURE) */
+/* fatsecret-search.js v4 — Sprint 26.7: Worker proxy + Polish translator */
 var FatSecretSearch = (function() {
   "use strict";
   var TAG = "[FatSecret]";
@@ -7,8 +7,85 @@ var FatSecretSearch = (function() {
   var CACHE_KEY = "fatsecret_cache";
   var CACHE_TTL = 7 * 86400000;
   
+  // Polski → angielski (FatSecret API jest po angielsku)
+  var POLISH_MAP = {
+    'kurczak': 'chicken',
+    'pierś kurczaka': 'chicken breast',
+    'piers kurczaka': 'chicken breast',
+    'indyk': 'turkey',
+    'wołowina': 'beef',
+    'wolowina': 'beef',
+    'wieprzowina': 'pork',
+    'łosoś': 'salmon',
+    'losos': 'salmon',
+    'tuńczyk': 'tuna',
+    'tunczyk': 'tuna',
+    'jajko': 'egg',
+    'jajka': 'eggs',
+    'mleko': 'milk',
+    'ser': 'cheese',
+    'twaróg': 'cottage cheese',
+    'twarog': 'cottage cheese',
+    'jogurt': 'yogurt',
+    'masło': 'butter',
+    'maslo': 'butter',
+    'oliwa': 'olive oil',
+    'olej': 'oil',
+    'ryż': 'rice',
+    'ryz': 'rice',
+    'ryż brązowy': 'brown rice',
+    'ryz brazowy': 'brown rice',
+    'makaron': 'pasta',
+    'chleb': 'bread',
+    'kasza': 'groats',
+    'kasza gryczana': 'buckwheat',
+    'owsianka': 'oatmeal',
+    'płatki owsiane': 'oats',
+    'platki owsiane': 'oats',
+    'banan': 'banana',
+    'jabłko': 'apple',
+    'jablko': 'apple',
+    'pomarańcza': 'orange',
+    'pomarancza': 'orange',
+    'truskawki': 'strawberries',
+    'borówki': 'blueberries',
+    'borowki': 'blueberries',
+    'awokado': 'avocado',
+    'pomidor': 'tomato',
+    'ogórek': 'cucumber',
+    'ogorek': 'cucumber',
+    'marchew': 'carrot',
+    'brokuły': 'broccoli',
+    'brokuly': 'broccoli',
+    'szpinak': 'spinach',
+    'ziemniaki': 'potato',
+    'orzechy': 'nuts',
+    'migdały': 'almonds',
+    'migdaly': 'almonds',
+    'orzechy włoskie': 'walnuts',
+    'orzechy wloskie': 'walnuts',
+    'orzeszki ziemne': 'peanuts',
+    'pestki dyni': 'pumpkin seeds',
+    'siemię lniane': 'flaxseed',
+    'siemie lniane': 'flaxseed',
+    'fasola': 'beans',
+    'soczewica': 'lentils',
+    'ciecierzyca': 'chickpeas',
+    'czekolada': 'chocolate'
+  };
+  
+  function translateQuery(query) {
+    var q = query.toLowerCase().trim();
+    if (POLISH_MAP[q]) return POLISH_MAP[q];
+    for (var key in POLISH_MAP) {
+      if (q.indexOf(key) >= 0) {
+        return POLISH_MAP[key] + ' ' + q.replace(key, '').trim();
+      }
+    }
+    return query;
+  }
+  
   function isConfigured() {
-    // No longer needs client config - Worker has keys
     return true;
   }
   
@@ -62,13 +139,12 @@ var FatSecretSearch = (function() {
     }
     
     if (!per100g.calories) return null;
-  
-    // FIX 2: Sanity check (kalorie >900/100g to zwykle błąd parsera)
+    
     if (per100g.calories > 900) {
       console.warn(TAG, 'Suspicious value, skipping:', food.food_name, per100g.calories);
       return null;
     }
-  
+    
     return {
       barcode: null,
       name: food.food_name || 'FatSecret product',
@@ -85,74 +161,14 @@ var FatSecretSearch = (function() {
     };
   }
   
-
-async function search(query, options) {
+  async function search(query, options) {
     if (!query || query.length < 2) return [];
     options = options || {};
     var limit = options.limit || 15;
     
-    // === FIX 1: Polski → angielski dla FatSecret ===
-    var polishMap = {
-      'kurczak': 'chicken',
-      'piers kurczaka': 'chicken breast',
-      'pierś kurczaka': 'chicken breast',
-      'indyk': 'turkey',
-      'wołowina': 'beef',
-      'wolowina': 'beef',
-      'wieprzowina': 'pork',
-      'łosoś': 'salmon',
-      'losos': 'salmon',
-      'tuńczyk': 'tuna',
-      'tunczyk': 'tuna',
-      'jajko': 'egg',
-      'jajka': 'eggs',
-      'mleko': 'milk',
-      'ser': 'cheese',
-      'twaróg': 'cottage cheese',
-      'twarog': 'cottage cheese',
-      'jogurt': 'yogurt',
-      'masło': 'butter',
-      'maslo': 'butter',
-      'oliwa': 'olive oil',
-      'olej': 'oil',
-      'ryż': 'rice',
-      'ryz': 'rice',
-      'makaron': 'pasta',
-      'chleb': 'bread',
-      'kasza': 'groats',
-      'owsianka': 'oatmeal',
-      'banan': 'banana',
-      'jabłko': 'apple',
-      'jablko': 'apple',
-      'pomarańcza': 'orange',
-      'pomaranca': 'orange',
-      'truskawki': 'strawberries',
-      'borówki': 'blueberries',
-      'borowki': 'blueberries',
-      'awokado': 'avocado',
-      'pomidor': 'tomato',
-      'ogórek': 'cucumber',
-      'ogorek': 'cucumber',
-      'marchew': 'carrot',
-      'brokuły': 'broccoli',
-      'brokuly': 'broccoli',
-      'szpinak': 'spinach',
-      'ziemniaki': 'potato',
-      'orzechy': 'nuts',
-      'migdały': 'almonds',
-      'migdaly': 'almonds'
-    };
-    
-    var queryLower = query.toLowerCase().trim();
-    var searchQuery = polishMap[queryLower] || query;
-    // Częściowe matche
-    if (!polishMap[queryLower]) {
-      for (var key in polishMap) {
-        if (queryLower.indexOf(key) >= 0) {
-          searchQuery = polishMap[key] + ' ' + queryLower.replace(key, '').trim();
-          break;
-        }
-      }
+    var searchQuery = translateQuery(query);
+    if (searchQuery !== query) {
+      console.log(TAG, 'Translated:', query, '→', searchQuery);
     }
     
     var cacheKey = 'q_' + searchQuery.toLowerCase().slice(0, 50);
@@ -165,11 +181,10 @@ async function search(query, options) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'fatsecret-search',
-          query: searchQuery,  // <-- przetłumaczony query
+          query: searchQuery,
           limit: limit
         })
       });
-
       
       if (!resp.ok) {
         var errData = await resp.json().catch(function() { return {}; });
@@ -184,10 +199,9 @@ async function search(query, options) {
         return [];
       }
       
-      var foods = data.foods?.food;
-      if (!foods) return [];
+      if (!data.foods || !data.foods.food) return [];
       
-      var foodArray = Array.isArray(foods) ? foods : [foods];
+      var foodArray = Array.isArray(data.foods.food) ? data.foods.food : [data.foods.food];
       
       var products = foodArray.map(parseFood).filter(function(p) {
         return p && p.per_100g.calories !== null;
@@ -213,17 +227,16 @@ async function search(query, options) {
     };
   }
   
-  // Cleanup old client-side config (security)
   try {
     if (localStorage.getItem('fatsecret_config')) {
       localStorage.removeItem('fatsecret_config');
-      console.log(TAG, 'Cleaned old client-side config (now using Worker)');
     }
   } catch(e) {}
   
   return {
     isConfigured: isConfigured,
     search: search,
-    calculatePortion: calculatePortion
+    calculatePortion: calculatePortion,
+    translateQuery: translateQuery
   };
 })();
