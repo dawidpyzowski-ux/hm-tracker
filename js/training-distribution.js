@@ -33,6 +33,7 @@ var TrainingDistribution = (function() {
     var zoneMinutes = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0 };
     var totalMinutes = 0;
 
+  
     weekActs.forEach(function(a) {
       var streams = DB.getStreams ? DB.getStreams(a.strava_id) : null;
       if (!streams || !streams.heartrate) return;
@@ -40,14 +41,35 @@ var TrainingDistribution = (function() {
       var hrData = streams.heartrate.data || streams.heartrate;
       var timeData = streams.time ? (streams.time.data || streams.time) : null;
       
+      // Calculate realny sample interval
+      var defaultInterval = 1; // sec, fallback
+      if (timeData && timeData.length >= 2) {
+        // Average interval z pierwszych 100 samples
+        var sampleCount = Math.min(100, timeData.length - 1);
+        var totalDelta = 0;
+        for (var k = 1; k <= sampleCount; k++) {
+          totalDelta += (timeData[k] - timeData[k-1]);
+        }
+        defaultInterval = totalDelta / sampleCount;
+      }
+      
       hrData.forEach(function(hr, i) {
         if (!hr || hr < 50) return;
         var zone = getHRZone(hr);
-        // 1 sample = ~1 second, /60 to minutes
-        zoneMinutes[zone] += 1/60;
-        totalMinutes += 1/60;
+        
+        // Use real time delta if available
+        var deltaSec = defaultInterval;
+        if (timeData && i > 0 && i < timeData.length) {
+          deltaSec = timeData[i] - timeData[i-1];
+          // Sanity: jeśli delta > 30s (np. przerwa, GPS lost), użyj default
+          if (deltaSec > 30 || deltaSec < 0) deltaSec = defaultInterval;
+        }
+        
+        zoneMinutes[zone] += deltaSec / 60;
+        totalMinutes += deltaSec / 60;
       });
     });
+
 
     if (totalMinutes < 1) return null;
 
