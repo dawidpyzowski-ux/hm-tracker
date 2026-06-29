@@ -71,11 +71,14 @@
   }
 
   // pomoc: "13.06" → "06-13"
+
   function convertDate(d) {
     var parts = d.split(".");
     if (parts.length !== 2) return "";
-    return parts[1] + "-" + parts[0].padStart(2, "0");
+    // Format: "06.28" (MM.DD) → "06-28" (MM-DD format jak a.date.slice(5))
+    return parts[0].padStart(2, "0") + "-" + parts[1].padStart(2, "0");
   }
+
 
   // 🚀 Observer (działa po każdym renderze)
   var observer = new MutationObserver(function() {
