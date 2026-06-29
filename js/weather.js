@@ -45,70 +45,372 @@ const Weather={
 
   _windDir(deg){var d=['N','NE','E','SE','S','SW','W','NW'];return d[Math.round(deg/45)%8];},
 
-  _clothing(temp,feelsLike,wind,humidity,rain,code){
-    var t=feelsLike||temp;
-    var layers={base:'',mid:'',outer:'',legs:'',acc:'',extra:[]};
-    if(t<0)layers.base='Bielizna termoaktywna (merino/syntetyk)';
-    else if(t<5)layers.base='Koszulka termoaktywna z dlugim rekawem';
-    else if(t<10)layers.base='Koszulka z dlugim rekawem';
-    else if(t<15)layers.base='Koszulka z dlugim lub krotkim rekawem';
-    else if(t<20)layers.base='Koszulka techniczna';
-    else layers.base='Lekka koszulka/singlet (najjasniejszy kolor)';
-
-    if(t<-5)layers.mid='Bluza polarowa / softshell';
-    else if(t<5)layers.mid='Lekka bluza biegowa';
-    else if(t<10)layers.mid='Opcjonalnie: rekawki lub lekka bluza';
-    else layers.mid='';
-
-    if(rain>0||(code>=51&&code<=67))layers.outer='Kurtka przeciwdeszczowa (lekka, oddychajaca)';
-    else if(t<0)layers.outer='Kurtka wiatroszczelna';
-    else if(t<5&&wind>15)layers.outer='Kamizelka wiatroszczelna';
-    else if(wind>25)layers.outer='Kamizelka wiatroszczelna';
-    else layers.outer='';
-
-    if(t<0)layers.legs='Getry termiczne / legginsy ocieplane';
-    else if(t<5)layers.legs='Dluge legginsy biegowe';
-    else if(t<10)layers.legs='Legginsy 3/4 lub dluge';
-    else if(t<15)layers.legs='Krotkie spodenki lub legginsy 3/4';
-    else layers.legs='Krotkie spodenki biegowe';
-
-    var acc=[];
-    if(t<0){acc.push('Rekawiczki ocieplane','Czapka/buff','Ocieplacz na szyje');}
-    else if(t<5){acc.push('Lekkie rekawiczki','Opaska na uszy');}
-    else if(t<10){acc.push('Opcjonalnie: cienkie rekawiczki');}
-    if(t>20)acc.push('Czapka z daszkiem');
-    if(t>22||(code<3&&t>15))acc.push('Krem z filtrem SPF 30+');
-    if(humidity>75&&t>20)acc.push('Opaska na pot');
-    layers.acc=acc.join(', ');
-
-    if(t>28)layers.extra.push('\u26A0 UPAL: Rozwaz przesuniecie treningu na rano/wieczor');
-    if(t<-10)layers.extra.push('\u26A0 MROZ: Oddychaj przez nos lub buff!');
-    if(wind>30)layers.extra.push('\u26A0 SILNY WIATR: Wybierz oslaniana trase');
-    if(rain>5)layers.extra.push('\u26A0 INTENSYWNY DESZCZ: Rozwaz bieznie lub przesun trening');
-    if(humidity>85&&t>25)layers.extra.push('\u26A0 WYSOKA WILGOTNOSC + UPAL: Skroc trening, pij co 15 min');
-    return layers;
+ 
+  _layers(temp,humidity,wind,rain,c.uv_index){
+    var l={base:'',mid:'',legs:'',accessories:[],warnings:[]};
+    var acc=l.accessories, warn=l.warnings;
+    
+    // BASE LAYER
+    if(temp>=27){
+      l.base='Lekka, jasna koszulka/singlet z odprowadzaniem potu';
+      acc.push('Mokra chusta na szyję/głowę (chłodzenie evaporative)');
+    }
+    else if(temp>=22){
+      l.base='Lekka koszulka tech (jasny kolor)';
+    }
+    else if(temp>=15){
+      l.base='Standardowa koszulka tech';
+    }
+    else if(temp>=10){
+      l.base='Koszulka z długim rękawem tech';
+    }
+    else if(temp>=5){
+      l.base='Termoaktywna koszulka długim rękawem';
+    }
+    else if(temp>=-5){
+      l.base='Termoaktywna baza + lekki mid layer';
+    }
+    else{
+      l.base='Termoaktywna baza warstwowo (Merino lub syntetyk)';
+    }
+    
+    // MID LAYER
+    if(temp>=20){
+      l.mid='Nie potrzeba';
+    }
+    else if(temp>=10){
+      l.mid='Opcjonalnie: rękawki lub lekka bluza tech';
+    }
+    else if(temp>=0){
+      l.mid='Lekka bluza tech wiatroszczelna';
+    }
+    else if(temp>=-10){
+      l.mid='Cieplejszy mid layer + windproof shell';
+    }
+    else{
+      l.mid='Warstwowo: thermal + windproof + waterproof';
+    }
+    
+    // LEGS
+    if(temp>=22){
+      l.legs='Krótkie spodenki biegowe';
+    }
+    else if(temp>=15){
+      l.legs='Spodenki lub legginsy 3/4';
+    }
+    else if(temp>=5){
+      l.legs='Legginsy lub spodnie tech (długie)';
+    }
+    else if(temp>=-5){
+      l.legs='Termoaktywne legginsy lub kalesony + spodnie';
+    }
+    else{
+      l.legs='Warstwowe: thermal + windproof spodnie';
+    }
+    
+    // ACCESSORIES — heat-specific
+    if(temp>=25){
+      acc.push('Czapka z daszkiem lub wiszor (osłonie głowy)');
+      acc.push('Krem SPF 30+ (twarz, kark, ramiona)');
+      acc.push('Okulary przeciwsłoneczne');
+      if(temp>=30){
+        acc.unshift('🥶 LÓD: Bidon z lodem');
+        acc.push('Elektrolity (sole) — woda nie wystarcza');
+      }
+    }
+    
+    // UV-specific
+    if(uv!==undefined && uv!==null){
+      if(uv>=8){
+        acc.push('☀️ UV ' + uv + ' - krem SPF 50+ + czapka');
+      }
+      else if(uv>=6 && temp<25){
+        acc.push('☀️ UV ' + uv + ' - krem SPF 30+');
+      }
+    }
+    
+    // COLD-specific
+    if(temp<=5){
+      acc.push('Rękawiczki tech (cienkie powyżej 0°C, grubsze poniżej)');
+      acc.push('Buff lub czapka');
+      if(temp<=-5){
+        acc.push('Buff na usta (zapobiega zamarzaniu dróg oddechowych)');
+        acc.push('Termiczne skarpetki tech');
+      }
+    }
+    
+    // RAIN
+    if(rain>=5){
+      acc.push('💧 Lekka kurtka przeciwdeszczowa');
+      acc.push('Czapka z daszkiem (chroń oczy)');
+    }
+    else if(rain>=2){
+      acc.push('Czapka z daszkiem');
+    }
+    
+    // WIND
+    if(wind>=25){
+      acc.push('💨 Wiatroszczelne ubranie');
+    }
+    
+    // WARNINGS — actionable
+    if(temp>=35){
+      warn.push('⛔ EKSTREMALNY upał: rozważ odwołanie/skrócenie treningu');
+      warn.push('🕐 Najlepszy czas: 5:00-7:00 lub 21:00+');
+      warn.push('🚰 Hydratacja CO 15 min, 200ml');
+    }
+    else if(temp>=30){
+      warn.push('⚠️ Bardzo gorąco: skróć trening 30-50%');
+      warn.push('🕐 Idealnie: wczesny ranek lub późny wieczór');
+      warn.push('🚰 Elektrolity OBOWIĄZKOWE');
+    }
+    else if(temp>=27){
+      warn.push('⚠️ Gorąco: skróć trening 15-25%, zwolnij tempo');
+      warn.push('🕐 Wybierz wczesny ranek/wieczór');
+      warn.push('🚰 Pij 150-200ml co 20 min');
+    }
+    else if(temp>=23){
+      warn.push('🌡️ Cieplo: easy run OK, hard runs przenieś na wieczór');
+    }
+    
+    if(temp<-10){
+      warn.push('❄️ Ekstremalny mróz: rozważ trening w domu');
+      warn.push('🫁 Oddychaj przez nos lub buff');
+    }
+    
+    return l;
   },
 
-  _performance(temp,humidity,wind,rain){
-    var score=10,effects=[],totalPace=0,totalHR=0;
 
-    if(temp>=15&&temp<=18){effects.push({icon:'\u2705',text:'Idealna temperatura do biegania',pace:0,hr:0});}
-    else if(temp<0){var a=Math.round(Math.abs(temp)*2);effects.push({icon:'\u2744',text:'Zimno: termoregulacja kosztuje energie',pace:+a,hr:+Math.round(Math.abs(temp)*0.5)});totalPace+=a;totalHR+=Math.round(Math.abs(temp)*0.5);score-=Math.min(3,a/10);}
-    else if(temp<10){var hrUp=Math.round((10-temp)*0.3);effects.push({icon:'\uD83C\uDF21',text:'Chlodno: dobra po rozgrzewce',pace:0,hr:+hrUp});totalHR+=hrUp;}
-    else if(temp>25){var a2=Math.round((temp-15)*1.5);var hra=Math.round((temp-20)*1.5);effects.push({icon:'\uD83D\uDD25',text:'Goraco: odwodnienie + przegrzanie',pace:+a2,hr:+hra});totalPace+=a2;totalHR+=hra;score-=Math.min(4,a2/10);}
-    else if(temp>18){var pb=Math.round((temp-15)*1);var hrb=Math.round((temp-18)*1.5);effects.push({icon:'\u26A0',text:'Cieplo: lekkie spowolnienie',pace:+pb,hr:+Math.max(0,hrb)});totalPace+=pb;totalHR+=Math.max(0,hrb);if(pb>3)score-=1;}
+  
+  // ============================================
+  // HEAT INDEX (NWS formula)
+  // ============================================
+  _heatIndex(tempC, rh){
+    // NWS Heat Index — działa dla T>=27°C i RH>=40%
+    var T=tempC*9/5+32; // C → F
+    var R=rh;
+    if(T<80||R<40) return tempC; // poniżej progu używamy raw
+    var HI=-42.379+2.04901523*T+10.14333127*R-0.22475541*T*R
+      -0.00683783*T*T-0.05481717*R*R+0.00122874*T*T*R
+      +0.00085282*T*R*R-0.00000199*T*T*R*R;
+    return Math.round((HI-32)*5/9*10)/10; // F → C
+  },
 
-    if(humidity>80&&temp>20){effects.push({icon:'\uD83D\uDCA6',text:'Wilgotnosc '+humidity+'%: pot nie odparowuje',pace:+5,hr:+8});totalPace+=5;totalHR+=8;score-=2;}
-    else if(humidity>70&&temp>22){effects.push({icon:'\uD83D\uDCA6',text:'Podwyzszona wilgotnosc',pace:+2,hr:+4});totalPace+=2;totalHR+=4;score-=1;}
-    else if(humidity<30){effects.push({icon:'\uD83C\uDFDC',text:'Suche powietrze: nawadniaj sluzowki',pace:0,hr:0});}
+  // ============================================
+  // DEW POINT estimation (Magnus formula)
+  // ============================================
+  _dewPoint(tempC, rh){
+    var a=17.27, b=237.7;
+    var alpha=(a*tempC)/(b+tempC)+Math.log(rh/100);
+    return (b*alpha)/(a-alpha);
+  },
 
-    if(wind>25){var wp=Math.round(wind/5);effects.push({icon:'\uD83C\uDF2C',text:'Silny wiatr '+Math.round(wind)+' km/h (petla: ~+'+Math.round(wp/2)+', tam-powrot: zeruje sie)',pace:+Math.round(wp/2),hr:+2});totalPace+=Math.round(wp/2);totalHR+=2;score-=2;}
-    else if(wind>15){var wp2=Math.round(wind/8);effects.push({icon:'\uD83C\uDF2C',text:'Wiatr '+Math.round(wind)+' km/h: lekki opor',pace:+wp2,hr:+1});totalPace+=wp2;totalHR+=1;score-=1;}
-
-    if(rain>2){effects.push({icon:'\uD83C\uDF27',text:'Deszcz: sliska nawierzchnia',pace:+3,hr:0});totalPace+=3;score-=1;}
-
-    score=Math.max(1,Math.min(10,Math.round(score)));
-    return{score:score,effects:effects,totalPace:totalPace,totalHR:totalHR};
+  // ============================================
+  // PERFORMANCE SCORING — multi-factor, science-based
+  // Based on: Mantzios 2022 (3891 marathoners),
+  // Williams 2017, El Helou 2012, Kenney/Armstrong
+  // ============================================
+  _performance(temp,humidity,wind,rain,apparent,uv){
+    var score=10, effects=[], totalPace=0, totalHR=0;
+    
+    // Use apparent temp jeśli dostarczone, fallback do raw
+    var effTemp = (apparent !== undefined && apparent !== null) ? apparent : temp;
+    var heatIdx = this._heatIndex(temp, humidity);
+    var dewPt = this._dewPoint(temp, humidity);
+    
+    // For scoring, używamy MAX z: apparent, heat index (worse case dla biegacza)
+    var scoreTemp = Math.max(effTemp, heatIdx);
+    
+    // ============================================
+    // 1. TEMPERATURE penalty (sport science)
+    // 5-13°C = optimal (Mantzios 2022 finding)
+    // ============================================
+    
+    if(scoreTemp>=5 && scoreTemp<=13){
+      // OPTIMAL ZONE
+      effects.push({icon:'✅',text:'Idealna temperatura ('+Math.round(scoreTemp)+'°C odczuwalna): zero spowolnienia',pace:0,hr:0});
+    }
+    else if(scoreTemp>=14 && scoreTemp<=18){
+      // Slight warmth
+      var p1=Math.round((scoreTemp-13)*1);
+      effects.push({icon:'🌡️',text:'Lekko cieplo ('+Math.round(scoreTemp)+'°C): minimalne spowolnienie',pace:+p1,hr:+1});
+      totalPace+=p1; totalHR+=1; score-=0.5;
+    }
+    else if(scoreTemp>=19 && scoreTemp<=22){
+      // Warm
+      var p2=Math.round((scoreTemp-13)*1.5);
+      var h2=Math.round((scoreTemp-18)*1);
+      effects.push({icon:'🌡️',text:'Cieplo ('+Math.round(scoreTemp)+'°C): drobne spowolnienie',pace:+p2,hr:+h2});
+      totalPace+=p2; totalHR+=h2; score-=1;
+    }
+    else if(scoreTemp>=23 && scoreTemp<=26){
+      // Hot
+      var p3=Math.round((scoreTemp-13)*2);
+      var h3=Math.round((scoreTemp-18)*1.2);
+      effects.push({icon:'🌡️',text:'Goraco ('+Math.round(scoreTemp)+'°C): znaczace spowolnienie (5%)',pace:+p3,hr:+h3});
+      totalPace+=p3; totalHR+=h3; score-=2;
+    }
+    else if(scoreTemp>=27 && scoreTemp<=30){
+      // Very hot
+      var p4=Math.round((scoreTemp-13)*2.5);
+      var h4=Math.round((scoreTemp-18)*1.5);
+      effects.push({icon:'🔥',text:'Bardzo goraco ('+Math.round(scoreTemp)+'°C): spowolnienie 7-8%',pace:+p4,hr:+h4});
+      totalPace+=p4; totalHR+=h4; score-=4;
+    }
+    else if(scoreTemp>=31 && scoreTemp<=34){
+      // Dangerous
+      var p5=Math.round((scoreTemp-13)*2.8);
+      var h5=Math.round((scoreTemp-18)*1.7);
+      effects.push({icon:'🔥',text:'NIEBEZPIECZNE ('+Math.round(scoreTemp)+'°C): spowolnienie 8-10%, ryzyko zdrowia',pace:+p5,hr:+h5});
+      totalPace+=p5; totalHR+=h5; score-=6;
+    }
+    else if(scoreTemp>=35 && scoreTemp<=38){
+      // Extreme
+      var p6=Math.round((scoreTemp-13)*3);
+      var h6=Math.round((scoreTemp-18)*1.8);
+      effects.push({icon:'⛔',text:'EKSTREMALNE ('+Math.round(scoreTemp)+'°C): spowolnienie 10-12%, RYZYKO HIPERTERMII',pace:+p6,hr:+h6});
+      totalPace+=p6; totalHR+=h6; score-=8;
+    }
+    else if(scoreTemp>=39){
+      // Medical risk
+      var p7=Math.round((scoreTemp-13)*3.5);
+      var h7=Math.round((scoreTemp-18)*2);
+      effects.push({icon:'⛔',text:'RYZYKO MEDYCZNE ('+Math.round(scoreTemp)+'°C): NIE BIEGAJ. Hipertermia',pace:+p7,hr:+h7});
+      totalPace+=p7; totalHR+=h7; score=0;
+    }
+    // === COLD ===
+    else if(scoreTemp>=0 && scoreTemp<=4){
+      var pC1=Math.round((5-scoreTemp)*1);
+      var hC1=Math.round((5-scoreTemp)*0.4);
+      effects.push({icon:'❄️',text:'Chlodno ('+Math.round(scoreTemp)+'°C): rozgrzewka 15 min',pace:+pC1,hr:+hC1});
+      totalPace+=pC1; totalHR+=hC1; score-=1;
+    }
+    else if(scoreTemp>=-5 && scoreTemp<=-1){
+      var pC2=Math.round(Math.abs(scoreTemp)*1.5);
+      var hC2=Math.round(Math.abs(scoreTemp)*0.6);
+      effects.push({icon:'❄️',text:'Zimno ('+Math.round(scoreTemp)+'°C): termoregulacja kosztuje',pace:+pC2,hr:+hC2});
+      totalPace+=pC2; totalHR+=hC2; score-=2;
+    }
+    else if(scoreTemp>=-10 && scoreTemp<=-6){
+      var pC3=Math.round(Math.abs(scoreTemp)*2);
+      var hC3=Math.round(Math.abs(scoreTemp)*0.8);
+      effects.push({icon:'❄️',text:'Mroz ('+Math.round(scoreTemp)+'°C): oddychaj przez buff!',pace:+pC3,hr:+hC3});
+      totalPace+=pC3; totalHR+=hC3; score-=4;
+    }
+    else if(scoreTemp<-10){
+      var pC4=Math.round(Math.abs(scoreTemp)*2.5);
+      var hC4=Math.round(Math.abs(scoreTemp)*1);
+      effects.push({icon:'⛔',text:'EKSTREMALNY MROZ ('+Math.round(scoreTemp)+'°C): ryzyko zdrowia',pace:+pC4,hr:+hC4});
+      totalPace+=pC4; totalHR+=hC4; score-=7;
+    }
+    
+    // ============================================
+    // 2. DEW POINT (lepiej niż RH dla biegacza)
+    // ============================================
+    if(dewPt>=21 && temp>18){
+      effects.push({icon:'💧',text:'Dew point '+Math.round(dewPt)+'°C: oppressive, pot nie odparowuje',pace:+4,hr:+5});
+      totalPace+=4; totalHR+=5; score-=2;
+    }
+    else if(dewPt>=18 && temp>18){
+      effects.push({icon:'💧',text:'Dew point '+Math.round(dewPt)+'°C: muggy, redukcja chlodzenia',pace:+2,hr:+3});
+      totalPace+=2; totalHR+=3; score-=1;
+    }
+    else if(dewPt>=16 && temp>20){
+      effects.push({icon:'💧',text:'Dew point '+Math.round(dewPt)+'°C: sticky',pace:+1,hr:+1});
+      totalPace+=1; totalHR+=1; score-=0.5;
+    }
+    
+    // ============================================
+    // 3. HUMIDITY (additional dla extreme)
+    // ============================================
+    if(humidity<25){
+      effects.push({icon:'🏜️',text:'Bardzo sucho ('+humidity+'%): nawadniaj sluzowki',pace:0,hr:0});
+    }
+    
+    // ============================================
+    // 4. WIND
+    // ============================================
+    if(wind>=40){
+      effects.push({icon:'💨',text:'EKSTREMALNY wiatr '+Math.round(wind)+' km/h: niebezpieczne',pace:+8,hr:+3});
+      totalPace+=8; totalHR+=3; score-=3;
+    }
+    else if(wind>=25){
+      var wp1=Math.round(wind/5);
+      effects.push({icon:'💨',text:'Silny wiatr '+Math.round(wind)+' km/h (loop: ~+'+Math.round(wp1/2)+', out-back: ~zero)',pace:+Math.round(wp1/2),hr:+2});
+      totalPace+=Math.round(wp1/2); totalHR+=2; score-=2;
+    }
+    else if(wind>=15){
+      var wp2=Math.round(wind/8);
+      effects.push({icon:'💨',text:'Wiatr '+Math.round(wind)+' km/h: lekki opor',pace:+wp2,hr:+1});
+      totalPace+=wp2; totalHR+=1; score-=1;
+    }
+    
+    // ============================================
+    // 5. RAIN
+    // ============================================
+    if(rain>=15){
+      effects.push({icon:'🌧️',text:'Ulewa '+rain.toFixed(1)+' mm/h: niebezpieczne, ryzyko hipotermii',pace:+8,hr:+2});
+      totalPace+=8; totalHR+=2; score-=3;
+    }
+    else if(rain>=5){
+      effects.push({icon:'🌧️',text:'Deszcz '+rain.toFixed(1)+' mm/h: sliska, mokra',pace:+4,hr:+1});
+      totalPace+=4; totalHR+=1; score-=2;
+    }
+    else if(rain>=2){
+      effects.push({icon:'🌦️',text:'Lekki deszcz: sliska nawierzchnia',pace:+2,hr:0});
+      totalPace+=2; score-=1;
+    }
+    else if(rain>=0.5){
+      effects.push({icon:'🌦️',text:'Mzawka: schlodzi, OK',pace:0,hr:0});
+    }
+    
+    // ============================================
+    // 6. UV INDEX (długi run >1h)
+    // ============================================
+    if(uv!==undefined && uv!==null){
+      if(uv>=11){
+        effects.push({icon:'☀️',text:'UV '+uv+' EKSTREMALNY: przesun trening, full shade',pace:0,hr:+1});
+        totalHR+=1; score-=2;
+      }
+      else if(uv>=8){
+        effects.push({icon:'☀️',text:'UV '+uv+' bardzo wysoki: SPF 50+, czapka',pace:0,hr:0});
+        score-=1.5;
+      }
+      else if(uv>=6){
+        effects.push({icon:'☀️',text:'UV '+uv+' wysoki: SPF 30+, czapka',pace:0,hr:0});
+        score-=1;
+      }
+      else if(uv>=3){
+        effects.push({icon:'☀️',text:'UV '+uv+' umiarkowany: krem SPF 30+',pace:0,hr:0});
+        score-=0.5;
+      }
+    }
+    
+    // ============================================
+    // FINAL SCORE
+    // ============================================
+    score=Math.max(0,Math.min(10,Math.round(score)));
+    
+    // Determine status emoji
+    var status;
+    if(score>=9) status='🟢';
+    else if(score>=7) status='🟢';
+    else if(score>=5) status='🟡';
+    else if(score>=3) status='🟠';
+    else if(score>=1) status='🔴';
+    else status='⛔';
+    
+    return{
+      score:score,
+      status:status,
+      effects:effects,
+      totalPace:totalPace,
+      totalHR:totalHR,
+      heatIndex:Math.round(heatIdx*10)/10,
+      dewPoint:Math.round(dewPt*10)/10,
+      effectiveTemp:Math.round(scoreTemp*10)/10
+    };
   },
 
   _getNextTraining(){
@@ -197,7 +499,7 @@ const Weather={
     var fast=fasting||false;
 
     var cloth=Weather._clothing(temp,feels,wind,hum,rain,code);
-    var perf=Weather._performance(temp,hum,wind,rain);
+    var perf=Weather._performance(temp,hum,wind,rain,c.apparent_temperature,c.uv_index);
     var training=Weather._getNextTraining();
     var nutr=Weather._nutrition(temp,hum,fast,training);
     var fa=Weather._fastingAdvice(training);
