@@ -62,7 +62,13 @@ var FatSecretSearch = (function() {
     }
     
     if (!per100g.calories) return null;
-    
+  
+    // FIX 2: Sanity check (kalorie >900/100g to zwykle błąd parsera)
+    if (per100g.calories > 900) {
+      console.warn(TAG, 'Suspicious value, skipping:', food.food_name, per100g.calories);
+      return null;
+    }
+  
     return {
       barcode: null,
       name: food.food_name || 'FatSecret product',
@@ -79,12 +85,77 @@ var FatSecretSearch = (function() {
     };
   }
   
-  async function search(query, options) {
+
+async function search(query, options) {
     if (!query || query.length < 2) return [];
     options = options || {};
     var limit = options.limit || 15;
     
-    var cacheKey = 'q_' + query.toLowerCase().slice(0, 50);
+    // === FIX 1: Polski → angielski dla FatSecret ===
+    var polishMap = {
+      'kurczak': 'chicken',
+      'piers kurczaka': 'chicken breast',
+      'pierś kurczaka': 'chicken breast',
+      'indyk': 'turkey',
+      'wołowina': 'beef',
+      'wolowina': 'beef',
+      'wieprzowina': 'pork',
+      'łosoś': 'salmon',
+      'losos': 'salmon',
+      'tuńczyk': 'tuna',
+      'tunczyk': 'tuna',
+      'jajko': 'egg',
+      'jajka': 'eggs',
+      'mleko': 'milk',
+      'ser': 'cheese',
+      'twaróg': 'cottage cheese',
+      'twarog': 'cottage cheese',
+      'jogurt': 'yogurt',
+      'masło': 'butter',
+      'maslo': 'butter',
+      'oliwa': 'olive oil',
+      'olej': 'oil',
+      'ryż': 'rice',
+      'ryz': 'rice',
+      'makaron': 'pasta',
+      'chleb': 'bread',
+      'kasza': 'groats',
+      'owsianka': 'oatmeal',
+      'banan': 'banana',
+      'jabłko': 'apple',
+      'jablko': 'apple',
+      'pomarańcza': 'orange',
+      'pomaranca': 'orange',
+      'truskawki': 'strawberries',
+      'borówki': 'blueberries',
+      'borowki': 'blueberries',
+      'awokado': 'avocado',
+      'pomidor': 'tomato',
+      'ogórek': 'cucumber',
+      'ogorek': 'cucumber',
+      'marchew': 'carrot',
+      'brokuły': 'broccoli',
+      'brokuly': 'broccoli',
+      'szpinak': 'spinach',
+      'ziemniaki': 'potato',
+      'orzechy': 'nuts',
+      'migdały': 'almonds',
+      'migdaly': 'almonds'
+    };
+    
+    var queryLower = query.toLowerCase().trim();
+    var searchQuery = polishMap[queryLower] || query;
+    // Częściowe matche
+    if (!polishMap[queryLower]) {
+      for (var key in polishMap) {
+        if (queryLower.indexOf(key) >= 0) {
+          searchQuery = polishMap[key] + ' ' + queryLower.replace(key, '').trim();
+          break;
+        }
+      }
+    }
+    
+    var cacheKey = 'q_' + searchQuery.toLowerCase().slice(0, 50);
     var cached = getCached(cacheKey);
     if (cached) return cached;
     
@@ -94,10 +165,11 @@ var FatSecretSearch = (function() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'fatsecret-search',
-          query: query,
+          query: searchQuery,  // <-- przetłumaczony query
           limit: limit
         })
       });
+
       
       if (!resp.ok) {
         var errData = await resp.json().catch(function() { return {}; });
