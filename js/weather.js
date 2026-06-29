@@ -46,140 +46,99 @@ const Weather={
   _windDir(deg){var d=['N','NE','E','SE','S','SW','W','NW'];return d[Math.round(deg/45)%8];},
 
  
-  _layers(temp,humidity,wind,rain,c.uv_index){
-    var l={base:'',mid:'',legs:'',accessories:[],warnings:[]};
-    var acc=l.accessories, warn=l.warnings;
+ 
+  _clothing(temp,feels,wind,humidity,rain,code){
+    var uv=null;
+    if(Weather._cache && Weather._cache.current) uv=Weather._cache.current.uv_index;
+    
+    var l={base:'',mid:'',outer:'',legs:'',acc:'',extra:[]};
+    var accList=[], warnList=[];
     
     // BASE LAYER
     if(temp>=27){
       l.base='Lekka, jasna koszulka/singlet z odprowadzaniem potu';
-      acc.push('Mokra chusta na szyję/głowę (chłodzenie evaporative)');
+      accList.push('Mokra chusta na szyję/głowę');
     }
-    else if(temp>=22){
-      l.base='Lekka koszulka tech (jasny kolor)';
-    }
-    else if(temp>=15){
-      l.base='Standardowa koszulka tech';
-    }
-    else if(temp>=10){
-      l.base='Koszulka z długim rękawem tech';
-    }
-    else if(temp>=5){
-      l.base='Termoaktywna koszulka długim rękawem';
-    }
-    else if(temp>=-5){
-      l.base='Termoaktywna baza + lekki mid layer';
-    }
-    else{
-      l.base='Termoaktywna baza warstwowo (Merino lub syntetyk)';
-    }
+    else if(temp>=22) l.base='Lekka koszulka tech (jasny kolor)';
+    else if(temp>=15) l.base='Standardowa koszulka tech';
+    else if(temp>=10) l.base='Koszulka z długim rękawem tech';
+    else if(temp>=5) l.base='Termoaktywna koszulka długim rękawem';
+    else if(temp>=-5) l.base='Termoaktywna baza + lekki mid layer';
+    else l.base='Termoaktywna baza warstwowo';
     
-    // MID LAYER
-    if(temp>=20){
-      l.mid='Nie potrzeba';
-    }
-    else if(temp>=10){
-      l.mid='Opcjonalnie: rękawki lub lekka bluza tech';
-    }
-    else if(temp>=0){
-      l.mid='Lekka bluza tech wiatroszczelna';
-    }
-    else if(temp>=-10){
-      l.mid='Cieplejszy mid layer + windproof shell';
-    }
-    else{
-      l.mid='Warstwowo: thermal + windproof + waterproof';
-    }
+    // MID
+    if(temp>=20) l.mid='';
+    else if(temp>=10) l.mid='Opcjonalnie: rękawki lub lekka bluza tech';
+    else if(temp>=0) l.mid='Lekka bluza tech wiatroszczelna';
+    else if(temp>=-10) l.mid='Cieplejszy mid layer + windproof shell';
+    else l.mid='Warstwowo: thermal + windproof + waterproof';
+    
+    // OUTER (rain/wind)
+    if(rain>=5) l.outer='Lekka kurtka przeciwdeszczowa';
+    else if(wind>=25) l.outer='Wiatroszczelna kurtka';
     
     // LEGS
-    if(temp>=22){
-      l.legs='Krótkie spodenki biegowe';
-    }
-    else if(temp>=15){
-      l.legs='Spodenki lub legginsy 3/4';
-    }
-    else if(temp>=5){
-      l.legs='Legginsy lub spodnie tech (długie)';
-    }
-    else if(temp>=-5){
-      l.legs='Termoaktywne legginsy lub kalesony + spodnie';
-    }
-    else{
-      l.legs='Warstwowe: thermal + windproof spodnie';
-    }
+    if(temp>=22) l.legs='Krótkie spodenki biegowe';
+    else if(temp>=15) l.legs='Spodenki lub legginsy 3/4';
+    else if(temp>=5) l.legs='Legginsy lub spodnie tech';
+    else if(temp>=-5) l.legs='Termoaktywne legginsy + spodnie';
+    else l.legs='Warstwowe: thermal + windproof';
     
-    // ACCESSORIES — heat-specific
+    // ACCESSORIES
     if(temp>=25){
-      acc.push('Czapka z daszkiem lub wiszor (osłonie głowy)');
-      acc.push('Krem SPF 30+ (twarz, kark, ramiona)');
-      acc.push('Okulary przeciwsłoneczne');
+      accList.push('Czapka z daszkiem');
+      accList.push('Krem SPF 30+');
+      accList.push('Okulary przeciwsłoneczne');
       if(temp>=30){
-        acc.unshift('🥶 LÓD: Bidon z lodem');
-        acc.push('Elektrolity (sole) — woda nie wystarcza');
+        accList.unshift('LÓD: bidon z lodem');
+        accList.push('Elektrolity (sole)');
       }
     }
     
-    // UV-specific
-    if(uv!==undefined && uv!==null){
-      if(uv>=8){
-        acc.push('☀️ UV ' + uv + ' - krem SPF 50+ + czapka');
-      }
-      else if(uv>=6 && temp<25){
-        acc.push('☀️ UV ' + uv + ' - krem SPF 30+');
-      }
+    // UV
+    if(uv!==null && uv!==undefined){
+      if(uv>=8) accList.push('☀️ UV '+Math.round(uv)+' - SPF 50+ + czapka');
+      else if(uv>=6 && temp<25) accList.push('☀️ UV '+Math.round(uv)+' - SPF 30+');
     }
     
-    // COLD-specific
+    // COLD
     if(temp<=5){
-      acc.push('Rękawiczki tech (cienkie powyżej 0°C, grubsze poniżej)');
-      acc.push('Buff lub czapka');
+      accList.push('Rękawiczki tech');
+      accList.push('Buff lub czapka');
       if(temp<=-5){
-        acc.push('Buff na usta (zapobiega zamarzaniu dróg oddechowych)');
-        acc.push('Termiczne skarpetki tech');
+        accList.push('Buff na usta');
+        accList.push('Termiczne skarpetki');
       }
     }
     
-    // RAIN
-    if(rain>=5){
-      acc.push('💧 Lekka kurtka przeciwdeszczowa');
-      acc.push('Czapka z daszkiem (chroń oczy)');
-    }
-    else if(rain>=2){
-      acc.push('Czapka z daszkiem');
-    }
+    if(rain>=2 && rain<5) accList.push('Czapka z daszkiem (chroń oczy)');
     
-    // WIND
-    if(wind>=25){
-      acc.push('💨 Wiatroszczelne ubranie');
-    }
+    l.acc=accList.join(', ');
     
-    // WARNINGS — actionable
+    // WARNINGS
     if(temp>=35){
-      warn.push('⛔ EKSTREMALNY upał: rozważ odwołanie/skrócenie treningu');
-      warn.push('🕐 Najlepszy czas: 5:00-7:00 lub 21:00+');
-      warn.push('🚰 Hydratacja CO 15 min, 200ml');
+      warnList.push('⛔ EKSTREMALNY upał: rozważ odwołanie/skrócenie treningu');
+      warnList.push('🕐 Najlepszy czas: 5:00-7:00 lub 21:00+');
+      warnList.push('🚰 Hydratacja CO 15 min, 200ml');
     }
     else if(temp>=30){
-      warn.push('⚠️ Bardzo gorąco: skróć trening 30-50%');
-      warn.push('🕐 Idealnie: wczesny ranek lub późny wieczór');
-      warn.push('🚰 Elektrolity OBOWIĄZKOWE');
+      warnList.push('⚠️ Bardzo gorąco: skróć trening 30-50%');
+      warnList.push('🕐 Wczesny ranek lub późny wieczór');
+      warnList.push('🚰 Elektrolity OBOWIĄZKOWE');
     }
     else if(temp>=27){
-      warn.push('⚠️ Gorąco: skróć trening 15-25%, zwolnij tempo');
-      warn.push('🕐 Wybierz wczesny ranek/wieczór');
-      warn.push('🚰 Pij 150-200ml co 20 min');
+      warnList.push('⚠️ Gorąco: skróć trening 15-25%, zwolnij');
+      warnList.push('🕐 Wybierz ranek/wieczór');
     }
-    else if(temp>=23){
-      warn.push('🌡️ Cieplo: easy run OK, hard runs przenieś na wieczór');
-    }
-    
-    if(temp<-10){
-      warn.push('❄️ Ekstremalny mróz: rozważ trening w domu');
-      warn.push('🫁 Oddychaj przez nos lub buff');
+    else if(temp<-10){
+      warnList.push('❄️ Ekstremalny mróz: rozważ trening w domu');
+      warnList.push('🫁 Oddychaj przez nos lub buff');
     }
     
+    l.extra=warnList;
     return l;
   },
+
 
 
   
