@@ -110,30 +110,56 @@ var VoiceInput = (function() {
   // ============================================
   // AI PARSE — transcript → meal data
   // ============================================
+
   async function parseTranscript(transcript) {
     if (!transcript || transcript.trim().length < 3) return null;
     
-    try {
-      var resp = await fetch(WORKER_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'voice-parse',
-          transcript: transcript
-        })
-      });
-      
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      var data = await resp.json();
-      
-      if (data.error) throw new Error(data.error);
-      
-      return parseAIResponse(data.analysis, transcript);
-    } catch(e) {
-      console.warn(TAG, 'Parse error:', e);
-      throw e;
+    var maxRetries = 3;
+    var lastError = null;
+    
+    for (var attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        var resp = await fetch(WORKER_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'voice-parse',
+            transcript: transcript
+          })
+        });
+        
+        if (resp.ok) {
+          var data = await resp.json();
+          if (data.error) throw new Error(data.error);
+          return parseAIResponse(data.analysis, transcript);
+        }
+        
+        // Retry on 5xx
+        if (resp.status >= 500 && attempt < maxRetries) {
+          console.warn(TAG, 'Server error ' + resp.status + ', retry ' + attempt + '/' + maxRetries);
+          await new Promise(function(r) { setTimeout(r, 1500 * attempt); });
+          continue;
+        }
+        
+        var errData = await resp.json().catch(function() { return {}; });
+        throw new Error('HTTP ' + resp.status + ': ' + (errData.error || 'unknown'));
+      } catch(e) {
+        lastError = e;
+        if (attempt < maxRetries && (e.message.indexOf('HTTP 5') >= 0 || e.message.indexOf('Failed to fetch') >= 0)) {
+          console.warn(TAG, 'Attempt ' + attempt + ' failed, retrying:', e.message);
+          await new Promise(function(r) { setTimeout(r, 1500 * attempt); });
+        } else if (attempt >= maxRetries) {
+          break;
+        } else {
+          // Non-retryable error
+          throw e;
+        }
+      }
     }
+    
+    throw lastError || new Error('Failed after ' + maxRetries + ' retries');
   }
+
 
   function parseAIResponse(text, originalTranscript) {
     if (!text) return null;
