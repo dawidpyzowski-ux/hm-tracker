@@ -170,39 +170,47 @@ var HealthSync = (function() {
     return Object.values(map).sort(function(a, b) { return a.date.localeCompare(b.date); });
   }
 
-  // Merge nutrition logs (po dacie + meal id, najnowsze wygrywają)
+
+  // Merge logs (po dacie + item id, najnowsze wygrywają)
+  // Działa dla nutrition (meals) i caffeine (entries)
   function mergeNutritionLogs(local, cloud) {
     var merged = {};
     
-    // Wszystkie unikalne daty
-    var allDates = new Set([].concat(Object.keys(local), Object.keys(cloud)));
+    var allDates = new Set([].concat(Object.keys(local || {}), Object.keys(cloud || {})));
     
     allDates.forEach(function(date) {
-      var localDay = local[date] || { meals: [], date: date };
-      var cloudDay = cloud[date] || { meals: [], date: date };
+      var localDay = local[date] || {};
+      var cloudDay = cloud[date] || {};
       
-      // Merge meals — unikalne po id, najnowsze wygrywają
-      var mealMap = {};
-      cloudDay.meals.forEach(function(m) {
-        if (m.id) mealMap[m.id] = m;
+      // Detect format: nutrition uses "meals", caffeine uses "entries"
+      var itemKey = (localDay.entries || cloudDay.entries) ? 'entries' : 'meals';
+      
+      var localItems = localDay[itemKey] || [];
+      var cloudItems = cloudDay[itemKey] || [];
+      
+      // Merge items — unique po id, najnowsze wygrywają
+      var itemMap = {};
+      cloudItems.forEach(function(item) {
+        if (item.id) itemMap[item.id] = item;
       });
-      localDay.meals.forEach(function(m) {
-        if (!m.id) return;
-        if (!mealMap[m.id] || (m.ts && mealMap[m.id].ts && m.ts > mealMap[m.id].ts)) {
-          mealMap[m.id] = m;
+      localItems.forEach(function(item) {
+        if (!item.id) return;
+        if (!itemMap[item.id] || (item.ts && itemMap[item.id].ts && item.ts > itemMap[item.id].ts)) {
+          itemMap[item.id] = item;
         }
       });
       
-      merged[date] = {
-        date: date,
-        meals: Object.values(mealMap).sort(function(a, b) {
-          return (a.time || '00:00').localeCompare(b.time || '00:00');
-        })
-      };
+      var sortedItems = Object.values(itemMap).sort(function(a, b) {
+        return (a.time || '00:00').localeCompare(b.time || '00:00');
+      });
+      
+      merged[date] = { date: date };
+      merged[date][itemKey] = sortedItems;
     });
     
     return merged;
   }
+
 
   function mergeFavorites(local, cloud) {
     var map = {};
