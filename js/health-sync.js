@@ -13,6 +13,18 @@ var HealthSync = (function() {
     } catch(e) { return {}; }
   }
 
+
+  function getCaffeineLogs() {
+    try { return JSON.parse(localStorage.getItem('caffeine_logs') || '{}'); }
+    catch(e) { return {}; }
+  }
+  
+  function getCaffeineSettings() {
+    try { return JSON.parse(localStorage.getItem('caffeine_settings') || 'null'); }
+    catch(e) { return null; }
+  }
+
+  
   function getNutritionSettings() {
     try {
       return JSON.parse(localStorage.getItem('nutrition_settings') || 'null');
@@ -100,6 +112,19 @@ var HealthSync = (function() {
         nutritionDaysMerged = Object.keys(mergedLogs).length;
       }
 
+
+      // === CAFFEINE MERGE ===
+      if (record.caffeine && record.caffeine.logs) {
+        var localCaff = getCaffeineLogs();
+        var mergedCaff = mergeNutritionLogs(localCaff, record.caffeine.logs);
+        localStorage.setItem('caffeine_logs', JSON.stringify(mergedCaff));
+        
+        if (record.caffeine.settings && !getCaffeineSettings()) {
+          localStorage.setItem('caffeine_settings', JSON.stringify(record.caffeine.settings));
+        }
+      }
+
+      
       // Settings (cloud override if exists)
       if (cloudNutrition.settings) {
         var localSettings = getNutritionSettings();
