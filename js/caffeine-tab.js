@@ -109,15 +109,22 @@ var CaffeineTab = (function() {
     if (data.log.entries.length === 0) {
       h += '<p style="color:#6b7280;text-align:center;padding:20px;font-size:0.85em;">Brak wpisów. Tap przycisk wyżej żeby dodać.</p>';
     } else {
+
       data.log.entries.forEach(function(e) {
-        h += '<div style="background:#374151;padding:10px;border-radius:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">';
-        h += '<div>';
+        h += '<div style="background:#374151;padding:10px;border-radius:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;">';
+        h += '<div style="flex:1;min-width:0;">';
         h += '<div style="color:#f9fafb;font-size:0.9em;font-weight:600;">' + (e.emoji || '☕') + ' ' + e.name + '</div>';
-        h += '<div style="color:#9ca3af;font-size:0.75em;">' + e.time + ' · ' + e.mg + ' mg' + (e.notes ? ' · ' + e.notes : '') + '</div>';
+        h += '<div style="color:#9ca3af;font-size:0.75em;display:flex;align-items:center;gap:6px;margin-top:4px;">';
+        h += '<input type="time" value="' + e.time + '" onchange="CaffeineTab.updateTime(\'' + currentDate + '\',' + e.id + ',this.value)" style="background:#1f2937;border:1px solid #4b5563;color:#9ca3af;padding:2px 4px;border-radius:4px;font-size:0.85em;font-family:monospace;">';
+        h += '<span>·</span>';
+        h += '<span>' + e.mg + ' mg</span>';
+        if (e.notes) h += '<span>· ' + e.notes + '</span>';
+        h += '</div>';
         h += '</div>';
         h += '<button onclick="CaffeineTab.deleteEntry(\'' + currentDate + '\',' + e.id + ')" style="background:transparent;border:none;color:#ef4444;font-size:1.2em;cursor:pointer;padding:4px 8px;">🗑️</button>';
         h += '</div>';
       });
+
     }
     
     h += '</div>';
@@ -273,6 +280,29 @@ var CaffeineTab = (function() {
       if (container) render('caffeine-content');
     };
   }
+
+
+  function updateTime(date, entryId, newTime) {
+    if (!newTime || !/^\d{2}:\d{2}$/.test(newTime)) return;
+    
+    var all = CaffeineTracker.getAllLogs();
+    if (!all[date]) return;
+    
+    var entry = all[date].entries.find(function(e) { return e.id === entryId; });
+    if (!entry) return;
+    
+    entry.time = newTime;
+    localStorage.setItem('caffeine_logs', JSON.stringify(all));
+    
+    // Sync to cloud
+    if (typeof HealthSync !== 'undefined' && HealthSync.pushNutrition) {
+      try { HealthSync.pushNutrition(); } catch(e) {}
+    }
+    
+    // Re-render dla update'u "in body now" + "bedtime projection"
+    render('caffeine-content');
+  }
+
   
   function setDate(date) {
     currentDate = date;
