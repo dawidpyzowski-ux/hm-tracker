@@ -44,6 +44,7 @@ var HealthSync = (function() {
       var nutritionSettings = getNutritionSettings();
       var nutritionFavorites = getNutritionFavorites();
       
+
       var payload = {
         health: healthData,
         nutrition: {
@@ -51,12 +52,17 @@ var HealthSync = (function() {
           settings: nutritionSettings,
           favorites: nutritionFavorites
         },
+        caffeine: {
+          logs: getCaffeineLogs(),
+          settings: getCaffeineSettings()
+        },
         meta: {
           updated: new Date().toISOString(),
-          version: 3,
+          version: 4,
           device: navigator.userAgent.includes("iPhone") ? "iphone" : "desktop"
         }
       };
+
 
       var res = await fetch(BASE_URL, {
         method: "PUT",
@@ -74,7 +80,10 @@ var HealthSync = (function() {
       }
 
       var nutritionDays = Object.keys(nutritionLogs).length;
-      console.log("[Sync] ✅ PUSH OK", healthData.length, "health records,", nutritionDays, "nutrition days");
+
+      var caffeineDays = Object.keys(getCaffeineLogs()).length;
+      console.log("[Sync] ✅ PUSH OK", healthData.length, "health records,", nutritionDays, "nutrition days,", caffeineDays, "caffeine days");
+
       return true;
     } catch (e) {
       console.error("[Sync] ❌ PUSH ERROR", e);
