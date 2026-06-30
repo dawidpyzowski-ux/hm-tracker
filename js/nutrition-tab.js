@@ -31,16 +31,20 @@ html += '<button class="sub-tab ' + (currentTab==='week'?'act':'') + '" onclick=
 html += '<button class="sub-tab ' + (currentTab==='analytics'?'act':'') + '" onclick="NutritionTab.setTab(\'analytics\')">📈 Analytics</button>';
 html += '<button class="sub-tab ' + (currentTab==='ai'?'act':'') + '" onclick="NutritionTab.setTab(\'ai\')">🤖 AI</button>';
 html += '<button class="sub-tab ' + (currentTab==='plan'?'act':'') + '" onclick="NutritionTab.setTab(\'plan\')">📋 Plan</button>';
+        html += '<button class="sub-tab ' + (currentTab==='caffeine'?'act':'') + '" onclick="NutritionTab.setTab(\'caffeine\')">☕ Kofeina</button>';
 
     html += '</div>';
     
     html += '<div id="nutr-content">';
 
-if (currentTab === 'today') html += renderToday();
-else if (currentTab === 'week') html += renderWeek();
-else if (currentTab === 'analytics') html += renderAnalyticsPlaceholder();
-else if (currentTab === 'ai') html += renderAIPlaceholder();
-else if (currentTab === 'plan') html += renderPlan();
+
+    if (currentTab === 'today') html += renderToday();
+    else if (currentTab === 'week') html += renderWeek();
+    else if (currentTab === 'analytics') html += renderAnalyticsPlaceholder();
+    else if (currentTab === 'caffeine') html += '<div id="caffeine-content"><p style="color:#9ca3af;text-align:center;padding:30px;">⏳ Ładuję...</p></div>';
+    else if (currentTab === 'ai') html += renderAIPlaceholder();
+    else if (currentTab === 'plan') html += renderPlan();
+
 
     html += '</div>';
     
