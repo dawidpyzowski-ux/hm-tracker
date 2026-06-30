@@ -288,4 +288,3 @@ var CaffeineTab = (function() {
   
   return window.CaffeineTab;
 })();
-``
