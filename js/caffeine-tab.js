@@ -308,13 +308,16 @@ var CaffeineTab = (function() {
     currentDate = date;
   }
   
+
   window.CaffeineTab = {
     render: render,
     quickAdd: quickAdd,
     deleteEntry: deleteEntry,
+    updateTime: updateTime,
     openCustom: openCustom,
     setDate: setDate
   };
+
   
   return window.CaffeineTab;
 })();
