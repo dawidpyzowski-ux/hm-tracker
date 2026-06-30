@@ -12,77 +12,101 @@ var CaffeineTracker = (function() {
   // Default daily target (mg)
   var DEFAULT_DAILY_TARGET = 400;
   
+
   // ============================================
-  // PRESET CALCULATOR
-  // Wzór: caffeine(mg) = 1000 × dose(g) × green% × roastFactor × brewFactor
-  // green% Arabica: 1.5% | Robusta: 2.5%
-  // roastFactor: 1.15 (light=1.20, medium=1.15, dark=1.10)
-  // brewFactor varies by method
+  // BREW FACTORS (mg/g) — calibrated from James Hoffmann lab analysis
+  // Lighttells caffeine analyzer, 18g dose, 21% extraction yield
+  // Source: youtube.com/watch?v=etnMr8oUSDo
+  //
+  // KEY INSIGHT: Filter coffee extracts MORE caffeine than espresso
+  // (more water = water not saturated = continues extracting)
   // ============================================
-  
   var BREW_FACTORS = {
-    espresso: 0.88,
-    nespresso: 0.85,      // dla kapsułek
-    drip_v60: 0.70,
-    aeropress: 0.80,
-    french_press: 0.85,
-    chemex: 0.65,
-    moka: 0.88,
-    cold_brew: 0.95,
-    instant: 0.90
+    espresso: 6.1,        // 110mg / 18g (Hoffmann double shot)
+    nespresso: 13.0,      // ~70mg / 5.5g (concentrated capsule)
+    drip_v60: 9.4,        // 170mg / 18g (FILTER WINS!)
+    aeropress: 8.5,       // ~150mg / 18g (between espresso & filter)
+    french_press: 9.0,    // similar to filter (full immersion)
+    chemex: 9.2,          // pour over, like V60
+    moka: 7.5,            // strong but less than espresso machine
+    cold_brew: 10.0,      // longest contact time
+    instant: 8.0          // depends on heaped vs level teaspoon
   };
   
+  // ============================================
+  // ROAST FACTORS — REVERSED from common belief
+  // Hoffmann: dark roast has MORE caffeine per gram
+  // (developed cells release caffeine easier)
+  // ============================================
   var ROAST_FACTORS = {
-    light: 1.20,
-    medium: 1.15,
-    dark: 1.10
+    light: 0.95,    // less caffeine (denser beans)
+    medium: 1.00,   // baseline
+    dark: 1.10      // MORE caffeine (developed beans)
   };
+
   
+
+  // ============================================
+  // CALCULATE — Hoffmann-based
+  // Wzór: caffeine = dose × mg_per_gram × roast × beans
+  //
+  // mg_per_gram comes directly from brew method
+  // (no more "green% × extraction%" — Hoffmann measures final mg/g)
+  // ============================================
   function calculate(method, dose_g, beans, roast) {
     beans = beans || 'arabica';
     roast = roast || 'medium';
     
-    var greenPct = beans === 'robusta' ? 0.025 : 0.015;
-    var roastF = ROAST_FACTORS[roast] || 1.15;
-    var brewF = BREW_FACTORS[method] || 0.85;
+    // Beans factor: Robusta has ~2× caffeine
+    var beansFactor = beans === 'robusta' ? 2.0 : 1.0;
     
-    return Math.round(1000 * dose_g * greenPct * roastF * brewF);
+    var roastF = ROAST_FACTORS[roast] || 1.0;
+    var mgPerGram = BREW_FACTORS[method] || 8.0;
+    
+    return Math.round(dose_g * mgPerGram * roastF * beansFactor);
   }
+
+
   
+
   // ============================================
-  // PRESETS — Twoje typowe
+  // PRESETS — Hoffmann-calibrated (June 2025)
   // ============================================
   var PRESETS = [
-    // 🏢 W pracy
-    { id: 'work_espresso_double', name: 'Espresso (Lavazza)', emoji: '☕', mg: 120, group: 'work', dose_g: 12, method: 'espresso' },
-    { id: 'work_americano', name: 'Americano (Lavazza)', emoji: '☕', mg: 100, group: 'work', dose_g: 12, method: 'espresso', notes: '+gorąca woda' },
-    { id: 'work_cappuccino', name: 'Cappuccino (Lavazza)', emoji: '🥛', mg: 120, group: 'work', dose_g: 12, method: 'espresso', notes: 'double + mleko' },
-    { id: 'work_flat_white', name: 'Flat White (Lavazza)', emoji: '🥛', mg: 120, group: 'work', dose_g: 12, method: 'espresso', notes: 'double + mleko' },
-    { id: 'work_latte', name: 'Latte (Lavazza)', emoji: '🥛', mg: 120, group: 'work', dose_g: 12, method: 'espresso', notes: 'double + mleko' },
-    { id: 'work_nespresso', name: 'Nespresso karmelowa', emoji: '💊', mg: 70, group: 'work', dose_g: 5.5, method: 'nespresso' },
+    // 🏢 W pracy (Lavazza ekspres, 12g single dose for milk drinks)
+    // Note: Lavazza is medium roast, blend with some Robusta typically
+    // Smaller dose = less caffeine than cafe doubles
+    { id: 'work_espresso_double', name: 'Espresso (Lavazza)', emoji: '☕', mg: 73, group: 'work', dose_g: 12, method: 'espresso', notes: '12g dose ekspres pracy' },
+    { id: 'work_americano', name: 'Americano (Lavazza)', emoji: '☕', mg: 73, group: 'work', dose_g: 12, method: 'espresso', notes: 'espresso + gorąca woda (kofeina się nie zmienia)' },
+    { id: 'work_cappuccino', name: 'Cappuccino (Lavazza)', emoji: '🥛', mg: 73, group: 'work', dose_g: 12, method: 'espresso', notes: 'espresso + mleko' },
+    { id: 'work_flat_white', name: 'Flat White (Lavazza)', emoji: '🥛', mg: 73, group: 'work', dose_g: 12, method: 'espresso', notes: 'espresso + mleko' },
+    { id: 'work_latte', name: 'Latte (Lavazza)', emoji: '🥛', mg: 73, group: 'work', dose_g: 12, method: 'espresso', notes: 'espresso + dużo mleka' },
+    { id: 'work_nespresso', name: 'Nespresso karmelowa', emoji: '💊', mg: 70, group: 'work', dose_g: 5.5, method: 'nespresso', notes: 'kapsułka karmel ~70mg' },
     
-    // 🏠 W domu
-    { id: 'home_drip_15g', name: 'Drip V60 (15g)', emoji: '☕', mg: 95, group: 'home', dose_g: 15, method: 'drip_v60' },
-    { id: 'home_drip_18g', name: 'Drip V60 (18g)', emoji: '☕', mg: 115, group: 'home', dose_g: 18, method: 'drip_v60' },
-    { id: 'home_aeropress_15g', name: 'AeroPress (15g)', emoji: '💉', mg: 105, group: 'home', dose_g: 15, method: 'aeropress' },
-    { id: 'home_aeropress_18g', name: 'AeroPress (18g)', emoji: '💉', mg: 125, group: 'home', dose_g: 18, method: 'aeropress' },
+    // 🏠 W domu (specialty, fresh, mostly Arabica)
+    // Drip i AeroPress mają WIĘCEJ kofeiny per dose niż espresso (Hoffmann)
+    { id: 'home_drip_15g', name: 'Drip V60 (15g)', emoji: '☕', mg: 142, group: 'home', dose_g: 15, method: 'drip_v60', notes: 'pour over — filter wins!' },
+    { id: 'home_drip_18g', name: 'Drip V60 (18g)', emoji: '☕', mg: 170, group: 'home', dose_g: 18, method: 'drip_v60', notes: 'klasyczny V60 brew' },
+    { id: 'home_aeropress_15g', name: 'AeroPress (15g)', emoji: '💉', mg: 127, group: 'home', dose_g: 15, method: 'aeropress' },
+    { id: 'home_aeropress_18g', name: 'AeroPress (18g)', emoji: '💉', mg: 152, group: 'home', dose_g: 18, method: 'aeropress' },
     
-    // ☕ W kawiarni
-    { id: 'cafe_espresso', name: 'Espresso (cafe)', emoji: '☕', mg: 80, group: 'cafe', dose_g: 9, method: 'espresso' },
-    { id: 'cafe_espresso_double', name: 'Espresso double (cafe)', emoji: '☕', mg: 130, group: 'cafe', dose_g: 18, method: 'espresso' },
-    { id: 'cafe_cappuccino', name: 'Cappuccino (cafe)', emoji: '🥛', mg: 130, group: 'cafe', dose_g: 18, method: 'espresso' },
-    { id: 'cafe_flat_white', name: 'Flat White (cafe)', emoji: '🥛', mg: 130, group: 'cafe', dose_g: 18, method: 'espresso' },
-    { id: 'cafe_latte', name: 'Latte (cafe)', emoji: '🥛', mg: 130, group: 'cafe', dose_g: 18, method: 'espresso' },
-    { id: 'cafe_americano', name: 'Americano (cafe)', emoji: '☕', mg: 130, group: 'cafe', dose_g: 18, method: 'espresso' },
+    // ☕ W kawiarni (specialty, 18g double dose)
+    { id: 'cafe_espresso', name: 'Espresso single (cafe)', emoji: '☕', mg: 55, group: 'cafe', dose_g: 9, method: 'espresso' },
+    { id: 'cafe_espresso_double', name: 'Espresso double (cafe)', emoji: '☕', mg: 110, group: 'cafe', dose_g: 18, method: 'espresso', notes: 'standard cafe dose' },
+    { id: 'cafe_cappuccino', name: 'Cappuccino (cafe)', emoji: '🥛', mg: 110, group: 'cafe', dose_g: 18, method: 'espresso', notes: 'double + mleko spienione' },
+    { id: 'cafe_flat_white', name: 'Flat White (cafe)', emoji: '🥛', mg: 110, group: 'cafe', dose_g: 18, method: 'espresso' },
+    { id: 'cafe_latte', name: 'Latte (cafe)', emoji: '🥛', mg: 110, group: 'cafe', dose_g: 18, method: 'espresso', notes: 'double + dużo mleka' },
+    { id: 'cafe_americano', name: 'Americano (cafe)', emoji: '☕', mg: 110, group: 'cafe', dose_g: 18, method: 'espresso', notes: 'double + gorąca woda' },
     
-    // ⚡ Inne
-    { id: 'gel_caffeine', name: 'Żel z kofeiną', emoji: '⚡', mg: 50, group: 'other' },
-    { id: 'energy_drink', name: 'Energy drink (250ml)', emoji: '🥤', mg: 80, group: 'other' },
+    // ⚡ Inne (typowe wartości komercyjne)
+    { id: 'gel_caffeine', name: 'Żel z kofeiną', emoji: '⚡', mg: 50, group: 'other', notes: 'np. SiS Beta Fuel' },
+    { id: 'energy_drink', name: 'Energy drink (250ml)', emoji: '🥤', mg: 80, group: 'other', notes: 'Red Bull standard' },
     { id: 'cola', name: 'Cola (330ml)', emoji: '🥤', mg: 35, group: 'other' },
-    { id: 'green_tea', name: 'Zielona herbata', emoji: '🍵', mg: 30, group: 'other' },
+    { id: 'green_tea', name: 'Zielona herbata', emoji: '🍵', mg: 30, group: 'other', notes: 'średnio zaparzona' },
     { id: 'black_tea', name: 'Czarna herbata', emoji: '🍵', mg: 45, group: 'other' },
     { id: 'pill_200', name: 'Tabletka kofeiny 200mg', emoji: '💊', mg: 200, group: 'other' }
   ];
+
   
   // ============================================
   // STORAGE
