@@ -52,10 +52,15 @@ html += '<button class="sub-tab ' + (currentTab==='plan'?'act':'') + '" onclick=
     el.innerHTML = html;
     
   
-if (currentTab === 'ai') setTimeout(renderAI, 100);
-if (currentTab === 'analytics') setTimeout(renderAnalytics, 100);
+
+    if (currentTab === 'ai') setTimeout(renderAI, 100);
+    if (currentTab === 'analytics') setTimeout(renderAnalytics, 100);
+    if (currentTab === 'caffeine') setTimeout(function() {
+      if (typeof CaffeineTab !== 'undefined') CaffeineTab.render('caffeine-content');
+    }, 50);
 
   }
+
 
   function setTab(tab) {
     currentTab = tab;
