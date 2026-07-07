@@ -444,7 +444,22 @@ function filterAnalyticsHtml(html, includeKeywords) {
         plan = window.PLAN_FLAT.find(function(p) { return p.date === date; });
       }
       
-      document.getElementById('bench-content').innerHTML = WorkoutBenchmarkUI.render(activity, plan);
+      
+      var mainHtml = WorkoutBenchmarkUI.render(activity, plan);
+      
+      // Add progression trend section
+      var progHtml = '';
+      try {
+        if (typeof WorkoutBenchmarkUI.renderProgression === 'function') {
+          progHtml = '<div style="margin-top:20px;padding-top:20px;border-top:2px solid #374151;">' +
+            '<h3 style="color:#f9fafb;margin:0 0 12px;">📈 Twoja Progression</h3>' +
+            await WorkoutBenchmarkUI.renderProgression(30) +
+            '</div>';
+        }
+      } catch(e) { console.warn('Progression render error:', e); }
+      
+      document.getElementById('bench-content').innerHTML = mainHtml + progHtml;
+
     } catch(e) {
       console.error('Benchmark error:', e);
       document.getElementById('bench-content').innerHTML = '<p style="color:#fca5a5;text-align:center;padding:20px;">❌ ' + e.message + '</p>';
