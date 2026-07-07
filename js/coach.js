@@ -145,7 +145,7 @@ const Coach = (() => {
       if (d >= monday && d <= now) {
         weekKm += parseFloat(a.distance_km||a.km||0);
         weekSessions++;
-        var t = a.type || a.workout_type || "";
+        var t = (typeof PlanMatcher !== 'undefined' && PlanMatcher.getEffectiveType) ? (PlanMatcher.getEffectiveType(a) || "") : (a.type || a.workout_type || "");
         if (hardTypes.indexOf(t) >= 0) weekHardCount++;
       }
     });
@@ -218,7 +218,7 @@ const Coach = (() => {
 
     // --- Pace Trend ---
     var easyRuns = sorted.filter(function(a){
-      var t = a.type||a.workout_type||"";
+      var t = (typeof PlanMatcher !== 'undefined' && PlanMatcher.getEffectiveType) ? (PlanMatcher.getEffectiveType(a) || "") : (a.type||a.workout_type||"");
       return t === "Easy" || t === "Easy Run" || t === "Recovery";
     });
     if (easyRuns.length >= 4) {
@@ -267,7 +267,7 @@ const Coach = (() => {
 
     // --- Cardiac Drift on Long Runs ---
     var longRuns = activities.filter(function(a){
-      var t = a.type||a.workout_type||"";
+      var t = (typeof PlanMatcher !== 'undefined' && PlanMatcher.getEffectiveType) ? (PlanMatcher.getEffectiveType(a) || "") : (a.type||a.workout_type||"");
       return t === "Long Run" && parseFloat(a.distance_km||a.km||0) > 12;
     });
     if (longRuns.length >= 3) {
@@ -305,7 +305,7 @@ const Coach = (() => {
     var efforts = [];
 
     activities.forEach(function(a) {
-      var type = (a.type||a.workout_type||"").toLowerCase();
+      var type = ((typeof PlanMatcher !== 'undefined' && PlanMatcher.getEffectiveType ? PlanMatcher.getEffectiveType(a) : (a.type||a.workout_type)) || "").toLowerCase();
       var isHard = type.indexOf("interval")>=0 || type.indexOf("tempo")>=0
         || type.indexOf("fartlek")>=0 || type.indexOf("race")>=0;
       if (!isHard) return;
