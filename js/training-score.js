@@ -367,6 +367,7 @@ var avgPace = 0;
     var isEasy = type.toLowerCase().indexOf('easy') !== -1 || type.toLowerCase().indexOf('recovery') !== -1 || type.toLowerCase().indexOf('regen') !== -1;
     var isLong = type.toLowerCase().indexOf('long') !== -1;
     var isInterval = plan.category === 'intervals' || plan.category === 'fartlek';
+    var isTempo = plan.category === 'tempo' || type.toLowerCase().indexOf('tempo') !== -1;
     var workLaps = classified.filter(function(l) { return l.role === 'work'; });
     var restLaps = classified.filter(function(l) { return l.role === 'rest'; });
     var msgs = [];
@@ -386,17 +387,34 @@ var avgPace = 0;
         else if (avgHR < 165) { score = 65; msgs.push('HR ' + Math.round(avgHR) + ' bpm - za wysokie na easy!'); }
         else { score = 40; msgs.push('HR ' + Math.round(avgHR) + ' bpm - zdecydowanie za wysokie!'); }
       }
-    } else if (isInterval && workLaps.length > 0) {
-      // Work laps should have high HR
+    
+    } else if ((isInterval || isTempo) && workLaps.length > 0) {
+      // Work laps should have high HR (Tempo target: Z4, Intervals target: Z4-Z5)
       var avgWorkHR = 0;
       for (var w = 0; w < workLaps.length; w++) avgWorkHR += workLaps[w].hr;
       avgWorkHR = avgWorkHR / workLaps.length;
-      if (avgWorkHR > 165) { score = 95; msgs.push('HR odcinkow: ' + Math.round(avgWorkHR) + ' bpm - dobra intensywnosc'); }
-      else if (avgWorkHR > 155) { score = 80; msgs.push('HR odcinkow: ' + Math.round(avgWorkHR) + ' bpm - moglo byc wyzej'); }
-      else { score = 60; msgs.push('HR odcinkow: ' + Math.round(avgWorkHR) + ' bpm - niska intensywnosc'); }
+      
+      // Tempo: Z4 target (155-170), Intervals: Z4-Z5 (165+)
+      var hrLabel = isTempo ? 'HR pracy tempo' : 'HR odcinkow';
+      var goodThreshold = isTempo ? 155 : 165;
+      var okThreshold = isTempo ? 145 : 155;
+      
+      if (avgWorkHR > goodThreshold) { 
+        score = 95; 
+        msgs.push(hrLabel + ': ' + Math.round(avgWorkHR) + ' bpm - swietna intensywnosc (' + 
+          (isTempo ? 'Z4' : 'Z4-Z5') + ')'); 
+      }
+      else if (avgWorkHR > okThreshold) { 
+        score = 80; 
+        msgs.push(hrLabel + ': ' + Math.round(avgWorkHR) + ' bpm - dobra intensywnosc'); 
+      }
+      else { 
+        score = 60; 
+        msgs.push(hrLabel + ': ' + Math.round(avgWorkHR) + ' bpm - niska intensywnosc'); 
+      }
 
-      // Rest recovery
-      if (restLaps.length > 0 && workLaps.length > 0) {
+      // Rest recovery (tylko dla intervals)
+      if (isInterval && restLaps.length > 0 && workLaps.length > 0) {
         var drops = [];
         for (var r = 0; r < restLaps.length; r++) {
           var prevWork = null;
@@ -417,6 +435,7 @@ var avgPace = 0;
         }
       }
     } else if (isLong) {
+
       // Cardiac drift from streams or splits
       var hrStream = streams ? (Array.isArray(streams.heartrate) ? streams.heartrate : null) : null;
       if (hrStream && hrStream.length > 100) {
