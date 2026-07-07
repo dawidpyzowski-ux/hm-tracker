@@ -476,21 +476,70 @@ var avgPace = 0;
   }
 
   // === MAIN EVALUATE ===
+
   function evaluate(date) {
     if (typeof PLAN === 'undefined' || typeof S === 'undefined' || typeof DB === 'undefined') return null;
     var log = S.getLog(date);
     if (!log || !log.distance) return null;
 
-    // Find plan for this date
     var planDay = null, planDate = date;
-    for (var wi = 0; wi < PLAN.length; wi++) {
-      var w = PLAN[wi];
-      for (var di = 0; di < w.days.length; di++) {
-        var d = w.days[di];
-        var dt = getDayDate(w.start, d.dow);
-        if (dt === date && !d.rest) { planDay = d; break; }
+    
+    // === Sprint 30: Check PlanMatcher first (uses overrides + fuzzy match) ===
+    if (typeof PlanMatcher !== 'undefined' && PlanMatcher.getEffectivePlan) {
+      try {
+        // Build activity object dla PlanMatcher
+        var activity = {
+          date: date,
+          km: parseFloat(log.distance),
+          pace: log.pace,
+          type: log.type || log.workout_type,
+          avg_hr: log.hr || log.avg_hr,
+          strava_id: log.strava_id
+        };
+        
+        var effective = PlanMatcher.getEffectivePlan(activity);
+        
+        if (effective && effective.plan && effective.source !== 'override_skip') {
+          // Use effective plan (może to być inny dzień jeśli override)
+          var effPlan = effective.plan;
+          planDay = {
+            type: effPlan.type,
+            km: effPlan.km,
+            pace: effPlan.pace,
+            desc: effPlan.notes || effPlan.desc || effPlan.type,
+            rest: false
+          };
+          planDate = effPlan.date;
+          console.log('[TrainScore] Using effective plan:', effPlan.date, effPlan.type, '(' + effective.source + ', ' + effective.confidence + '%)');
+        } else if (effective && effective.source === 'override_skip') {
+          // User marked jako "poza planem"
+          return { 
+            total: 0, 
+            volume: { score: 0 }, 
+            intensity: { score: 0 }, 
+            hr: { score: 0 }, 
+            timing: { score: 0 }, 
+            coachMsg: 'Trening poza planem (oznaczony ręcznie)', 
+            planDay: null, 
+            classified: [] 
+          };
+        }
+      } catch(e) { 
+        console.warn('[TrainScore] PlanMatcher error:', e); 
       }
-      if (planDay) break;
+    }
+
+    // === Fallback: stary lookup (jeśli PlanMatcher nie dał rady) ===
+    if (!planDay) {
+      for (var wi = 0; wi < PLAN.length; wi++) {
+        var w = PLAN[wi];
+        for (var di = 0; di < w.days.length; di++) {
+          var d = w.days[di];
+          var dt = getDayDate(w.start, d.dow);
+          if (dt === date && !d.rest) { planDay = d; break; }
+        }
+        if (planDay) break;
+      }
     }
 
     // Sprint 11: fallback do PLAN_FLAT
@@ -500,6 +549,7 @@ var avgPace = 0;
         planDay = { type: pf.type, km: pf.km, pace: pf.pace, desc: pf.notes, rest: false };
       }
     }
+
 
     // Check shift matching
     if (!planDay) {
