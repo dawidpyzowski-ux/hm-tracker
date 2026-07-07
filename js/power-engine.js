@@ -94,7 +94,7 @@ var PowerEngine = (function() {
       var dur = a.duration_min || a.moving_time_min;
       if (!dur || dur < minDuration || dur > maxDuration) continue;
 
-      var type = (a.type || '').toLowerCase();
+      var type = ((typeof PlanMatcher !== 'undefined' && PlanMatcher.getEffectiveType ? PlanMatcher.getEffectiveType(a) : a.type) || '').toLowerCase();
       var isQuality = type.indexOf('tempo') >= 0 || type.indexOf('threshold') >= 0 ||
                       type.indexOf('interv') >= 0 || type.indexOf('interw') >= 0 ||
                       type.indexOf('race') >= 0 || type.indexOf('fartlek') >= 0;
