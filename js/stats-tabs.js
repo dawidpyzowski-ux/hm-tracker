@@ -338,9 +338,33 @@ function filterAnalyticsHtml(html, includeKeywords) {
       if (l.pace) h += '<span class="wlog-pace">⏱ ' + l.pace + '/km</span>';
       if (l.hr) h += '<span class="wlog-hr">❤ ' + l.hr + ' bpm</span>';
       if (l.feeling) h += '<span class="wlog-feel">' + (EMO_LOCAL[+l.feeling] || '') + '</span>';
-      if (planned) h += '<span class="wlog-match">✅ ' + planned.type + '</span>';
-      else h += '<span class="wlog-tag">✨ Poza planem</span>';
+     
+      // === Sprint 30: Smart Plan Matcher status ===
+      var actForMatch = { date: date, km: l.distance, pace: l.pace, type: l.type, avg_hr: l.hr, strava_id: l.strava_id };
+      var effective = null;
+      if (typeof PlanMatcher !== 'undefined') {
+        try { effective = PlanMatcher.getEffectivePlan(actForMatch); } catch(e) {}
+      }
+      
+      if (effective && effective.plan) {
+        var confLabel = effective.source === 'override_manual' ? '✍️ ' : 
+                       (effective.confidence_level === 'high' ? '✅ ' :
+                        effective.confidence_level === 'medium' ? '⚠️ ' : '❓ ');
+        h += '<span class="wlog-match" style="cursor:pointer" onclick="event.stopPropagation();PlanOverrideUI.open(' + 
+          JSON.stringify(actForMatch).replace(/"/g, '&quot;') + ')" title="Przypisano: ' + effective.plan.date + ' - ' + effective.plan.type + ' (' + effective.confidence + '%)">' + 
+          confLabel + effective.plan.type + '</span>';
+      } else if (effective && effective.source === 'override_skip') {
+        h += '<span class="wlog-tag" style="cursor:pointer" onclick="event.stopPropagation();PlanOverrideUI.open(' + 
+          JSON.stringify(actForMatch).replace(/"/g, '&quot;') + ')">✍️ Poza planem</span>';
+      } else if (planned) {
+        h += '<span class="wlog-match">✅ ' + planned.type + '</span>';
+      } else {
+        h += '<span class="wlog-tag" style="cursor:pointer" onclick="event.stopPropagation();PlanOverrideUI.open(' + 
+          JSON.stringify(actForMatch).replace(/"/g, '&quot;') + ')">✨ Poza planem</span>';
+      }
+      
       if (hasDet) h += '<span class="wlog-expand-btn">▼ szczegóły</span>';
+
       h += '</div>';
       if (l.notes) h += '<div class="wlog-note">' + l.notes + '</div>';
       if (hasDet) h += '<div class="wlog-detail" id="det-' + l.strava_id + '"></div>';
