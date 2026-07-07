@@ -919,6 +919,79 @@ var DailyCoachEngine = (function() {
     } catch(e) { console.warn(TAG, "Nutrition failed:", e); }
 
 
+    // === Sprint 31: Workout benchmark for latest workout ===
+    var workoutBenchmark = null;
+    var progressionTrends = null;
+    
+    try {
+      if (typeof WorkoutBenchmarker !== "undefined" && typeof PlanMatcher !== "undefined") {
+        // Get most recent workout
+        if (typeof DB !== "undefined" && DB.getAll) {
+          var recentActs = await DB.getAll();
+          var sorted = recentActs.sort(function(a, b) { return b.date.localeCompare(a.date); });
+          var latestWorkout = sorted[0];
+          
+          if (latestWorkout && latestWorkout.strava_id) {
+            // Enrich activity
+            if (typeof S !== "undefined") {
+              var log = S.getLog(latestWorkout.date);
+              if (log) {
+                if (!latestWorkout.pace) latestWorkout.pace = log.pace;
+                if (!latestWorkout.avg_hr) latestWorkout.avg_hr = log.hr;
+              }
+            }
+            
+            var eff = PlanMatcher.getEffectivePlan(latestWorkout);
+            if (eff && eff.plan) {
+              var bmResult = WorkoutBenchmarker.benchmark(latestWorkout, eff.plan);
+              if (bmResult && !bmResult.error) {
+                workoutBenchmark = {
+                  date: latestWorkout.date,
+                  type: eff.plan.type,
+                  execution_score: bmResult.execution_score,
+                  summary: bmResult.summary,
+                  cardiac_drift: bmResult.cardiac_drift.has_data ? bmResult.cardiac_drift.drift_bpm : null,
+                  pace_variance: bmResult.pace_consistency.has_data ? bmResult.pace_consistency.max_deviation_sec : null,
+                  insights_count: bmResult.insights.length,
+                  top_insight: bmResult.insights.length > 0 ? bmResult.insights[0] : null
+                };
+              }
+            }
+          }
+        }
+      }
+    } catch(e) { console.warn(TAG, "WorkoutBenchmark failed:", e); }
+    
+    try {
+      if (typeof WorkoutProgressionTracker !== "undefined") {
+        var prog = await WorkoutProgressionTracker.analyze(30);
+        if (prog) {
+          progressionTrends = {
+            total_workouts: prog.total_workouts,
+            overall_avg: prog.overall_avg,
+            quality_avg: prog.quality_avg,
+            tempo_trend: prog.trends.tempo ? {
+              trend: prog.trends.tempo.trend,
+              avg_score: prog.trends.tempo.avg_score,
+              slope: prog.trends.tempo.slope,
+              pace_variance: prog.trends.tempo.avg_pace_variance,
+              cardiac_drift: prog.trends.tempo.avg_cardiac_drift
+            } : null,
+            intervals_trend: prog.trends.intervals ? {
+              trend: prog.trends.intervals.trend,
+              avg_score: prog.trends.intervals.avg_score,
+              slope: prog.trends.intervals.slope
+            } : null,
+            long_trend: prog.trends.long ? {
+              trend: prog.trends.long.trend,
+              avg_score: prog.trends.long.avg_score,
+              slope: prog.trends.long.slope
+            } : null
+          };
+        }
+      }
+    } catch(e) { console.warn(TAG, "ProgressionTracker failed:", e); }
+
 
 
 
@@ -980,6 +1053,12 @@ var DailyCoachEngine = (function() {
       body: bodyData,
       biomechanics: biomechData,
       
+      // === Sprint 31: Workout benchmark ===
+   
+      workout_benchmark: workoutBenchmark,
+      progression_trends: progressionTrends,
+
+
       // Sprint 25 additions
       recovery_velocity: recoveryVelocity,
       sleep_recovery_score: sleepRecoveryScore,
