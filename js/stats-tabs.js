@@ -271,10 +271,13 @@ function filterAnalyticsHtml(html, includeKeywords) {
           if (typeof PlanOverridesStore !== 'undefined' && PlanOverridesStore.getCompletedPlansMap) {
             try {
               var completedMap = PlanOverridesStore.getCompletedPlansMap();
+
               if (completedMap[dt]) {
-                // Ktoś ręcznie przypisał trening do planu z tego dnia
-                hasShifted = true;
+                // Plan tego dnia jest wypełniony treningiem z innego dnia
+                // Ten fizyczny dzień → miss (nie ma real workout)
+                isSkippedByOverride = true;
               }
+
             } catch(e) {}
           }
           
