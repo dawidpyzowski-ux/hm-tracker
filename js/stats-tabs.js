@@ -367,8 +367,19 @@ function filterAnalyticsHtml(html, includeKeywords) {
 
       h += '</div>';
       if (l.notes) h += '<div class="wlog-note">' + l.notes + '</div>';
+
       if (hasDet) h += '<div class="wlog-detail" id="det-' + l.strava_id + '"></div>';
+      
+      // === Sprint 31: Benchmark button ===
+      var activityId = l.strava_id || l.id;
+      if (activityId) {
+        h += '<div style="margin-top:6px;">';
+        h += '<button onclick="event.stopPropagation();WorkoutBenchmarkUI_showModal(\'' + date + '\',\'' + activityId + '\')" style="background:#7c3aed;color:white;border:none;padding:5px 12px;border-radius:6px;font-size:0.75em;font-weight:600;cursor:pointer;">🎯 Idealny Trening</button>';
+        h += '</div>';
+      }
+      
       h += '</div></div>';
+
     });
     
     return h;
@@ -380,4 +391,64 @@ function filterAnalyticsHtml(html, includeKeywords) {
   }
 
   window.StatsTabs = { render: render, setTab: setTab };
+
+  
+  // === Sprint 31: Modal for benchmark ===
+  window.WorkoutBenchmarkUI_showModal = async function(date, activityId) {
+    if (typeof WorkoutBenchmarkUI === 'undefined') {
+      alert('Benchmark UI not loaded');
+      return;
+    }
+    
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+    
+    overlay.innerHTML = '<div style="background:#111827;border-radius:12px;max-width:700px;width:100%;padding:16px;border:1px solid #374151;margin-top:20px;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #374151;">' +
+      '<h3 style="margin:0;color:#f9fafb;">🎯 Idealny Trening — porównanie</h3>' +
+      '<button onclick="this.closest(\'div[style*=\\\'fixed\\\']\').remove()" style="background:#374151;border:none;color:white;width:32px;height:32px;border-radius:50%;cursor:pointer;">✕</button>' +
+      '</div>' +
+      '<div id="bench-content"><p style="color:#9ca3af;text-align:center;padding:30px;">⏳ Ładuję...</p></div>' +
+      '</div>';
+    
+    document.body.appendChild(overlay);
+    
+    // Load activity data
+    try {
+      var acts = await DB.getAll();
+      var activity = acts.find(function(a) {
+        return String(a.strava_id) === String(activityId) || String(a.id) === String(activityId);
+      });
+      
+      if (!activity) {
+        document.getElementById('bench-content').innerHTML = '<p style="color:#fca5a5;text-align:center;padding:20px;">Nie znaleziono treningu</p>';
+        return;
+      }
+      
+      // Add pace/hr from log if missing
+      var log = S.getLog(date);
+      if (log) {
+        if (!activity.pace) activity.pace = log.pace;
+        if (!activity.avg_hr) activity.avg_hr = log.hr;
+      }
+      
+      // Get plan using PlanMatcher
+      var plan = null;
+      if (typeof PlanMatcher !== 'undefined') {
+        var eff = PlanMatcher.getEffectivePlan(activity);
+        if (eff && eff.plan) plan = eff.plan;
+      }
+      
+      if (!plan && window.PLAN_FLAT) {
+        plan = window.PLAN_FLAT.find(function(p) { return p.date === date; });
+      }
+      
+      document.getElementById('bench-content').innerHTML = WorkoutBenchmarkUI.render(activity, plan);
+    } catch(e) {
+      console.error('Benchmark error:', e);
+      document.getElementById('bench-content').innerHTML = '<p style="color:#fca5a5;text-align:center;padding:20px;">❌ ' + e.message + '</p>';
+    }
+  };
+
 })();
