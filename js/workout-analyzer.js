@@ -339,7 +339,7 @@ function analyzeWorkLaps(classified, planType) {
       var type = (workout.type || "").toLowerCase();
       var sameType = acts.filter(function(a) {
         if (a.date === workout.date) return false;
-        var t = (a.type || "").toLowerCase();
+        var t = ((typeof PlanMatcher !== 'undefined' && PlanMatcher.getEffectiveType ? PlanMatcher.getEffectiveType(a) : a.type) || "").toLowerCase();
         return t.indexOf(type.split("_")[0]) >= 0 && Math.abs(a.km - workout.km) < 3;
       });
       sameType.sort(function(a, b) { return b.date.localeCompare(a.date); });
@@ -391,7 +391,7 @@ function getIntervalRaceGap(workLapAnalysis) {
     var trainScore = null;
     var workLapAnalysis = null;
     
-var planType = (activity.type || "").toLowerCase();
+var planType = ((typeof PlanMatcher !== 'undefined' && PlanMatcher.getEffectiveType ? PlanMatcher.getEffectiveType(activity) : activity.type) || "").toLowerCase();
 
 function isIntervalType(t) {
   return t.indexOf("interv") >= 0 ||
@@ -490,7 +490,7 @@ if (isIntervalType(planType) && typeof TrainScore !== "undefined") {
     var typeMeta = null;
     if (typeof TrainingClassifier !== "undefined") {
       try {
-        typeMeta = TrainingClassifier.classifyWithMetadata(activity.type || activity.workout_type);
+        typeMeta = TrainingClassifier.classifyWithMetadata((typeof PlanMatcher !== 'undefined' && PlanMatcher.getEffectiveType ? PlanMatcher.getEffectiveType(activity) : null) || activity.type || activity.workout_type);
       } catch (e) {}
     }
 
@@ -500,7 +500,7 @@ if (isIntervalType(planType) && typeof TrainScore !== "undefined") {
 
 workout: {
   date: activity.date,
-  type: activity.type || "",
+  type: (typeof PlanMatcher !== 'undefined' && PlanMatcher.getEffectiveType ? PlanMatcher.getEffectiveType(activity) : null) || activity.type || "",
   km: activity.km,
   pace: activity.pace || activity.avg_pace,
   avg_pace: activity.pace || activity.avg_pace,
