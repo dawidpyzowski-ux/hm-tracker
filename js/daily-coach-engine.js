@@ -395,6 +395,45 @@ var DailyCoachEngine = (function() {
     };
   }
 
+
+    // Sprint 30: Include plan overrides info
+    if (typeof PlanOverridesStore !== 'undefined') {
+      var overrides = PlanOverridesStore.getAll();
+      var overridesCount = Object.keys(overrides).length;
+      
+      if (overridesCount > 0) {
+        // Get recent overrides (last 7 days)
+        var weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        var weekAgoStr = weekAgo.toISOString().slice(0, 10);
+        
+        var recentOverrides = [];
+        Object.keys(overrides).forEach(function(actId) {
+          var o = overrides[actId];
+          if (o.activity_date >= weekAgoStr) {
+            recentOverrides.push({
+              activity_date: o.activity_date,
+              matched_plan_date: o.matched_plan_date,
+              matched_plan_type: o.matched_plan_type,
+              matched_by: o.matched_by,
+              is_extra: o.skip_plan
+            });
+          }
+        });
+        
+        if (recentOverrides.length > 0) {
+          if (!training) training = {};
+          training.plan_overrides_recent = recentOverrides;
+          training.plan_overrides_note = "Ostatnio " + recentOverrides.length + 
+            " treningi zostały ręcznie przypisane do innych dni planu";
+        }
+      }
+    }
+
+
+
+
+  
   // ============================================
   // 5. RACE CONTEXT
   // ============================================
