@@ -252,14 +252,59 @@ var PlanMatcher = (function() {
     
     return null;
   }
+
+  // ============================================
+  // GET EFFECTIVE CLASSIFICATION
+  // Używa matched plan zamiast surowej Strava name
+  // ============================================
+  function getEffectiveClassification(activity) {
+    if (!activity) return null;
+    if (typeof TrainingClassifier === 'undefined') return null;
+    
+    // 1. Get effective plan (uses override or auto-match)
+    var effective = getEffectivePlan(activity);
+    
+    // 2. Determine which type to classify
+    var typeToClassify;
+    var source;
+    
+    if (effective && effective.source === 'override_skip') {
+      // User marked as "poza planem" — use raw activity type
+      typeToClassify = activity.type || activity.workout_type;
+      source = 'raw_extra';
+    } else if (effective && effective.plan && effective.plan.type) {
+      // Use matched plan type (bardziej trafne niż Strava name)
+      typeToClassify = effective.plan.type;
+      source = effective.source;
+    } else {
+      // Fallback: raw activity type
+      typeToClassify = activity.type || activity.workout_type;
+      source = 'raw_only';
+    }
+    
+    // 3. Classify
+    var classification = TrainingClassifier.classifyWithMetadata(typeToClassify);
+    
+    return {
+      classification: classification,
+      matched_plan: effective && effective.plan ? effective.plan : null,
+      source: source,
+      confidence: effective ? effective.confidence : null,
+      raw_type: activity.type || activity.workout_type
+    };
+  }
+
   
+
   return {
     HIGH_CONFIDENCE: HIGH_CONFIDENCE,
     MEDIUM_CONFIDENCE: MEDIUM_CONFIDENCE,
     scoreMatch: scoreMatch,
     findBestMatch: findBestMatch,
     getEffectivePlan: getEffectivePlan,
+    getEffectiveClassification: getEffectiveClassification,  // ← NEW
     parsePlanPace: parsePlanPace,
     detectType: detectType
   };
+
 })();
