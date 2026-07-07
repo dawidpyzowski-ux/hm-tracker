@@ -106,4 +106,3 @@ var PlanOverridesStore = (function() {
     getCompletedPlansMap: getCompletedPlansMap
   };
 })();
-`
