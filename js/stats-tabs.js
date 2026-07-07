@@ -261,20 +261,61 @@ function filterAnalyticsHtml(html, includeKeywords) {
         var log = S.getLog(dt);
         var past = dt < t;
         var isToday = dt === t;
+        
         var hasShifted = false;
+        var isSkippedByOverride = false;
+        
         if (!d.rest && d.km > 0 && !log.distance && !log.status) {
-          if (typeof findShiftedLog === 'function') {
+          // === Sprint 30.4: Check PlanOverrides first ===
+          // Jeśli inne aktywności były manualnie przypisane do tego planu, oznacz jako done via override
+          if (typeof PlanOverridesStore !== 'undefined' && PlanOverridesStore.getCompletedPlansMap) {
+            try {
+              var completedMap = PlanOverridesStore.getCompletedPlansMap();
+              if (completedMap[dt]) {
+                // Ktoś ręcznie przypisał trening do planu z tego dnia
+                hasShifted = true;
+              }
+            } catch(e) {}
+          }
+          
+          // === Sprint 30.4: Fuzzy findShiftedLog ALE respektuj overrides ===
+          if (!hasShifted && typeof findShiftedLog === 'function') {
             var sh = findShiftedLog(w.start, we, dt, d.km);
-            if (sh) hasShifted = true;
+            if (sh) {
+              // Sprawdz czy ten shifted log NIE ma już override do INNEGO planu
+              var shiftedIsUsedElsewhere = false;
+              if (typeof PlanOverridesStore !== 'undefined') {
+                try {
+                  var allOverrides = PlanOverridesStore.getAll();
+                  Object.keys(allOverrides).forEach(function(activityId) {
+                    var o = allOverrides[activityId];
+                    // Jeśli activity_date pasuje do shifted log daty i override wskazuje na INNY plan
+                    if (o.activity_date === sh.date && o.matched_plan_date && o.matched_plan_date !== dt && !o.skip_plan) {
+                      shiftedIsUsedElsewhere = true;
+                    }
+                  });
+                } catch(e) {}
+              }
+              
+              if (!shiftedIsUsedElsewhere) {
+                hasShifted = true;
+              } else {
+                // Ten shifted log jest przypisany do innego planu → ten plan jest realnie missed
+                isSkippedByOverride = true;
+              }
+            }
           }
         }
+
+
         var cls = 'hm-cell';
         if (d.rest) cls += ' rest';
         else if (!past && !isToday) cls += ' future';
         else if (log.status === 'done' || hasShifted) cls += ' done';
-        else if (log.status === 'skipped') cls += ' skip';
+        else if (log.status === 'skipped' || isSkippedByOverride) cls += ' skip';
         else if (past) cls += ' miss';
         else cls += ' future';
+
         if (isToday) cls += ' today-cell';
         h += '<div class="' + cls + '" title="' + d.name + ' ' + dt + '"></div>';
       });
