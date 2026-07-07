@@ -204,14 +204,24 @@ var PlanMatcher = (function() {
       var override = PlanOverridesStore.getForActivity(
         activity.strava_id || activity.id
       );
+     
       if (override) {
         if (override.skip_plan) {
           return { source: 'override_skip', plan: null };
         }
-        // Reconstruct plan object from override
+        
+        // Enhance override plan by looking up FULL data from PLAN_FLAT (get notes/desc)
+        var fullPlan = null;
+        if (window.PLAN_FLAT && override.matched_plan_date) {
+          fullPlan = window.PLAN_FLAT.find(function(p) {
+            return p.date === override.matched_plan_date && 
+                   p.type === override.matched_plan_type;
+          });
+        }
+        
         return {
           source: 'override_manual',
-          plan: {
+          plan: fullPlan || {
             date: override.matched_plan_date,
             type: override.matched_plan_type,
             km: override.matched_plan_km,
@@ -221,6 +231,7 @@ var PlanMatcher = (function() {
           matched_by: override.matched_by
         };
       }
+
     }
     
     // 2. Auto-match
