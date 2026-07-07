@@ -24,6 +24,12 @@ var HealthSync = (function() {
     catch(e) { return null; }
   }
 
+
+  function getPlanOverrides() {
+    try { return JSON.parse(localStorage.getItem('plan_overrides') || '{}'); }
+    catch(e) { return {}; }
+  }
+
   
   function getNutritionSettings() {
     try {
@@ -56,6 +62,7 @@ var HealthSync = (function() {
           logs: getCaffeineLogs(),
           settings: getCaffeineSettings()
         },
+        plan_overrides: getPlanOverrides(),  // ← NEW
         meta: {
           updated: new Date().toISOString(),
           version: 4,
@@ -82,7 +89,10 @@ var HealthSync = (function() {
       var nutritionDays = Object.keys(nutritionLogs).length;
 
       var caffeineDays = Object.keys(getCaffeineLogs()).length;
-      console.log("[Sync] ✅ PUSH OK", healthData.length, "health records,", nutritionDays, "nutrition days,", caffeineDays, "caffeine days");
+      
+      var overridesCount = Object.keys(getPlanOverrides()).length;
+      console.log("[Sync] ✅ PUSH OK", healthData.length, "health records,", nutritionDays, "nutrition days,", caffeineDays, "caffeine days,", overridesCount, "overrides");
+
 
       return true;
     } catch (e) {
@@ -131,6 +141,22 @@ var HealthSync = (function() {
         if (record.caffeine.settings && !getCaffeineSettings()) {
           localStorage.setItem('caffeine_settings', JSON.stringify(record.caffeine.settings));
         }
+      }
+
+
+      // === PLAN OVERRIDES MERGE (Sprint 30) ===
+      if (record.plan_overrides && typeof record.plan_overrides === 'object') {
+        var localOv = getPlanOverrides();
+        var mergedOv = Object.assign({}, record.plan_overrides, localOv); // local wins for conflicts (edited recently)
+        // For each key, keep the one with newer ts
+        Object.keys(record.plan_overrides).forEach(function(k) {
+          if (localOv[k] && record.plan_overrides[k]) {
+            var localTs = localOv[k].ts || 0;
+            var cloudTs = record.plan_overrides[k].ts || 0;
+            mergedOv[k] = cloudTs > localTs ? record.plan_overrides[k] : localOv[k];
+          }
+        });
+        localStorage.setItem('plan_overrides', JSON.stringify(mergedOv));
       }
 
       
