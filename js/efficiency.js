@@ -125,17 +125,36 @@ const Efficiency = (() => {
    * ------------------------------------------------------- */
 
 
+
 function classifyTypeSimple(act) {
-    // 1. PRIORYTET: użyj TrainingClassifier jeśli jest dostępny
-    if (typeof TrainingClassifier !== "undefined" && TrainingClassifier.classify) {
-      var fromType = TrainingClassifier.classify(act.type || act.workout_type);
-      if (fromType) {
-        // Mapuj na EF wewnętrzne nazwy
-        if (fromType === "long") return "long_run";
-        if (fromType === "recovery") return "easy";
-        return fromType; // tempo, intervals, easy
+  // === Sprint 30.3: Check PlanMatcher first (uses manual overrides + fuzzy match) ===
+  if (typeof PlanMatcher !== "undefined" && PlanMatcher.getEffectivePlan) {
+    try {
+      var effective = PlanMatcher.getEffectivePlan(act);
+      if (effective && effective.plan && effective.plan.type && !effective.source.includes('skip')) {
+        // Use matched plan type instead of raw Strava name
+        if (typeof TrainingClassifier !== "undefined" && TrainingClassifier.classify) {
+          var fromPlan = TrainingClassifier.classify(effective.plan.type);
+          if (fromPlan) {
+            if (fromPlan === "long") return "long_run";
+            if (fromPlan === "recovery") return "easy";
+            return fromPlan;
+          }
+        }
       }
+    } catch(e) { console.warn('[EF] PlanMatcher error:', e); }
+  }
+  
+  // === Fallback: raw Strava name ===
+  if (typeof TrainingClassifier !== "undefined" && TrainingClassifier.classify) {
+    var fromType = TrainingClassifier.classify(act.type || act.workout_type);
+    if (fromType) {
+      if (fromType === "long") return "long_run";
+      if (fromType === "recovery") return "easy";
+      return fromType; // tempo, intervals, easy
     }
+  }
+
 
     // 2. Fallback: stara klasyfikacja po pace
     const km = parseFloat(act.distance_km || act.km || 0);
