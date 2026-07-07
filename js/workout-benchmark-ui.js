@@ -374,9 +374,130 @@ var WorkoutBenchmarkUI = (function() {
     
     return h;
   }
+
+
+  // ============================================
+  // RENDER PROGRESSION VIEW (trend, all workouts)
+  // ============================================
+  async function renderProgression(daysBack) {
+    daysBack = daysBack || 60;
+    if (typeof WorkoutProgressionTracker === 'undefined') {
+      return '<p style="color:#fca5a5;">ProgressionTracker not loaded</p>';
+    }
+    
+    var data = await WorkoutProgressionTracker.analyze(daysBack);
+    if (!data) return '<p style="color:#9ca3af;text-align:center;padding:30px;">Brak danych do analizy</p>';
+    
+    var h = '';
+    
+    // === Overall summary ===
+    h += '<div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-radius:12px;padding:16px;margin-bottom:12px;border:2px solid #7c3aed;">';
+    h += '<h4 style="margin:0 0 12px;color:#f9fafb;">📈 Execution Trend (' + data.days_analyzed + ' dni)</h4>';
+    
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+    
+    var overallColor = data.overall_avg >= 85 ? '#22c55e' : data.overall_avg >= 70 ? '#f59e0b' : '#ef4444';
+    h += '<div style="background:#374151;padding:12px;border-radius:8px;text-align:center;">';
+    h += '<div style="color:#9ca3af;font-size:0.75em;">Overall Avg</div>';
+    h += '<div style="color:' + overallColor + ';font-size:1.8em;font-weight:bold;">' + data.overall_avg + '</div>';
+    h += '<div style="color:#6b7280;font-size:0.7em;">' + data.total_workouts + ' treningów</div>';
+    h += '</div>';
+    
+    if (data.quality_avg !== null) {
+      var qColor = data.quality_avg >= 85 ? '#22c55e' : data.quality_avg >= 70 ? '#f59e0b' : '#ef4444';
+      h += '<div style="background:#374151;padding:12px;border-radius:8px;text-align:center;">';
+      h += '<div style="color:#9ca3af;font-size:0.75em;">Quality Avg</div>';
+      h += '<div style="color:' + qColor + ';font-size:1.8em;font-weight:bold;">' + data.quality_avg + '</div>';
+      h += '<div style="color:#6b7280;font-size:0.7em;">tempo + intervals</div>';
+      h += '</div>';
+    }
+    
+    h += '</div></div>';
+    
+    // === Per-category trends ===
+    var categoryLabels = {
+      tempo: { emoji: '🔥', label: 'Tempo Runs' },
+      intervals: { emoji: '⚡', label: 'Intervals' },
+      long: { emoji: '🏃', label: 'Long Runs' },
+      easy: { emoji: '🟢', label: 'Easy Runs' },
+      recovery: { emoji: '🧊', label: 'Recovery' }
+    };
+    
+    Object.keys(data.trends).forEach(function(cat) {
+      var trend = data.trends[cat];
+      if (!trend) return;
+      
+      var info = categoryLabels[cat] || { emoji: '📏', label: cat };
+      
+      var trendEmoji = trend.trend === 'improving_strongly' ? '📈' :
+                       trend.trend === 'improving' ? '↗️' :
+                       trend.trend === 'stable' ? '➡️' :
+                       trend.trend === 'declining' ? '↘️' : '📉';
+      
+      var trendColor = trend.trend.indexOf('improving') >= 0 ? '#22c55e' :
+                       trend.trend === 'stable' ? '#3b82f6' : '#f59e0b';
+      
+      var scoreColor = trend.avg_score >= 85 ? '#22c55e' : 
+                       trend.avg_score >= 70 ? '#f59e0b' : '#ef4444';
+      
+      h += '<div style="background:#1f2937;border-radius:10px;padding:12px;margin-bottom:10px;">';
+      
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+      h += '<div style="color:#f9fafb;font-weight:600;">' + info.emoji + ' ' + info.label + '</div>';
+      h += '<div style="color:' + trendColor + ';font-size:0.85em;">' + trendEmoji + ' ' + trend.trend + '</div>';
+      h += '</div>';
+      
+      // Mini chart of last scores
+      var maxScore = Math.max.apply(null, trend.recent_scores);
+      var minScore = Math.min.apply(null, trend.recent_scores);
+      var scoreRange = Math.max(20, maxScore - minScore);
+      
+      h += '<div style="display:flex;align-items:flex-end;gap:4px;height:60px;margin-bottom:10px;background:#0f172a;border-radius:6px;padding:6px;">';
+      trend.recent_scores.forEach(function(s) {
+        var pct = ((s - minScore) / scoreRange * 80) + 20; // min 20% height
+        var barColor = s >= 85 ? '#22c55e' : s >= 70 ? '#f59e0b' : '#ef4444';
+        h += '<div style="flex:1;background:' + barColor + ';height:' + pct + '%;border-radius:2px;position:relative;" title="' + s + '">';
+        h += '<div style="position:absolute;top:-16px;left:0;right:0;text-align:center;color:#f9fafb;font-size:0.65em;">' + s + '</div>';
+        h += '</div>';
+      });
+      h += '</div>';
+      
+      // Stats row
+      h += '<div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:6px;color:#9ca3af;font-size:0.75em;">';
+      h += '<div>📊 Avg: <b style="color:' + scoreColor + '">' + trend.avg_score + '</b></div>';
+      h += '<div>🎯 Slope: <b style="color:' + trendColor + '">' + (trend.slope > 0 ? '+' : '') + trend.slope + '/session</b></div>';
+      
+      if (trend.avg_pace_variance !== null) {
+        var varColor = trend.avg_pace_variance <= 5 ? '#22c55e' : trend.avg_pace_variance <= 15 ? '#f59e0b' : '#ef4444';
+        h += '<div>⏱ Variance: <b style="color:' + varColor + '">±' + trend.avg_pace_variance + 's</b></div>';
+      }
+      
+      if (trend.avg_cardiac_drift !== null) {
+        var driftColor = trend.avg_cardiac_drift <= 7 ? '#22c55e' : trend.avg_cardiac_drift <= 12 ? '#f59e0b' : '#ef4444';
+        h += '<div>❤️ Drift: <b style="color:' + driftColor + '">+' + trend.avg_cardiac_drift + ' bpm</b></div>';
+      }
+      
+      h += '</div>';
+      
+      // Best/worst
+      h += '<div style="display:flex;justify-content:space-between;color:#6b7280;font-size:0.7em;margin-top:6px;padding-top:6px;border-top:1px solid #374151;">';
+      h += '<span>🏆 Best: ' + trend.best.date + ' (' + trend.best.score + ')</span>';
+      h += '<span>Worst: ' + trend.worst.date + ' (' + trend.worst.score + ')</span>';
+      h += '</div>';
+      
+      h += '</div>';
+    });
+    
+    return h;
+  }
+
+
   
-  return {
+
+return {
     render: render,
-    renderCompact: renderCompact
+    renderCompact: renderCompact,
+    renderProgression: renderProgression
   };
+
 })();
