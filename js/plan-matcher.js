@@ -306,6 +306,25 @@ var PlanMatcher = (function() {
   }
 
   
+  // ============================================
+  // GET EFFECTIVE TYPE (simplest wrapper for other modules)
+  // Returns string: matched plan type OR raw activity type
+  // ============================================
+  function getEffectiveType(activity) {
+    if (!activity) return null;
+    
+    // Try PlanMatcher first
+    try {
+      var eff = getEffectivePlan(activity);
+      if (eff && eff.plan && eff.plan.type && !eff.source.includes('skip')) {
+        return eff.plan.type;
+      }
+    } catch(e) {}
+    
+    // Fallback: raw activity type
+    return activity.type || activity.workout_type || null;
+  }
+
 
   return {
     HIGH_CONFIDENCE: HIGH_CONFIDENCE,
@@ -315,6 +334,7 @@ var PlanMatcher = (function() {
     getEffectivePlan: getEffectivePlan,
     getEffectiveClassification: getEffectiveClassification,  // ← NEW
     parsePlanPace: parsePlanPace,
+    getEffectiveType: getEffectiveType,
     detectType: detectType
   };
 
