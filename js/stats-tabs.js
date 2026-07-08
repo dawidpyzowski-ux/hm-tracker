@@ -287,18 +287,22 @@ function filterAnalyticsHtml(html, includeKeywords) {
             if (sh) {
               // Sprawdz czy ten shifted log NIE ma już override do INNEGO planu
               var shiftedIsUsedElsewhere = false;
+         
               if (typeof PlanOverridesStore !== 'undefined') {
                 try {
                   var allOverrides = PlanOverridesStore.getAll();
                   Object.keys(allOverrides).forEach(function(activityId) {
                     var o = allOverrides[activityId];
-                    // Jeśli activity_date pasuje do shifted log daty i override wskazuje na INNY plan
-                    if (o.activity_date === sh.date && o.matched_plan_date && o.matched_plan_date !== dt && !o.skip_plan) {
+                    // Jeśli shifted log (Pn) MA override — cokolwiek by nie było wskazane:
+                    // to znaczy że został "zaadresowany" gdzie indziej,
+                    // NIE możemy go liczyć jako shift do tego dnia (Wt)
+                    if (o.activity_date === sh.date && !o.skip_plan) {
                       shiftedIsUsedElsewhere = true;
                     }
                   });
                 } catch(e) {}
               }
+
               
               if (!shiftedIsUsedElsewhere) {
                 hasShifted = true;
