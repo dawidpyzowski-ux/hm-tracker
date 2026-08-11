@@ -119,7 +119,7 @@ return{splits:d.splits_metric||[],laps:d.laps||[],cadence:d.average_cadence||nul
         if(pageActs.length<100)break;
       }
       const acts=allActs;
-      const acts=await r.json();
+      
       if(!Array.isArray(acts))return 0;
       const runs=acts.filter(a=>a.type==='Run'||a.sport_type==='Run');
 
