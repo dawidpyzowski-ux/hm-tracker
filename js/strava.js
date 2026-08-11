@@ -109,8 +109,16 @@ return{splits:d.splits_metric||[],laps:d.laps||[],cadence:d.average_cadence||nul
     const token=await this.getToken();if(!token)return 0;
     let count=0;
     try{
-      const after=Math.floor(new Date('2026-04-13')/1000);
-      const r=await fetch('https://www.strava.com/api/v3/athlete/activities?after='+after+'&per_page=100',{headers:{'Authorization':'Bearer '+token}});
+      // Fetch najnowsze (Strava DESC bez 'after') + paginacja
+      let allActs=[];
+      for(let page=1;page<=3;page++){
+        const r=await fetch('https://www.strava.com/api/v3/athlete/activities?per_page=100&page='+page,{headers:{'Authorization':'Bearer '+token}});
+        const pageActs=await r.json();
+        if(!Array.isArray(pageActs)||pageActs.length===0)break;
+        allActs=allActs.concat(pageActs);
+        if(pageActs.length<100)break;
+      }
+      const acts=allActs;
       const acts=await r.json();
       if(!Array.isArray(acts))return 0;
       const runs=acts.filter(a=>a.type==='Run'||a.sport_type==='Run');
